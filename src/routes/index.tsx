@@ -1,15 +1,14 @@
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useLiveQuery } from "@tanstack/react-db";
-import { Plus, FileText, Trash2 } from "lucide-react";
+import { Plus, Trash2 } from "lucide-react";
 import { pageCollection } from "@/client/tanstack-db";
+import { NewPageOptions } from "@/client/components/NewPageOptions";
 
 export const Route = createFileRoute("/")({
   component: Home,
 });
 
 function Home() {
-  const navigate = useNavigate();
-
   // Live query that updates automatically when data changes (sorted by updatedAt desc)
   const {
     data: pages,
@@ -20,18 +19,6 @@ function Home() {
       .from({ page: pageCollection })
       .orderBy(({ page }) => page.updatedAt, "desc"),
   );
-
-  const handleNewPage = () => {
-    const id = crypto.randomUUID();
-    const now = new Date().toISOString();
-    pageCollection.insert({
-      id,
-      title: "Untitled",
-      createdAt: now,
-      updatedAt: now,
-    });
-    navigate({ to: "/page/$pageId", params: { pageId: id } });
-  };
 
   const handleDeletePage = (e: React.MouseEvent, pageId: string) => {
     e.preventDefault();
@@ -57,26 +44,18 @@ function Home() {
         {/* Header - desktop only */}
         <div className="hidden md:flex items-center justify-between py-4">
           <h1 className="text-2xl font-bold text-base-content">Pages</h1>
-          <button onClick={handleNewPage} className="btn btn-primary gap-2">
-            <Plus className="h-4 w-4" />
-            New Page
-          </button>
+          {pages && pages.length > 0 && (
+            <Link to="/new" className="btn btn-primary gap-2">
+              <Plus className="h-4 w-4" />
+              New Page
+            </Link>
+          )}
         </div>
 
         {/* Page list */}
         {!pages || pages.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-16 text-center">
-            <FileText className="h-16 w-16 text-base-content/30 mb-4" />
-            <h2 className="text-xl font-semibold text-base-content mb-2">
-              No pages yet
-            </h2>
-            <p className="text-base-content/60 mb-6">
-              Create your first page to get started writing.
-            </p>
-            <button onClick={handleNewPage} className="btn btn-primary gap-2">
-              <Plus className="h-4 w-4" />
-              Create Page
-            </button>
+          <div className="py-8">
+            <NewPageOptions />
           </div>
         ) : (
           <div className="space-y-2">
@@ -119,13 +98,13 @@ function Home() {
       </div>
 
       {/* Mobile: FAB for creating pages */}
-      <button
-        onClick={handleNewPage}
+      <Link
+        to="/new"
         className="md:hidden fixed bottom-24 right-4 z-40 w-14 h-14 bg-primary text-primary-content rounded-xl flex items-center justify-center shadow-lg border border-base-content/10"
         aria-label="Create new page"
       >
         <Plus className="w-6 h-6" />
-      </button>
+      </Link>
     </div>
   );
 }
