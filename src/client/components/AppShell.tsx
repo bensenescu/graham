@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Outlet, useNavigate, useLocation, Link } from "@tanstack/react-router";
 import { Plus, Menu, FileText } from "lucide-react";
 import { SidebarNav } from "./Sidebar";
@@ -58,25 +58,82 @@ function MobileNavbarRight() {
 
 /**
  * AppShell provides the main layout structure for the app:
- * - Responsive drawer (hamburger on mobile, always-open sidebar on desktop)
+ * - Drawer that opens on hover (desktop) or hamburger tap (mobile)
  * - Mobile navbar with page title and route-specific actions
  * - Main content area
  */
 export function AppShell() {
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const pageTitle = usePageTitle();
+  const hoverZoneRef = useRef<HTMLDivElement>(null);
+  const sidebarRef = useRef<HTMLDivElement>(null);
+  const closeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Handle hover behavior for desktop
+  useEffect(() => {
+    const hoverZone = hoverZoneRef.current;
+    const sidebar = sidebarRef.current;
+
+    if (!hoverZone || !sidebar) return;
+
+    const handleMouseEnter = () => {
+      // Clear any pending close timeout
+      if (closeTimeoutRef.current) {
+        clearTimeout(closeTimeoutRef.current);
+        closeTimeoutRef.current = null;
+      }
+      setIsDrawerOpen(true);
+    };
+
+    const handleMouseLeave = () => {
+      // Delay closing to allow mouse to move to sidebar
+      closeTimeoutRef.current = setTimeout(() => {
+        setIsDrawerOpen(false);
+      }, 150);
+    };
+
+    const handleSidebarEnter = () => {
+      // Clear close timeout when entering sidebar
+      if (closeTimeoutRef.current) {
+        clearTimeout(closeTimeoutRef.current);
+        closeTimeoutRef.current = null;
+      }
+    };
+
+    const handleSidebarLeave = () => {
+      // Close when leaving sidebar
+      closeTimeoutRef.current = setTimeout(() => {
+        setIsDrawerOpen(false);
+      }, 150);
+    };
+
+    hoverZone.addEventListener("mouseenter", handleMouseEnter);
+    hoverZone.addEventListener("mouseleave", handleMouseLeave);
+    sidebar.addEventListener("mouseenter", handleSidebarEnter);
+    sidebar.addEventListener("mouseleave", handleSidebarLeave);
+
+    return () => {
+      hoverZone.removeEventListener("mouseenter", handleMouseEnter);
+      hoverZone.removeEventListener("mouseleave", handleMouseLeave);
+      sidebar.removeEventListener("mouseenter", handleSidebarEnter);
+      sidebar.removeEventListener("mouseleave", handleSidebarLeave);
+      if (closeTimeoutRef.current) {
+        clearTimeout(closeTimeoutRef.current);
+      }
+    };
+  }, []);
 
   return (
-    <div className="drawer md:drawer-open h-screen overflow-hidden">
-      <input
-        id="mobile-drawer"
-        type="checkbox"
-        className="drawer-toggle"
-        checked={isDrawerOpen}
-        onChange={(e) => setIsDrawerOpen(e.target.checked)}
+    <div className="relative h-screen overflow-hidden">
+      {/* Hover zone - invisible area on left edge to trigger sidebar (desktop only) */}
+      <div
+        ref={hoverZoneRef}
+        className="hidden md:block fixed left-0 top-0 w-3 h-full z-40"
       />
-      <div className="drawer-content flex flex-col h-screen overflow-hidden">
-        {/* Mobile navbar - hidden on desktop */}
+
+      {/* Main content area */}
+      <div className="flex flex-col h-screen overflow-hidden">
+        {/* Mobile navbar */}
         <div className="navbar bg-base-100 border-b border-base-300 px-4 min-h-14 flex-shrink-0 md:hidden">
           <div className="flex-none">
             <button
@@ -104,14 +161,28 @@ export function AppShell() {
         </div>
       </div>
 
-      <div className="drawer-side z-50">
-        <label
-          htmlFor="mobile-drawer"
-          aria-label="close sidebar"
-          className="drawer-overlay"
+      {/* Overlay - shown when drawer is open on mobile */}
+      {isDrawerOpen && (
+        <div
+          className="md:hidden fixed inset-0 bg-black/50 z-40"
+          onClick={() => setIsDrawerOpen(false)}
         />
-        <div className="sidebar w-72 min-h-full bg-base-100 border-r border-base-300">
-          <SidebarNav onNavigate={() => setIsDrawerOpen(false)} />
+      )}
+
+      {/* Sidebar drawer with extended hover area */}
+      <div
+        ref={sidebarRef}
+        className={`fixed top-0 left-0 h-full z-50 transform transition-transform duration-200 ease-out ${
+          isDrawerOpen ? "translate-x-0" : "-translate-x-full"
+        }`}
+      >
+        <div className="flex h-full">
+          {/* Actual sidebar */}
+          <div className="w-72 h-full bg-base-100 border-r border-base-300">
+            <SidebarNav onNavigate={() => setIsDrawerOpen(false)} />
+          </div>
+          {/* Invisible extended hover area (desktop only) */}
+          <div className="hidden md:block w-8 h-full" />
         </div>
       </div>
     </div>
