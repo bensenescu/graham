@@ -14,14 +14,28 @@ import { useAIReview } from "@/client/hooks/useAIReview";
 import { useBlockPositions } from "@/client/hooks/useBlockPositions";
 import type { PageBlock } from "@/types/schemas/pages";
 
+type ReviewTab = "configure" | "overall" | "detailed";
+
+interface PageSearchParams {
+  tab?: ReviewTab;
+}
+
 export const Route = createFileRoute("/page/$pageId")({
   component: PageEditor,
   // Remount component when pageId changes to reset all state
   remountDeps: ({ params }) => params.pageId,
+  validateSearch: (search: Record<string, unknown>): PageSearchParams => {
+    const tab = search.tab as string | undefined;
+    if (tab === "configure" || tab === "overall" || tab === "detailed") {
+      return { tab };
+    }
+    return {};
+  },
 });
 
 function PageEditor() {
   const { pageId } = Route.useParams();
+  const { tab: initialTab } = Route.useSearch();
   const navigate = useNavigate();
   const { open: openDrawer } = useDrawer();
   const titleDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -255,11 +269,13 @@ function PageEditor() {
           defaultMainWidth={50}
           sidePanel={
             <AIReviewPanel
+              pageId={pageId}
               blocks={sortedBlocks}
               reviews={reviews}
               blockPositions={blockPositions}
               activeBlockId={activeBlockId}
               isReviewingAll={isReviewingAll}
+              initialTab={initialTab}
               onClose={closePanel}
               onBlockClick={handlePanelBlockClick}
               onReReview={reviewBlock}
