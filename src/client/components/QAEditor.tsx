@@ -17,35 +17,41 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { QABlock } from "./QABlock";
-import type {
-  QABlock as QABlockType,
-  PageContent,
-} from "@/types/schemas/pages";
+import type { PageBlock } from "@/types/schemas/pages";
 import {
   generateDefaultSortKey,
   generateSortKeyBetween,
 } from "@/client/lib/fractional-indexing";
 
 interface QAEditorProps {
-  content: PageContent;
-  onContentChange: (content: PageContent) => void;
+  pageId: string;
+  blocks: PageBlock[];
+  onBlockCreate: (block: PageBlock) => void;
+  onBlockUpdate: (id: string, updates: Partial<PageBlock>) => void;
+  onBlockDelete: (id: string) => void;
 }
 
-export function QAEditor({ content, onContentChange }: QAEditorProps) {
+export function QAEditor({
+  pageId,
+  blocks,
+  onBlockCreate,
+  onBlockUpdate,
+  onBlockDelete,
+}: QAEditorProps) {
   // Local state for editing - this prevents re-renders from parent on every keystroke
-  const [localBlocks, setLocalBlocks] = useState<QABlockType[]>(content.blocks);
+  const [localBlocks, setLocalBlocks] = useState<PageBlock[]>(blocks);
   const debounceTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const sensors = useDraggableSensors();
 
-  // Sync local state when content changes from parent (e.g., initial load, external changes)
+  // Sync local state when blocks change from parent (e.g., initial load, external changes)
   useEffect(() => {
     // Only update if the blocks are actually different (by comparing JSON)
     const localJson = JSON.stringify(localBlocks);
-    const contentJson = JSON.stringify(content.blocks);
-    if (localJson !== contentJson) {
-      setLocalBlocks(content.blocks);
+    const blocksJson = JSON.stringify(blocks);
+    if (localJson !== blocksJson) {
+      setLocalBlocks(blocks);
     }
-  }, [content.blocks]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [blocks]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Sort blocks by sortKey in descending order (higher = top)
   const sortedBlocks = useMemo(() => {
@@ -55,121 +61,97 @@ export function QAEditor({ content, onContentChange }: QAEditorProps) {
   }, [localBlocks]);
 
   // Debounced save to parent
-  const debouncedSave = useCallback(
-    (newBlocks: QABlockType[]) => {
+  const debouncedUpdate = useCallback(
+    (id: string, updates: Partial<PageBlock>) => {
       if (debounceTimeoutRef.current) {
         clearTimeout(debounceTimeoutRef.current);
       }
       debounceTimeoutRef.current = setTimeout(() => {
-        onContentChange({ blocks: newBlocks });
+        onBlockUpdate(id, updates);
       }, 500);
     },
-    [onContentChange],
-  );
-
-  // Immediate save to parent (for structural changes like add/delete/reorder)
-  const immediateSave = useCallback(
-    (newBlocks: QABlockType[]) => {
-      if (debounceTimeoutRef.current) {
-        clearTimeout(debounceTimeoutRef.current);
-      }
-      onContentChange({ blocks: newBlocks });
-    },
-    [onContentChange],
+    [onBlockUpdate],
   );
 
   const handleQuestionChange = useCallback(
     (id: string, question: string) => {
-      setLocalBlocks((prev) => {
-        const newBlocks = prev.map((block) =>
-          block.id === id ? { ...block, question } : block,
-        );
-        debouncedSave(newBlocks);
-        return newBlocks;
-      });
+      setLocalBlocks((prev) =>
+        prev.map((block) => (block.id === id ? { ...block, question } : block)),
+      );
+      debouncedUpdate(id, { question });
     },
-    [debouncedSave],
+    [debouncedUpdate],
   );
 
   const handleAnswerChange = useCallback(
     (id: string, answer: string) => {
-      setLocalBlocks((prev) => {
-        const newBlocks = prev.map((block) =>
-          block.id === id ? { ...block, answer } : block,
-        );
-        debouncedSave(newBlocks);
-        return newBlocks;
-      });
+      setLocalBlocks((prev) =>
+        prev.map((block) => (block.id === id ? { ...block, answer } : block)),
+      );
+      debouncedUpdate(id, { answer });
     },
-    [debouncedSave],
+    [debouncedUpdate],
   );
 
   const handleDelete = useCallback(
     (id: string) => {
-      setLocalBlocks((prev) => {
-        const newBlocks = prev.filter((block) => block.id !== id);
-        immediateSave(newBlocks);
-        return newBlocks;
-      });
+      setLocalBlocks((prev) => prev.filter((block) => block.id !== id));
+      onBlockDelete(id);
     },
-    [immediateSave],
+    [onBlockDelete],
   );
 
   const handleAddBlock = useCallback(() => {
-    setLocalBlocks((prev) => {
-      // Sort to find the lowest sortKey
-      const sorted = [...prev].sort((a, b) =>
+    // Sort to find the lowest sortKey
+    const sorted = [...localBlocks].sort((a, b) =>
+      b.sortKey > a.sortKey ? 1 : b.sortKey < a.sortKey ? -1 : 0,
+    );
+    const lowestSortKey = sorted[sorted.length - 1]?.sortKey;
+    const newSortKey = lowestSortKey
+      ? "!" + lowestSortKey // Below the lowest
+      : generateDefaultSortKey();
+
+    const newBlock: PageBlock = {
+      id: crypto.randomUUID(),
+      pageId,
+      question: "",
+      answer: "",
+      sortKey: newSortKey,
+    };
+
+    setLocalBlocks((prev) => [...prev, newBlock]);
+    onBlockCreate(newBlock);
+  }, [localBlocks, pageId, onBlockCreate]);
+
+  const handleAddAfter = useCallback(
+    (afterId: string) => {
+      // Sort to find positions
+      const sorted = [...localBlocks].sort((a, b) =>
         b.sortKey > a.sortKey ? 1 : b.sortKey < a.sortKey ? -1 : 0,
       );
-      const lowestSortKey = sorted[sorted.length - 1]?.sortKey;
-      const newSortKey = lowestSortKey
-        ? "!" + lowestSortKey // Below the lowest
-        : generateDefaultSortKey();
+      const blockIndex = sorted.findIndex((b) => b.id === afterId);
+      if (blockIndex === -1) return;
 
-      const newBlock: QABlockType = {
+      const afterBlock = sorted[blockIndex];
+      const belowBlock = sorted[blockIndex + 1];
+
+      const newSortKey = generateSortKeyBetween(
+        belowBlock?.sortKey,
+        afterBlock.sortKey,
+      );
+
+      const newBlock: PageBlock = {
         id: crypto.randomUUID(),
+        pageId,
         question: "",
         answer: "",
         sortKey: newSortKey,
       };
 
-      const newBlocks = [...prev, newBlock];
-      immediateSave(newBlocks);
-      return newBlocks;
-    });
-  }, [immediateSave]);
-
-  const handleAddAfter = useCallback(
-    (afterId: string) => {
-      setLocalBlocks((prev) => {
-        // Sort to find positions
-        const sorted = [...prev].sort((a, b) =>
-          b.sortKey > a.sortKey ? 1 : b.sortKey < a.sortKey ? -1 : 0,
-        );
-        const blockIndex = sorted.findIndex((b) => b.id === afterId);
-        if (blockIndex === -1) return prev;
-
-        const afterBlock = sorted[blockIndex];
-        const belowBlock = sorted[blockIndex + 1];
-
-        const newSortKey = generateSortKeyBetween(
-          belowBlock?.sortKey,
-          afterBlock.sortKey,
-        );
-
-        const newBlock: QABlockType = {
-          id: crypto.randomUUID(),
-          question: "",
-          answer: "",
-          sortKey: newSortKey,
-        };
-
-        const newBlocks = [...prev, newBlock];
-        immediateSave(newBlocks);
-        return newBlocks;
-      });
+      setLocalBlocks((prev) => [...prev, newBlock]);
+      onBlockCreate(newBlock);
     },
-    [immediateSave],
+    [localBlocks, pageId, onBlockCreate],
   );
 
   const handleDragEnd = useCallback(
@@ -178,38 +160,34 @@ export function QAEditor({ content, onContentChange }: QAEditorProps) {
 
       if (!over || active.id === over.id) return;
 
-      setLocalBlocks((prev) => {
-        const sorted = [...prev].sort((a, b) =>
-          b.sortKey > a.sortKey ? 1 : b.sortKey < a.sortKey ? -1 : 0,
-        );
+      const sorted = [...localBlocks].sort((a, b) =>
+        b.sortKey > a.sortKey ? 1 : b.sortKey < a.sortKey ? -1 : 0,
+      );
 
-        const draggedIndex = sorted.findIndex(
-          (block) => block.id === active.id,
-        );
-        const targetIndex = sorted.findIndex((block) => block.id === over.id);
+      const draggedIndex = sorted.findIndex((block) => block.id === active.id);
+      const targetIndex = sorted.findIndex((block) => block.id === over.id);
 
-        if (draggedIndex === -1 || targetIndex === -1) return prev;
+      if (draggedIndex === -1 || targetIndex === -1) return;
 
-        const { beforeBlock, afterBlock } = calculateNewPosition(
-          sorted,
-          draggedIndex,
-          targetIndex,
-        );
+      const { beforeBlock, afterBlock } = calculateNewPosition(
+        sorted,
+        draggedIndex,
+        targetIndex,
+      );
 
-        const newSortKey = generateSortKeyBetween(
-          afterBlock?.sortKey,
-          beforeBlock?.sortKey,
-        );
+      const newSortKey = generateSortKeyBetween(
+        afterBlock?.sortKey,
+        beforeBlock?.sortKey,
+      );
 
-        const newBlocks = prev.map((block) =>
+      setLocalBlocks((prev) =>
+        prev.map((block) =>
           block.id === active.id ? { ...block, sortKey: newSortKey } : block,
-        );
-
-        immediateSave(newBlocks);
-        return newBlocks;
-      });
+        ),
+      );
+      onBlockUpdate(active.id as string, { sortKey: newSortKey });
     },
-    [immediateSave],
+    [localBlocks, onBlockUpdate],
   );
 
   return (
@@ -272,10 +250,10 @@ export function QAEditor({ content, onContentChange }: QAEditorProps) {
 }
 
 function calculateNewPosition(
-  blocks: QABlockType[],
+  blocks: PageBlock[],
   draggedIndex: number,
   targetIndex: number,
-): { beforeBlock?: QABlockType; afterBlock?: QABlockType } {
+): { beforeBlock?: PageBlock; afterBlock?: PageBlock } {
   const isMovingDown = draggedIndex < targetIndex;
 
   if (isMovingDown) {

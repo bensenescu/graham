@@ -21,7 +21,6 @@ async function create(userId: string, data: CreatePageInput) {
     id: data.id,
     userId,
     title: data.title,
-    content: data.content ?? "",
   });
 
   return { success: true };
@@ -41,7 +40,6 @@ async function update(userId: string, data: UpdatePageInput) {
   // Prepare update data
   const updateData = {
     title: data.title ?? existingPage.title,
-    content: data.content ?? existingPage.content,
   };
 
   await PageRepository.update(data.id, userId, updateData);

@@ -36,7 +36,6 @@ function MobileNavbarRight() {
       pageCollection.insert({
         id,
         title: "Untitled",
-        content: "",
         createdAt: now,
         updatedAt: now,
       });

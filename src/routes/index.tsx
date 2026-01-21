@@ -1,6 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useLiveQuery } from "@tanstack/react-db";
-import { useMemo } from "react";
 import { Plus, FileText, Trash2 } from "lucide-react";
 import { pageCollection } from "@/client/tanstack-db";
 
@@ -11,21 +10,16 @@ export const Route = createFileRoute("/")({
 function Home() {
   const navigate = useNavigate();
 
-  // Live query that updates automatically when data changes
+  // Live query that updates automatically when data changes (sorted by updatedAt desc)
   const {
     data: pages,
     isLoading,
     isError,
-  } = useLiveQuery((q) => q.from({ page: pageCollection }));
-
-  // Sort pages by updatedAt (most recent first)
-  const sortedPages = useMemo(() => {
-    return [...(pages ?? [])].sort((a, b) => {
-      const dateA = new Date(a.updatedAt ?? 0).getTime();
-      const dateB = new Date(b.updatedAt ?? 0).getTime();
-      return dateB - dateA;
-    });
-  }, [pages]);
+  } = useLiveQuery((q) =>
+    q
+      .from({ page: pageCollection })
+      .orderBy(({ page }) => page.updatedAt, "desc"),
+  );
 
   const handleNewPage = () => {
     const id = crypto.randomUUID();
@@ -33,7 +27,6 @@ function Home() {
     pageCollection.insert({
       id,
       title: "Untitled",
-      content: "",
       createdAt: now,
       updatedAt: now,
     });
@@ -71,7 +64,7 @@ function Home() {
         </div>
 
         {/* Page list */}
-        {sortedPages.length === 0 ? (
+        {!pages || pages.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 text-center">
             <FileText className="h-16 w-16 text-base-content/30 mb-4" />
             <h2 className="text-xl font-semibold text-base-content mb-2">
@@ -87,7 +80,7 @@ function Home() {
           </div>
         ) : (
           <div className="space-y-2">
-            {sortedPages.map((page) => (
+            {pages.map((page) => (
               <Link
                 key={page.id}
                 to="/page/$pageId"

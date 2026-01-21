@@ -2,10 +2,10 @@ import { useRef, useEffect, useCallback } from "react";
 import { GripVertical, Trash2 } from "lucide-react";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import type { QABlock as QABlockType } from "@/types/schemas/pages";
+import type { PageBlock } from "@/types/schemas/pages";
 
 interface QABlockProps {
-  block: QABlockType;
+  block: PageBlock;
   onQuestionChange: (id: string, question: string) => void;
   onAnswerChange: (id: string, answer: string) => void;
   onDelete: (id: string) => void;

@@ -111,3 +111,24 @@ function generateKeyBetween(before: string, after: string): string {
   // This gives us: before < before + "n" < after (assuming before + "n" < after)
   return before + "n";
 }
+
+/**
+ * Generate a sort key for a specific index in a list of a known total length.
+ * Used when creating blocks from templates where we know all positions upfront.
+ *
+ * Since list is sorted DESC (higher = top), we generate keys so that:
+ * - Index 0 gets the highest key (appears at top)
+ * - Index N-1 gets the lowest key (appears at bottom)
+ */
+export function generateSortKeyAtIndex(
+  index: number,
+  totalLength: number,
+): string {
+  // Use a base that gives us room between indices
+  // Start from a high base and decrease for each position
+  const base = "z".repeat(3); // Start with "zzz" as highest
+  const position = totalLength - index; // Invert so 0 -> highest
+
+  // Pad position to ensure consistent ordering
+  return base + position.toString().padStart(6, "0");
+}
