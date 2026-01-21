@@ -107,16 +107,6 @@ export const ycApplicationTemplate: Template = {
         "What convinced you to apply to Y Combinator? Did someone encourage you to apply? Have you been to any YC events?",
       section: "Curious",
     },
-    {
-      question: "How did you hear about Y Combinator?",
-      section: "Curious",
-    },
-
-    // Batch Preference
-    {
-      question: "What batch do you want to apply for?",
-      section: "Batch Preference",
-    },
   ],
 };
 

@@ -1,12 +1,17 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useLiveQuery, eq } from "@tanstack/react-db";
-import { useState, useCallback, useMemo } from "react";
-import { ArrowLeft, Trash2 } from "lucide-react";
+import { useCallback, useMemo, useRef } from "react";
+import { Menu, Trash2, Sparkles, MoreVertical } from "lucide-react";
+import { useDrawer } from "@/client/contexts/DrawerContext";
 import {
   pageCollection,
   createPageBlockCollection,
 } from "@/client/tanstack-db";
-import { QAEditor } from "@/client/components/QAEditor";
+import { QADocumentEditor } from "@/client/components/QADocumentEditor";
+import { AIReviewPanel } from "@/client/components/AIReviewPanel";
+import { ResizablePanelLayout } from "@/client/components/ResizablePanelLayout";
+import { useAIReview } from "@/client/hooks/useAIReview";
+import { useBlockPositions } from "@/client/hooks/useBlockPositions";
 import type { PageBlock } from "@/types/schemas/pages";
 
 export const Route = createFileRoute("/page/$pageId")({
@@ -18,8 +23,11 @@ export const Route = createFileRoute("/page/$pageId")({
 function PageEditor() {
   const { pageId } = Route.useParams();
   const navigate = useNavigate();
-  const [isEditingTitle, setIsEditingTitle] = useState(false);
-  const [titleInput, setTitleInput] = useState("");
+  const { open: openDrawer } = useDrawer();
+  const titleDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Ref for the scroll container (passed to ResizablePanelLayout)
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   // Create block collection for this page
   const blockCollection = useMemo(
@@ -38,33 +46,45 @@ function PageEditor() {
   );
 
   const page = pages?.[0];
+  const sortedBlocks = useMemo(() => {
+    return [...(blocks ?? [])].sort((a, b) =>
+      b.sortKey > a.sortKey ? 1 : b.sortKey < a.sortKey ? -1 : 0,
+    );
+  }, [blocks]);
 
-  const handleTitleClick = useCallback(() => {
-    if (page) {
-      setTitleInput(page.title || "");
-      setIsEditingTitle(true);
-    }
-  }, [page]);
+  // Get block IDs in display order
+  const blockIds = useMemo(() => sortedBlocks.map((b) => b.id), [sortedBlocks]);
 
-  const handleTitleSubmit = useCallback(() => {
-    if (page && titleInput.trim()) {
-      pageCollection.update(pageId, (draft) => {
-        draft.title = titleInput.trim();
-        draft.updatedAt = new Date().toISOString();
-      });
-    }
-    setIsEditingTitle(false);
-  }, [page, pageId, titleInput]);
+  // Track block positions for syncing review panel
+  const blockPositions = useBlockPositions(scrollContainerRef, blockIds);
 
-  const handleTitleKeyDown = useCallback(
-    (e: React.KeyboardEvent) => {
-      if (e.key === "Enter") {
-        handleTitleSubmit();
-      } else if (e.key === "Escape") {
-        setIsEditingTitle(false);
+  // AI Review state
+  const {
+    reviews,
+    isPanelOpen,
+    isReviewingAll,
+    activeBlockId,
+    reviewBlock,
+    reviewAll,
+    openPanel,
+    closePanel,
+    setActiveBlock,
+  } = useAIReview({ pageId, blocks: sortedBlocks });
+
+  const handleTitleChange = useCallback(
+    (title: string) => {
+      // Debounce the title update
+      if (titleDebounceRef.current) {
+        clearTimeout(titleDebounceRef.current);
       }
+      titleDebounceRef.current = setTimeout(() => {
+        pageCollection.update(pageId, (draft) => {
+          draft.title = title;
+          draft.updatedAt = new Date().toISOString();
+        });
+      }, 500);
     },
-    [handleTitleSubmit],
+    [pageId],
   );
 
   const handleBlockCreate = useCallback(
@@ -106,6 +126,33 @@ function PageEditor() {
     navigate({ to: "/" });
   }, [pageId, navigate]);
 
+  // Handle clicking a block in the review panel (scroll to it in editor)
+  const handlePanelBlockClick = useCallback(
+    (blockId: string) => {
+      setActiveBlock(blockId);
+      // Scroll to the block in the document
+      if (scrollContainerRef.current) {
+        const blockElement = scrollContainerRef.current.querySelector(
+          `[data-block-id="${blockId}"]`,
+        );
+        if (blockElement) {
+          blockElement.scrollIntoView({ behavior: "smooth", block: "center" });
+        }
+      }
+    },
+    [setActiveBlock],
+  );
+
+  // Handle focusing a block in the editor (highlight it in panel)
+  const handleEditorBlockFocus = useCallback(
+    (blockId: string) => {
+      if (isPanelOpen) {
+        setActiveBlock(blockId);
+      }
+    },
+    [isPanelOpen, setActiveBlock],
+  );
+
   if (isLoadingPages || isLoadingBlocks) {
     return (
       <div className="h-full flex items-center justify-center">
@@ -136,53 +183,105 @@ function PageEditor() {
   return (
     <div className="h-full flex flex-col bg-base-200">
       {/* Header */}
-      <div className="border-b border-base-300 bg-base-100 px-4 py-3 flex items-center gap-3">
+      <div className="flex-shrink-0 border-b border-base-300 bg-base-100 px-4 py-3 flex items-center gap-3">
         <button
-          onClick={() => navigate({ to: "/" })}
-          className="btn btn-ghost btn-sm btn-square md:hidden"
-          aria-label="Back to pages"
+          onMouseEnter={openDrawer}
+          onClick={openDrawer}
+          className="btn btn-ghost btn-sm btn-square"
+          aria-label="Open menu"
         >
-          <ArrowLeft className="h-5 w-5" />
+          <Menu className="h-5 w-5" />
         </button>
 
-        {isEditingTitle ? (
-          <input
-            type="text"
-            value={titleInput}
-            onChange={(e) => setTitleInput(e.target.value)}
-            onBlur={handleTitleSubmit}
-            onKeyDown={handleTitleKeyDown}
-            autoFocus
-            className="input input-sm flex-1 font-semibold text-lg"
-          />
-        ) : (
-          <h1
-            onClick={handleTitleClick}
-            className="flex-1 font-semibold text-lg text-base-content cursor-pointer hover:text-primary transition-colors truncate"
-            title="Click to edit title"
+        <h1 className="flex-1 font-semibold text-lg text-base-content">
+          Graham
+        </h1>
+
+        {/* Actions dropdown */}
+        <div className="dropdown dropdown-end">
+          <button
+            tabIndex={0}
+            className="btn btn-ghost btn-sm btn-square"
+            aria-label="Page actions"
           >
-            {page.title || "Untitled"}
-          </h1>
-        )}
-
-        <button
-          onClick={handleDelete}
-          className="btn btn-ghost btn-sm btn-square text-error"
-          aria-label="Delete page"
-        >
-          <Trash2 className="h-4 w-4" />
-        </button>
+            <MoreVertical className="h-5 w-5" />
+          </button>
+          <ul
+            tabIndex={0}
+            className="dropdown-content z-20 menu p-1 shadow-lg bg-base-100 rounded-lg border border-base-300 w-48"
+          >
+            <li>
+              <button
+                onClick={reviewAll}
+                disabled={isReviewingAll || sortedBlocks.length === 0}
+                className="flex items-center gap-2 text-sm"
+              >
+                {isReviewingAll ? (
+                  <>
+                    <span className="loading loading-spinner loading-xs" />
+                    Reviewing...
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="h-4 w-4" />
+                    Review All
+                  </>
+                )}
+              </button>
+            </li>
+            <li>
+              <button
+                onClick={handleDelete}
+                className="flex items-center gap-2 text-sm text-error"
+              >
+                <Trash2 className="h-4 w-4" />
+                Delete Page
+              </button>
+            </li>
+          </ul>
+        </div>
       </div>
 
-      {/* Q&A Editor */}
+      {/* Main content with resizable panel */}
       <div className="flex-1 overflow-hidden">
-        <QAEditor
-          pageId={pageId}
-          blocks={blocks ?? []}
-          onBlockCreate={handleBlockCreate}
-          onBlockUpdate={handleBlockUpdate}
-          onBlockDelete={handleBlockDelete}
-        />
+        <ResizablePanelLayout
+          ref={scrollContainerRef}
+          isPanelOpen={isPanelOpen}
+          onPanelOpen={openPanel}
+          onPanelClose={closePanel}
+          storageKey={`review-panel-width-${pageId}`}
+          minMainWidth={33}
+          maxMainWidth={66}
+          defaultMainWidth={50}
+          sidePanel={
+            <AIReviewPanel
+              blocks={sortedBlocks}
+              reviews={reviews}
+              blockPositions={blockPositions}
+              activeBlockId={activeBlockId}
+              isReviewingAll={isReviewingAll}
+              onClose={closePanel}
+              onBlockClick={handlePanelBlockClick}
+              onReReview={reviewBlock}
+              onReviewAll={reviewAll}
+            />
+          }
+        >
+          <QADocumentEditor
+            pageId={pageId}
+            pageTitle={page.title}
+            blocks={sortedBlocks}
+            reviews={reviews}
+            activeBlockId={activeBlockId}
+            showGradeBadges={false}
+            onBlockCreate={handleBlockCreate}
+            onBlockUpdate={handleBlockUpdate}
+            onBlockDelete={handleBlockDelete}
+            onBlockFocus={handleEditorBlockFocus}
+            onReviewRequest={reviewBlock}
+            onTitleChange={handleTitleChange}
+          />
+        </ResizablePanelLayout>
       </div>
     </div>
   );
