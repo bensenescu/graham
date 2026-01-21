@@ -3,7 +3,12 @@ import { useLiveQuery } from "@tanstack/react-db";
 import { useState, useCallback, useMemo } from "react";
 import { ArrowLeft, Trash2 } from "lucide-react";
 import { pageCollection } from "@/client/tanstack-db";
-import { Editor } from "@/client/components/Editor";
+import { QAEditor } from "@/client/components/QAEditor";
+import {
+  parsePageContent,
+  stringifyPageContent,
+  type PageContent,
+} from "@/types/schemas/pages";
 
 export const Route = createFileRoute("/page/$pageId")({
   component: PageEditor,
@@ -24,6 +29,11 @@ function PageEditor() {
     () => pages?.find((p) => p.id === pageId),
     [pages, pageId],
   );
+
+  // Parse the content JSON
+  const content = useMemo(() => {
+    return parsePageContent(page?.content || "");
+  }, [page?.content]);
 
   const handleTitleClick = useCallback(() => {
     if (page) {
@@ -53,11 +63,11 @@ function PageEditor() {
     [handleTitleSubmit],
   );
 
-  const handleContentUpdate = useCallback(
-    (newContent: string) => {
+  const handleContentChange = useCallback(
+    (newContent: PageContent) => {
       if (page) {
         pageCollection.update(pageId, (draft) => {
-          draft.content = newContent;
+          draft.content = stringifyPageContent(newContent);
           draft.updatedAt = new Date().toISOString();
         });
       }
@@ -138,9 +148,9 @@ function PageEditor() {
         </button>
       </div>
 
-      {/* Editor */}
+      {/* Q&A Editor */}
       <div className="flex-1 overflow-hidden">
-        <Editor content={page.content || ""} onUpdate={handleContentUpdate} />
+        <QAEditor content={content} onContentChange={handleContentChange} />
       </div>
     </div>
   );
