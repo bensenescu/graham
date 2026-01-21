@@ -1,8 +1,9 @@
-import { useState, useRef, useEffect } from "react";
-import { Outlet, useNavigate, useLocation, Link } from "@tanstack/react-router";
+import { useRef, useEffect } from "react";
+import { Outlet, useNavigate, useLocation } from "@tanstack/react-router";
 import { Plus, Menu, FileText } from "lucide-react";
 import { SidebarNav } from "./Sidebar";
 import { pageCollection } from "@/client/tanstack-db";
+import { DrawerProvider, useDrawer } from "@/client/contexts/DrawerContext";
 
 /**
  * Hook to determine the page title based on current route
@@ -62,8 +63,12 @@ function MobileNavbarRight() {
  * - Mobile navbar with page title and route-specific actions
  * - Main content area
  */
-export function AppShell() {
-  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+function AppShellContent() {
+  const {
+    isOpen: isDrawerOpen,
+    open: openDrawer,
+    close: closeDrawer,
+  } = useDrawer();
   const pageTitle = usePageTitle();
   const hoverZoneRef = useRef<HTMLDivElement>(null);
   const sidebarRef = useRef<HTMLDivElement>(null);
@@ -82,13 +87,13 @@ export function AppShell() {
         clearTimeout(closeTimeoutRef.current);
         closeTimeoutRef.current = null;
       }
-      setIsDrawerOpen(true);
+      openDrawer();
     };
 
     const handleMouseLeave = () => {
       // Delay closing to allow mouse to move to sidebar
       closeTimeoutRef.current = setTimeout(() => {
-        setIsDrawerOpen(false);
+        closeDrawer();
       }, 150);
     };
 
@@ -103,7 +108,7 @@ export function AppShell() {
     const handleSidebarLeave = () => {
       // Close when leaving sidebar
       closeTimeoutRef.current = setTimeout(() => {
-        setIsDrawerOpen(false);
+        closeDrawer();
       }, 150);
     };
 
@@ -137,7 +142,7 @@ export function AppShell() {
         <div className="navbar bg-base-100 border-b border-base-300 px-4 min-h-14 flex-shrink-0 md:hidden">
           <div className="flex-none">
             <button
-              onClick={() => setIsDrawerOpen(true)}
+              onClick={openDrawer}
               aria-label="open sidebar"
               className="btn btn-square btn-ghost btn-sm"
             >
@@ -165,7 +170,7 @@ export function AppShell() {
       {isDrawerOpen && (
         <div
           className="md:hidden fixed inset-0 bg-black/50 z-40"
-          onClick={() => setIsDrawerOpen(false)}
+          onClick={closeDrawer}
         />
       )}
 
@@ -179,12 +184,26 @@ export function AppShell() {
         <div className="flex h-full">
           {/* Actual sidebar */}
           <div className="w-72 h-full bg-base-100 border-r border-base-300">
-            <SidebarNav onNavigate={() => setIsDrawerOpen(false)} />
+            <SidebarNav onNavigate={closeDrawer} />
           </div>
           {/* Invisible extended hover area (desktop only) */}
           <div className="hidden md:block w-8 h-full" />
         </div>
       </div>
     </div>
+  );
+}
+
+/**
+ * AppShell provides the main layout structure for the app:
+ * - Drawer that opens on hover (desktop) or hamburger tap (mobile)
+ * - Mobile navbar with page title and route-specific actions
+ * - Main content area
+ */
+export function AppShell() {
+  return (
+    <DrawerProvider>
+      <AppShellContent />
+    </DrawerProvider>
   );
 }
