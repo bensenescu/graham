@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as NewRouteImport } from './routes/new'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as PagePageIdRouteImport } from './routes/page.$pageId'
+import { Route as ApiReviewRouteImport } from './routes/api/review'
 
 const NewRoute = NewRouteImport.update({
   id: '/new',
@@ -28,34 +29,43 @@ const PagePageIdRoute = PagePageIdRouteImport.update({
   path: '/page/$pageId',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiReviewRoute = ApiReviewRouteImport.update({
+  id: '/api/review',
+  path: '/api/review',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/new': typeof NewRoute
+  '/api/review': typeof ApiReviewRoute
   '/page/$pageId': typeof PagePageIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/new': typeof NewRoute
+  '/api/review': typeof ApiReviewRoute
   '/page/$pageId': typeof PagePageIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/new': typeof NewRoute
+  '/api/review': typeof ApiReviewRoute
   '/page/$pageId': typeof PagePageIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/new' | '/page/$pageId'
+  fullPaths: '/' | '/new' | '/api/review' | '/page/$pageId'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/new' | '/page/$pageId'
-  id: '__root__' | '/' | '/new' | '/page/$pageId'
+  to: '/' | '/new' | '/api/review' | '/page/$pageId'
+  id: '__root__' | '/' | '/new' | '/api/review' | '/page/$pageId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   NewRoute: typeof NewRoute
+  ApiReviewRoute: typeof ApiReviewRoute
   PagePageIdRoute: typeof PagePageIdRoute
 }
 
@@ -82,12 +92,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PagePageIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/review': {
+      id: '/api/review'
+      path: '/api/review'
+      fullPath: '/api/review'
+      preLoaderRoute: typeof ApiReviewRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   NewRoute: NewRoute,
+  ApiReviewRoute: ApiReviewRoute,
   PagePageIdRoute: PagePageIdRoute,
 }
 export const routeTree = rootRouteImport

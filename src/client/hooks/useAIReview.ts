@@ -1,89 +1,45 @@
-import { useState, useCallback, useMemo } from "react";
-import type { AIReview, ReviewSummary, Grade } from "@/types/schemas/reviews";
+import { useState, useCallback, useMemo, useRef } from "react";
+import { useLiveQuery } from "@tanstack/react-db";
+import { createOptimisticAction } from "@tanstack/react-db";
+import type { BlockReview, ReviewSummary } from "@/types/schemas/reviews";
 import type { PageBlock } from "@/types/schemas/pages";
+import { authenticatedFetch } from "@every-app/sdk/core";
+import { createBlockReviewCollection } from "@/client/tanstack-db";
+
+interface ReviewAPIResponse {
+  strengths: string[];
+  improvements: string[];
+  tips?: string[] | null;
+}
 
 /**
- * Mock review generator for development.
- * In production, this would call an AI API.
+ * Call the review API to get AI feedback on a block.
  */
-async function generateMockReview(
+async function callReviewAPI(
   block: PageBlock,
-): Promise<Omit<AIReview, "id" | "blockId" | "createdAt">> {
-  // Simulate API delay
-  await new Promise((resolve) =>
-    setTimeout(resolve, 1000 + Math.random() * 1500),
-  );
+  customInstructions?: string,
+): Promise<ReviewAPIResponse> {
+  const response = await authenticatedFetch("/api/review", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      blockId: block.id,
+      question: block.question,
+      answer: block.answer || "",
+      customInstructions,
+    }),
+  });
 
-  // If no answer, return low score
-  if (!block.answer || block.answer.trim().length < 10) {
-    return {
-      grade: "D",
-      score: 35,
-      strengths: [],
-      improvements: ["Answer is too short or missing"],
-      tips: ["Provide a detailed response to this question"],
-      status: "completed",
+  if (!response.ok) {
+    const errorData = (await response.json().catch(() => ({}))) as {
+      error?: string;
     };
+    throw new Error(errorData.error || `Review failed: ${response.status}`);
   }
 
-  // Generate mock feedback based on answer length and content
-  const answerLength = block.answer.length;
-  const hasNumbers = /\d/.test(block.answer);
-  const hasSpecificDetails = answerLength > 100;
-
-  let score = 60;
-  const strengths: string[] = [];
-  const improvements: string[] = [];
-  const tips: string[] = [];
-
-  if (answerLength > 200) {
-    score += 15;
-    strengths.push("Provides comprehensive detail");
-  } else if (answerLength > 100) {
-    score += 8;
-    strengths.push("Good level of detail");
-  } else {
-    improvements.push("Consider adding more detail");
-  }
-
-  if (hasNumbers) {
-    score += 10;
-    strengths.push("Includes specific metrics or numbers");
-  } else {
-    tips.push("Consider adding specific numbers or metrics");
-  }
-
-  if (hasSpecificDetails) {
-    score += 5;
-    strengths.push("Contains specific examples");
-  }
-
-  // Random variations
-  score += Math.floor(Math.random() * 10) - 5;
-  score = Math.max(0, Math.min(100, score));
-
-  // Determine grade
-  let grade: Grade;
-  if (score >= 90) grade = "A";
-  else if (score >= 80) grade = "B";
-  else if (score >= 70) grade = "C";
-  else if (score >= 60) grade = "D";
-  else grade = "F";
-
-  // Add some generic tips
-  if (tips.length === 0 && Math.random() > 0.5) {
-    tips.push("YC values concise, specific answers");
-  }
-
-  return {
-    grade,
-    score,
-    strengths,
-    improvements,
-    tips,
-    status: "completed",
-    model: "mock-gpt-4",
-  };
+  return (await response.json()) as ReviewAPIResponse;
 }
 
 /**
@@ -91,32 +47,14 @@ async function generateMockReview(
  */
 function calculateSummary(
   pageId: string,
-  reviews: Map<string, AIReview>,
+  reviews: BlockReview[],
   totalBlocks: number,
 ): ReviewSummary | null {
-  const completedReviews = Array.from(reviews.values()).filter(
-    (r) => r.status === "completed",
-  );
-
-  if (completedReviews.length === 0) return null;
-
-  const avgScore = Math.round(
-    completedReviews.reduce((sum, r) => sum + r.score, 0) /
-      completedReviews.length,
-  );
-
-  let overallGrade: Grade;
-  if (avgScore >= 90) overallGrade = "A";
-  else if (avgScore >= 80) overallGrade = "B";
-  else if (avgScore >= 70) overallGrade = "C";
-  else if (avgScore >= 60) overallGrade = "D";
-  else overallGrade = "F";
+  if (reviews.length === 0) return null;
 
   return {
     pageId,
-    overallGrade,
-    overallScore: avgScore,
-    reviewedCount: completedReviews.length,
+    reviewedCount: reviews.length,
     totalCount: totalBlocks,
     updatedAt: new Date().toISOString(),
   };
@@ -125,22 +63,127 @@ function calculateSummary(
 interface UseAIReviewOptions {
   pageId: string;
   blocks: PageBlock[];
+  promptId: string | null; // The prompt to use for reviews
+  customInstructions?: string;
 }
+
+import type { ReviewTab } from "@/client/components/AIReviewPanel";
+// Re-export ReviewTab for convenience
+export type { ReviewTab };
 
 /**
  * Hook for managing AI review state and operations.
  */
-export function useAIReview({ pageId, blocks }: UseAIReviewOptions) {
-  const [reviews, setReviews] = useState<Map<string, AIReview>>(new Map());
+export function useAIReview({
+  pageId,
+  blocks,
+  promptId,
+  customInstructions,
+}: UseAIReviewOptions) {
+  // Create the collection for this page
+  const reviewCollection = useMemo(
+    () => createBlockReviewCollection(pageId),
+    [pageId],
+  );
+
+  // Get reviews from the collection
+  const { data: reviewsArray } = useLiveQuery((q) =>
+    q.from({ review: reviewCollection }),
+  );
+
+  // Convert to a Map keyed by blockId for easy lookup
+  // Note: For now we only have one review per block (using default prompt)
+  // In the future when we support multiple prompts, we'll need a different structure
+  const reviews = useMemo(() => {
+    const map = new Map<string, BlockReview>();
+    for (const review of reviewsArray ?? []) {
+      // Only include reviews for the current prompt
+      if (promptId && review.promptId === promptId) {
+        map.set(review.blockId, review);
+      }
+    }
+    return map;
+  }, [reviewsArray, promptId]);
+
+  // Track which blocks are currently being reviewed (loading state)
+  const [loadingBlockIds, setLoadingBlockIds] = useState<Set<string>>(
+    new Set(),
+  );
   const [isReviewingAll, setIsReviewingAll] = useState(false);
   const [isPanelOpen, setIsPanelOpen] = useState(false);
   const [activeBlockId, setActiveBlockId] = useState<string | null>(null);
+  const [requestedTab, setRequestedTab] = useState<ReviewTab | null>(null);
+
+  // Keep refs for values needed in the optimistic action
+  const customInstructionsRef = useRef(customInstructions);
+  customInstructionsRef.current = customInstructions;
+
+  const promptIdRef = useRef(promptId);
+  promptIdRef.current = promptId;
 
   // Calculate summary
   const summary = useMemo(
-    () => calculateSummary(pageId, reviews, blocks.length),
+    () => calculateSummary(pageId, Array.from(reviews.values()), blocks.length),
     [pageId, reviews, blocks.length],
   );
+
+  // Create the optimistic action for reviewing a block
+  const reviewBlockAction = useMemo(() => {
+    return createOptimisticAction<{ block: PageBlock }>({
+      onMutate: ({ block }) => {
+        // Add to loading set (we don't insert a placeholder into the collection)
+        setLoadingBlockIds((prev) => new Set(prev).add(block.id));
+      },
+      mutationFn: async ({ block }) => {
+        const currentPromptId = promptIdRef.current;
+        if (!currentPromptId) {
+          throw new Error("No prompt selected for review");
+        }
+
+        try {
+          // Call the API to get the review
+          const result = await callReviewAPI(
+            block,
+            customInstructionsRef.current,
+          );
+
+          // Generate an ID for the review
+          const reviewId = crypto.randomUUID();
+          const now = new Date().toISOString();
+
+          // Insert the review into the collection (this will persist via onInsert handler)
+          reviewCollection.insert({
+            id: reviewId,
+            blockId: block.id,
+            promptId: currentPromptId,
+            strengths: result.strengths,
+            improvements: result.improvements,
+            tips: result.tips ?? null,
+            answerSnapshot: block.answer || null,
+            createdAt: now,
+            updatedAt: now,
+          });
+
+          // Remove from loading set
+          setLoadingBlockIds((prev) => {
+            const next = new Set(prev);
+            next.delete(block.id);
+            return next;
+          });
+
+          return result;
+        } catch (error) {
+          // Remove from loading set on error
+          setLoadingBlockIds((prev) => {
+            const next = new Set(prev);
+            next.delete(block.id);
+            return next;
+          });
+          throw error;
+        }
+      },
+    });
+  }, [reviewCollection]);
 
   // Review a single block
   const reviewBlock = useCallback(
@@ -148,62 +191,34 @@ export function useAIReview({ pageId, blocks }: UseAIReviewOptions) {
       const block = blocks.find((b) => b.id === blockId);
       if (!block) return;
 
-      // Set loading state
-      setReviews((prev) => {
-        const next = new Map(prev);
-        next.set(blockId, {
-          id: crypto.randomUUID(),
-          blockId,
-          grade: "C",
-          score: 0,
-          strengths: [],
-          improvements: [],
-          status: "loading",
-          createdAt: new Date().toISOString(),
-        });
-        return next;
-      });
+      if (!promptId) {
+        console.error("No prompt selected for review");
+        return;
+      }
 
-      // Open panel and focus on this block
+      // Open panel, focus on this block, and switch to detailed tab
       setIsPanelOpen(true);
       setActiveBlockId(blockId);
+      setRequestedTab("detailed");
 
+      // Execute the optimistic action
       try {
-        const result = await generateMockReview(block);
-
-        setReviews((prev) => {
-          const next = new Map(prev);
-          next.set(blockId, {
-            id: crypto.randomUUID(),
-            blockId,
-            ...result,
-            createdAt: new Date().toISOString(),
-          });
-          return next;
-        });
+        await reviewBlockAction({ block });
       } catch (error) {
-        setReviews((prev) => {
-          const next = new Map(prev);
-          next.set(blockId, {
-            id: crypto.randomUUID(),
-            blockId,
-            grade: "F",
-            score: 0,
-            strengths: [],
-            improvements: [],
-            status: "error",
-            error: error instanceof Error ? error.message : "Review failed",
-            createdAt: new Date().toISOString(),
-          });
-          return next;
-        });
+        console.error("Review failed:", error);
+        // Error is already handled in mutationFn (loading state cleared)
       }
     },
-    [blocks],
+    [blocks, promptId, reviewBlockAction],
   );
 
   // Review all blocks
   const reviewAll = useCallback(async () => {
+    if (!promptId) {
+      console.error("No prompt selected for review");
+      return;
+    }
+
     setIsReviewingAll(true);
     setIsPanelOpen(true);
 
@@ -211,11 +226,19 @@ export function useAIReview({ pageId, blocks }: UseAIReviewOptions) {
     const batchSize = 3;
     for (let i = 0; i < blocks.length; i += batchSize) {
       const batch = blocks.slice(i, i + batchSize);
-      await Promise.all(batch.map((block) => reviewBlock(block.id)));
+      await Promise.all(
+        batch.map(async (block) => {
+          try {
+            await reviewBlockAction({ block });
+          } catch (e) {
+            console.error(`Review failed for block ${block.id}:`, e);
+          }
+        }),
+      );
     }
 
     setIsReviewingAll(false);
-  }, [blocks, reviewBlock]);
+  }, [blocks, promptId, reviewBlockAction]);
 
   // Open panel
   const openPanel = useCallback(() => {
@@ -232,16 +255,31 @@ export function useAIReview({ pageId, blocks }: UseAIReviewOptions) {
     setActiveBlockId(blockId);
   }, []);
 
+  // Clear the requested tab (called by panel after it has switched)
+  const clearRequestedTab = useCallback(() => {
+    setRequestedTab(null);
+  }, []);
+
+  // Check if a block is currently loading
+  const isBlockLoading = useCallback(
+    (blockId: string) => loadingBlockIds.has(blockId),
+    [loadingBlockIds],
+  );
+
   return {
     reviews,
     summary,
     isPanelOpen,
     isReviewingAll,
     activeBlockId,
+    requestedTab,
+    loadingBlockIds,
     reviewBlock,
     reviewAll,
     openPanel,
     closePanel,
     setActiveBlock,
+    clearRequestedTab,
+    isBlockLoading,
   };
 }

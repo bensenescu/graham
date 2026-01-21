@@ -13,6 +13,10 @@ interface ResizablePanelLayoutProps {
   children: ReactNode;
   /** Side panel content (right side) */
   sidePanel: ReactNode;
+  /** Optional header for main content that also gets pushed when panel opens */
+  mainHeader?: ReactNode;
+  /** Optional header for side panel that stays fixed when scrolling */
+  sidePanelHeader?: ReactNode;
   /** Whether the side panel is open */
   isPanelOpen: boolean;
   /** Callback when panel is closed */
@@ -27,6 +31,8 @@ interface ResizablePanelLayoutProps {
   maxMainWidth?: number;
   /** Default width of main content as percentage (default: 50) */
   defaultMainWidth?: number;
+  /** When true, side panel scrolls independently instead of syncing with main content */
+  sidePanelIndependentScroll?: boolean;
 }
 
 /**
@@ -41,6 +47,8 @@ export const ResizablePanelLayout = forwardRef<
   {
     children,
     sidePanel,
+    mainHeader,
+    sidePanelHeader,
     isPanelOpen,
     onPanelClose,
     onPanelOpen,
@@ -48,6 +56,7 @@ export const ResizablePanelLayout = forwardRef<
     minMainWidth = 33,
     maxMainWidth = 66,
     defaultMainWidth = 50,
+    sidePanelIndependentScroll = false,
   },
   ref,
 ) {
@@ -128,6 +137,42 @@ export const ResizablePanelLayout = forwardRef<
 
   return (
     <div ref={containerRef} className="h-full flex flex-col overflow-hidden">
+      {/* Header row - main header gets pushed when panel opens */}
+      {mainHeader && (
+        <div className="flex-shrink-0 flex">
+          {/* Main header - animates width */}
+          <div
+            className="flex-shrink-0 transition-[width] duration-300 ease-out overflow-hidden"
+            style={{ width: isPanelOpen ? `${mainWidthPercent}%` : "100%" }}
+          >
+            {mainHeader}
+          </div>
+
+          {/* Spacer for resize handle */}
+          <div
+            className={`
+              w-1 flex-shrink-0 bg-base-300 border-b border-base-300
+              transition-opacity duration-300 ease-out
+              ${isPanelOpen ? "opacity-100" : "opacity-0 w-0"}
+            `}
+          />
+
+          {/* Side panel header - fixed at top, aligns with main header */}
+          <div
+            className={`
+              flex-shrink-0 bg-base-100 border-b border-base-300
+              transition-all duration-300 ease-out overflow-hidden
+              ${isPanelOpen ? "opacity-100" : "opacity-0"}
+            `}
+            style={{
+              width: isPanelOpen ? `calc(${panelWidthPercent}% - 4px)` : "0px",
+            }}
+          >
+            {sidePanelHeader}
+          </div>
+        </div>
+      )}
+
       {/* Single scroll container for both panels */}
       <div ref={ref} className="flex-1 overflow-y-auto overflow-x-hidden">
         <div className="flex min-h-full">
@@ -167,9 +212,10 @@ export const ResizablePanelLayout = forwardRef<
           {/* Side panel - slides in/out from right */}
           <div
             className={`
-              flex-shrink-0 bg-base-100 border-l border-base-300
+              flex-shrink-0 bg-base-100
               transition-all duration-300 ease-out
               ${isPanelOpen ? "opacity-100" : "opacity-0"}
+              ${sidePanelIndependentScroll ? "sticky top-0 h-screen overflow-y-auto" : ""}
             `}
             style={{
               width: isPanelOpen ? `calc(${panelWidthPercent}% - 4px)` : "0px",

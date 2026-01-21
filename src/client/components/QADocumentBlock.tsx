@@ -3,11 +3,11 @@ import { GripVertical, Trash2, Sparkles, MoreVertical } from "lucide-react";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import type { PageBlock } from "@/types/schemas/pages";
-import type { AIReview } from "@/types/schemas/reviews";
+import type { BlockReview } from "@/types/schemas/reviews";
 
 interface QADocumentBlockProps {
   block: PageBlock;
-  review?: AIReview;
+  review?: BlockReview;
   isActive?: boolean;
   onQuestionChange: (id: string, question: string) => void;
   onAnswerChange: (id: string, answer: string) => void;
@@ -57,27 +57,6 @@ function AutoResizeTextarea({
       className={`w-full resize-none overflow-hidden bg-transparent focus:outline-none ${className}`}
       rows={1}
     />
-  );
-}
-
-/**
- * Grade badge component
- */
-function GradeBadge({ grade, score }: { grade: string; score: number }) {
-  const badgeClass =
-    {
-      A: "badge-success",
-      B: "badge-info",
-      C: "badge-warning",
-      D: "badge-error",
-      F: "badge-error",
-    }[grade] || "badge-ghost";
-
-  return (
-    <div className={`badge ${badgeClass} badge-sm gap-1`}>
-      <span className="font-semibold">{grade}</span>
-      <span className="text-xs opacity-80">{score}</span>
-    </div>
   );
 }
 
@@ -168,10 +147,10 @@ export function QADocumentBlock({
               placeholder="What question are you exploring?"
               className="text-base font-semibold text-base-content placeholder:text-base-content/40 leading-relaxed"
             />
-            {/* Grade badge if review exists */}
+            {/* Review indicator if review exists */}
             {review && (
               <div className="flex-shrink-0 mt-1">
-                <GradeBadge grade={review.grade} score={review.score} />
+                <div className="badge badge-success badge-sm">Reviewed</div>
               </div>
             )}
           </div>

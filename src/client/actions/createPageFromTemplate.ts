@@ -2,6 +2,7 @@ import { createOptimisticAction } from "@tanstack/react-db";
 import {
   pageCollection,
   createPageBlockCollection,
+  promptCollection,
 } from "@/client/tanstack-db";
 import { createPage, batchCreatePageBlocks } from "@/serverFunctions/pages";
 import type { Template } from "@/templates";
@@ -72,6 +73,8 @@ export const createPageFromTemplate =
 
       // Refetch to sync optimistic state with server
       await pageCollection.utils.refetch();
+      // Also refetch prompts since a new default prompt was created
+      await promptCollection.utils.refetch();
     },
   });
 

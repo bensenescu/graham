@@ -1,4 +1,5 @@
 import { useRef, useEffect, useState, useMemo, useCallback } from "react";
+import { toast } from "sonner";
 import {
   X,
   RefreshCw,
@@ -13,29 +14,37 @@ import {
   Trash2,
   Edit2,
 } from "lucide-react";
-import type { AIReview } from "@/types/schemas/reviews";
+import type { BlockReview } from "@/types/schemas/reviews";
 import type { PageBlock } from "@/types/schemas/pages";
-import type { Prompt } from "@/types/schemas/prompts";
+import type { Prompt, OverallReviewMode } from "@/types/schemas/prompts";
 import {
   type BlockPosition,
   calculateCardPositions,
 } from "@/client/hooks/useBlockPositions";
 import { usePageReviewSettings } from "@/client/hooks/usePageReviewSettings";
+import { usePageOverallReviewSettings } from "@/client/hooks/usePageOverallReviewSettings";
 
-type ReviewTab = "configure" | "overall" | "detailed";
+export type ReviewTab = "configure" | "overall" | "detailed";
 
 interface AIReviewPanelProps {
   pageId: string;
   blocks: PageBlock[];
-  reviews: Map<string, AIReview>;
+  reviews: Map<string, BlockReview>;
   blockPositions: Map<string, BlockPosition>;
   activeBlockId: string | null;
   isReviewingAll: boolean;
-  initialTab?: ReviewTab;
+  /** Set of block IDs currently being reviewed (for loading state) */
+  loadingBlockIds: Set<string>;
+  /** Current active tab - controlled from parent */
+  activeTab: ReviewTab;
+  /** Called when tab changes */
+  onTabChange?: (tab: ReviewTab) => void;
   onClose: () => void;
   onBlockClick: (blockId: string) => void;
   onReReview: (blockId: string) => void;
   onReviewAll: () => void;
+  /** If true, header is rendered externally and not inside the panel */
+  externalHeader?: boolean;
 }
 
 /**
@@ -123,6 +132,10 @@ function ConfigureTab({ pageId }: { pageId: string }) {
   const [editingPrompt, setEditingPrompt] = useState<Prompt | null>(null);
   const [newPromptName, setNewPromptName] = useState("");
   const [newPromptText, setNewPromptText] = useState("");
+  const [isCreatingDefault, setIsCreatingDefault] = useState(false);
+  const [defaultPromptText, setDefaultPromptText] = useState("");
+  const [isEditingDefaultPrompt, setIsEditingDefaultPrompt] = useState(false);
+  const [editedDefaultPromptText, setEditedDefaultPromptText] = useState("");
 
   const handleCreatePrompt = () => {
     if (!newPromptName.trim() || !newPromptText.trim()) return;
@@ -130,6 +143,14 @@ function ConfigureTab({ pageId }: { pageId: string }) {
     setNewPromptName("");
     setNewPromptText("");
     setIsCreating(false);
+  };
+
+  const handleCreateDefaultPrompt = () => {
+    if (!defaultPromptText.trim()) return;
+    const id = createPrompt("Default Prompt", defaultPromptText.trim());
+    updateDefaultPromptId(id);
+    setDefaultPromptText("");
+    setIsCreatingDefault(false);
   };
 
   const handleUpdatePrompt = () => {
@@ -154,8 +175,10 @@ function ConfigureTab({ pageId }: { pageId: string }) {
   const cancelEditing = () => {
     setEditingPrompt(null);
     setIsCreating(false);
+    setIsCreatingDefault(false);
     setNewPromptName("");
     setNewPromptText("");
+    setDefaultPromptText("");
   };
 
   if (isLoading) {
@@ -194,39 +217,67 @@ function ConfigureTab({ pageId }: { pageId: string }) {
         <label className="text-sm font-medium text-base-content mb-2 block">
           Default Prompt
         </label>
-        {defaultPrompt ? (
-          <PromptCard
-            prompt={defaultPrompt}
-            isDefault
-            onEdit={() => startEditing(defaultPrompt)}
-            onDelete={() => {
-              deletePrompt(defaultPrompt.id);
-              updateDefaultPromptId(null);
-            }}
-          />
-        ) : (
-          <div className="p-3 rounded-lg border border-dashed border-base-content/20 text-center">
-            <p className="text-sm text-base-content/50">
-              No default prompt set
-            </p>
-            {availablePrompts.length > 0 && (
-              <select
-                className="select select-bordered select-xs mt-2"
-                onChange={(e) => {
-                  if (e.target.value) updateDefaultPromptId(e.target.value);
-                }}
-                defaultValue=""
-              >
-                <option value="" disabled>
-                  Select a prompt...
-                </option>
-                {availablePrompts.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.name}
-                  </option>
-                ))}
-              </select>
-            )}
+        <textarea
+          value={
+            isEditingDefaultPrompt
+              ? editedDefaultPromptText
+              : (defaultPrompt?.prompt ?? defaultPromptText)
+          }
+          onChange={(e) => {
+            if (defaultPrompt) {
+              if (!isEditingDefaultPrompt) {
+                setIsEditingDefaultPrompt(true);
+                setEditedDefaultPromptText(e.target.value);
+              } else {
+                setEditedDefaultPromptText(e.target.value);
+              }
+            } else {
+              setDefaultPromptText(e.target.value);
+              if (!isCreatingDefault) setIsCreatingDefault(true);
+            }
+          }}
+          placeholder="Type default review prompt here..."
+          className="textarea textarea-bordered textarea-sm w-full h-20 text-sm"
+        />
+        {defaultPrompt && isEditingDefaultPrompt && (
+          <div className="flex justify-end gap-2 mt-2">
+            <button
+              onClick={() => {
+                setIsEditingDefaultPrompt(false);
+                setEditedDefaultPromptText("");
+              }}
+              className="btn btn-ghost btn-xs"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={() => {
+                updatePrompt(defaultPrompt.id, {
+                  prompt: editedDefaultPromptText.trim(),
+                });
+                setIsEditingDefaultPrompt(false);
+                setEditedDefaultPromptText("");
+                toast("Default prompt updated");
+              }}
+              className="btn btn-neutral btn-xs"
+              disabled={!editedDefaultPromptText.trim()}
+            >
+              Save
+            </button>
+          </div>
+        )}
+        {!defaultPrompt && isCreatingDefault && (
+          <div className="flex justify-end gap-2 mt-2">
+            <button onClick={cancelEditing} className="btn btn-ghost btn-xs">
+              Cancel
+            </button>
+            <button
+              onClick={handleCreateDefaultPrompt}
+              className="btn btn-neutral btn-xs"
+              disabled={!defaultPromptText.trim()}
+            >
+              Save
+            </button>
           </div>
         )}
       </div>
@@ -281,60 +332,67 @@ function ConfigureTab({ pageId }: { pageId: string }) {
 
       {/* Create/Edit Prompt Form */}
       {(isCreating || editingPrompt) && (
-        <div className="p-3 rounded-lg border border-primary/30 bg-primary/5 space-y-3">
-          <h4 className="text-sm font-medium">
-            {editingPrompt ? "Edit Prompt" : "New Prompt"}
-          </h4>
-          <input
-            type="text"
-            value={newPromptName}
-            onChange={(e) => setNewPromptName(e.target.value)}
-            placeholder="Prompt name..."
-            className="input input-bordered input-sm w-full"
-          />
-          <textarea
-            value={newPromptText}
-            onChange={(e) => setNewPromptText(e.target.value)}
-            placeholder="Enter your prompt..."
-            className="textarea textarea-bordered textarea-sm w-full h-24 text-sm"
-          />
-          <div className="flex justify-end gap-2">
-            <button onClick={cancelEditing} className="btn btn-ghost btn-xs">
-              Cancel
-            </button>
-            <button
-              onClick={editingPrompt ? handleUpdatePrompt : handleCreatePrompt}
-              className="btn btn-primary btn-xs"
-              disabled={!newPromptName.trim() || !newPromptText.trim()}
-            >
-              {editingPrompt ? "Save" : "Create"}
-            </button>
-          </div>
-        </div>
-      )}
+        <div className="space-y-3">
+          {/* Select existing prompt - only shown when creating (not editing) */}
+          {isCreating && !editingPrompt && availablePrompts.length > 0 && (
+            <>
+              <select
+                className="select select-bordered select-sm w-full"
+                onChange={(e) => {
+                  if (e.target.value) {
+                    addCustomPrompt(e.target.value);
+                    setIsCreating(false);
+                  }
+                }}
+                value=""
+              >
+                <option value="" disabled>
+                  Select an existing prompt...
+                </option>
+                {availablePrompts.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name}
+                  </option>
+                ))}
+              </select>
+              <div className="flex items-center gap-3">
+                <div className="flex-1 h-px bg-base-300" />
+                <span className="text-xs text-base-content/40">or</span>
+                <div className="flex-1 h-px bg-base-300" />
+              </div>
+            </>
+          )}
 
-      {/* Add existing prompt */}
-      {availablePrompts.length > 0 && !isCreating && !editingPrompt && (
-        <div>
-          <label className="text-sm font-medium text-base-content mb-2 block">
-            Add Existing Prompt
-          </label>
-          <select
-            className="select select-bordered select-sm w-full"
-            onChange={(e) => {
-              if (e.target.value) addCustomPrompt(e.target.value);
-            }}
-            value=""
-          >
-            <option value="" disabled>
-              Select a prompt to add...
-            </option>
-            {availablePrompts.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.name}
-              </option>
-            ))}
-          </select>
+          <div className="space-y-2">
+            <input
+              type="text"
+              value={newPromptName}
+              onChange={(e) => setNewPromptName(e.target.value)}
+              placeholder="Prompt name..."
+              className="input input-bordered input-sm w-full"
+              autoFocus
+            />
+            <textarea
+              value={newPromptText}
+              onChange={(e) => setNewPromptText(e.target.value)}
+              placeholder="Enter your prompt..."
+              className="textarea textarea-bordered textarea-sm w-full h-20 text-sm"
+            />
+            <div className="flex justify-end gap-2">
+              <button onClick={cancelEditing} className="btn btn-ghost btn-xs">
+                Cancel
+              </button>
+              <button
+                onClick={
+                  editingPrompt ? handleUpdatePrompt : handleCreatePrompt
+                }
+                className="btn btn-neutral btn-xs"
+                disabled={!newPromptName.trim() || !newPromptText.trim()}
+              >
+                {editingPrompt ? "Save" : "Create"}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
@@ -345,19 +403,30 @@ function ConfigureTab({ pageId }: { pageId: string }) {
  * Overall tab - Holistic feedback on the entire application
  */
 function OverallTab({
+  pageId,
   blocks,
   reviews,
   onReviewAll,
   isReviewingAll,
 }: {
+  pageId: string;
   blocks: PageBlock[];
-  reviews: Map<string, AIReview>;
+  reviews: Map<string, BlockReview>;
   onReviewAll: () => void;
   isReviewingAll: boolean;
 }) {
-  const completedReviews = useMemo(() => {
-    return Array.from(reviews.values()).filter((r) => r.status === "completed");
-  }, [reviews]);
+  const {
+    settings,
+    prompts,
+    selectedPrompts,
+    availablePrompts,
+    updateMode,
+    updateCustomPrompt,
+    addSelectedPrompt,
+    removeSelectedPrompt,
+  } = usePageOverallReviewSettings(pageId);
+
+  const reviewsArray = useMemo(() => Array.from(reviews.values()), [reviews]);
 
   const hasAnswers = useMemo(() => {
     return blocks.some((b) => b.answer && b.answer.trim().length > 0);
@@ -365,56 +434,167 @@ function OverallTab({
 
   // Calculate overall stats
   const stats = useMemo(() => {
-    if (completedReviews.length === 0) return null;
-    const avgScore = Math.round(
-      completedReviews.reduce((sum, r) => sum + r.score, 0) /
-        completedReviews.length,
-    );
-    const totalStrengths = completedReviews.reduce(
+    if (reviewsArray.length === 0) return null;
+    const totalStrengths = reviewsArray.reduce(
       (sum, r) => sum + r.strengths.length,
       0,
     );
-    const totalImprovements = completedReviews.reduce(
+    const totalImprovements = reviewsArray.reduce(
       (sum, r) => sum + r.improvements.length,
       0,
     );
     return {
-      avgScore,
       totalStrengths,
       totalImprovements,
-      reviewed: completedReviews.length,
+      reviewed: reviewsArray.length,
       total: blocks.length,
     };
-  }, [completedReviews, blocks.length]);
+  }, [reviewsArray, blocks.length]);
+
+  const currentMode = (settings?.mode ?? "all_prompts") as OverallReviewMode;
+
+  const modes: { id: OverallReviewMode; label: string }[] = [
+    { id: "all_prompts", label: "All" },
+    { id: "select_prompts", label: "Select" },
+    { id: "custom", label: "Custom" },
+  ];
+
+  // Determine context text based on mode
+  const getContextText = () => {
+    if (currentMode === "all_prompts") {
+      return `All ${prompts.length} prompt${prompts.length !== 1 ? "s" : ""} will be used as context for the overall review.`;
+    }
+    if (currentMode === "select_prompts") {
+      if (selectedPrompts.length === 0) {
+        return "Select which prompts to use as context.";
+      }
+      return `${selectedPrompts.length} prompt${selectedPrompts.length !== 1 ? "s" : ""} selected as context.`;
+    }
+    if (currentMode === "custom") {
+      return "Use a custom prompt for the overall review.";
+    }
+    return "";
+  };
 
   if (!stats) {
     return (
-      <div className="p-4">
-        <div className="flex items-start gap-3 mb-5">
-          <div>
-            <h3 className="text-sm font-medium text-base-content mb-1">
-              No reviews yet
-            </h3>
-            <p className="text-sm text-base-content/60">
-              Get holistic feedback on your entire application.
-            </p>
-          </div>
+      <div className="p-4 space-y-5">
+        {/* Header */}
+        <div>
+          <h3 className="text-sm font-medium text-base-content mb-1">
+            Overall Review
+          </h3>
+          <p className="text-sm text-base-content/60">
+            Get holistic feedback on your entire application.
+          </p>
         </div>
 
-        {hasAnswers ? (
-          <div className="space-y-4">
-            <button
-              onClick={onReviewAll}
-              disabled={isReviewingAll}
-              className="btn btn-primary btn-sm gap-2"
-            >
-              <Sparkles className="h-4 w-4" />
-              {isReviewingAll ? "Reviewing..." : "Review All Answers"}
-            </button>
+        {/* Prompts to Consider - Label + Badge Selector */}
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-medium text-base-content">
+              Prompts to Consider
+            </span>
+            <div className="flex rounded-lg border border-base-300 p-0.5 bg-base-200/50">
+              {modes.map((mode) => (
+                <button
+                  key={mode.id}
+                  onClick={() => updateMode(mode.id)}
+                  className={`
+                    px-3 py-1 text-xs font-medium rounded-md transition-all
+                    ${
+                      currentMode === mode.id
+                        ? "bg-primary text-primary-content shadow-sm"
+                        : "text-base-content/60 hover:text-base-content"
+                    }
+                  `}
+                >
+                  {mode.label}
+                </button>
+              ))}
+            </div>
           </div>
+
+          {/* Context text */}
+          <p className="text-xs text-base-content/50">{getContextText()}</p>
+
+          {/* Select Prompts Mode - show badges */}
+          {currentMode === "select_prompts" && (
+            <div className="space-y-2">
+              {selectedPrompts.length > 0 && (
+                <div className="flex flex-wrap gap-1.5">
+                  {selectedPrompts.map((prompt: Prompt) => (
+                    <div
+                      key={prompt.id}
+                      className="badge badge-sm bg-base-300 border-base-300 gap-1 pr-0.5"
+                    >
+                      <span className="truncate max-w-[100px]">
+                        {prompt.name}
+                      </span>
+                      <button
+                        onClick={() => removeSelectedPrompt(prompt.id)}
+                        className="hover:text-error transition-colors p-0.5"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {availablePrompts.length > 0 && (
+                <div className="dropdown">
+                  <button
+                    tabIndex={0}
+                    className="btn btn-xs btn-ghost gap-1 text-base-content/60 hover:text-primary -ml-1"
+                  >
+                    <Plus className="h-3 w-3" />
+                    Add prompt
+                  </button>
+                  <ul
+                    tabIndex={0}
+                    className="dropdown-content z-20 menu p-1 shadow-lg bg-base-100 rounded-lg border border-base-300 w-48 mt-1 max-h-40 overflow-y-auto"
+                  >
+                    {availablePrompts.map((prompt) => (
+                      <li key={prompt.id}>
+                        <button
+                          onClick={() => addSelectedPrompt(prompt.id)}
+                          className="text-sm"
+                        >
+                          <span className="truncate">{prompt.name}</span>
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Custom Mode - show textarea */}
+          {currentMode === "custom" && (
+            <textarea
+              value={settings?.customPrompt ?? ""}
+              onChange={(e) => updateCustomPrompt(e.target.value || null)}
+              placeholder="Enter your custom overall review prompt..."
+              className="textarea textarea-bordered textarea-sm w-full h-20 text-sm"
+            />
+          )}
+        </div>
+
+        {/* CTA */}
+        {hasAnswers ? (
+          <button
+            onClick={onReviewAll}
+            disabled={isReviewingAll}
+            className="btn btn-primary btn-sm gap-2"
+          >
+            <Sparkles className="h-4 w-4" />
+            {isReviewingAll ? "Reviewing..." : "Review All Answers"}
+          </button>
         ) : (
           <div className="p-3 rounded-lg bg-base-200/50 border border-base-300/50">
-            <p className="text-sm text-base-content/50">
+            <p className="text-sm text-base-content/50 text-center">
               Add some answers to your questions to get started.
             </p>
           </div>
@@ -424,25 +604,118 @@ function OverallTab({
   }
 
   return (
-    <div className="p-4 space-y-4">
-      {/* Overall Score */}
+    <div className="p-4 space-y-5">
+      {/* Prompts to Consider - Label + Badge Selector */}
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <span className="text-sm font-medium text-base-content">
+            Prompts to Consider
+          </span>
+          <div className="flex rounded-lg border border-base-300 p-0.5 bg-base-200/50">
+            {modes.map((mode) => (
+              <button
+                key={mode.id}
+                onClick={() => updateMode(mode.id)}
+                className={`
+                  px-3 py-1 text-xs font-medium rounded-md transition-all
+                  ${
+                    currentMode === mode.id
+                      ? "bg-primary text-primary-content shadow-sm"
+                      : "text-base-content/60 hover:text-base-content"
+                  }
+                `}
+              >
+                {mode.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Context text */}
+        <p className="text-xs text-base-content/50">{getContextText()}</p>
+
+        {/* Select Prompts Mode - show badges */}
+        {currentMode === "select_prompts" && (
+          <div className="space-y-2">
+            {selectedPrompts.length > 0 && (
+              <div className="flex flex-wrap gap-1.5">
+                {selectedPrompts.map((prompt: Prompt) => (
+                  <div
+                    key={prompt.id}
+                    className="badge badge-sm bg-base-300 border-base-300 gap-1 pr-0.5"
+                  >
+                    <span className="truncate max-w-[100px]">
+                      {prompt.name}
+                    </span>
+                    <button
+                      onClick={() => removeSelectedPrompt(prompt.id)}
+                      className="hover:text-error transition-colors p-0.5"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {availablePrompts.length > 0 && (
+              <div className="dropdown">
+                <button
+                  tabIndex={0}
+                  className="btn btn-xs btn-ghost gap-1 text-base-content/60 hover:text-primary -ml-1"
+                >
+                  <Plus className="h-3 w-3" />
+                  Add prompt
+                </button>
+                <ul
+                  tabIndex={0}
+                  className="dropdown-content z-20 menu p-1 shadow-lg bg-base-100 rounded-lg border border-base-300 w-48 mt-1 max-h-40 overflow-y-auto"
+                >
+                  {availablePrompts.map((prompt) => (
+                    <li key={prompt.id}>
+                      <button
+                        onClick={() => addSelectedPrompt(prompt.id)}
+                        className="text-sm"
+                      >
+                        <span className="truncate">{prompt.name}</span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Custom Mode - show textarea */}
+        {currentMode === "custom" && (
+          <textarea
+            value={settings?.customPrompt ?? ""}
+            onChange={(e) => updateCustomPrompt(e.target.value || null)}
+            placeholder="Enter your custom overall review prompt..."
+            className="textarea textarea-bordered textarea-sm w-full h-20 text-sm"
+          />
+        )}
+      </div>
+
+      {/* Progress */}
       <div className="p-4 rounded-lg bg-base-200/50 border border-base-300">
         <div className="flex items-center justify-between mb-3">
           <span className="text-sm font-medium text-base-content">
-            Overall Score
+            Review Progress
           </span>
-          <span className="text-2xl font-bold text-primary">
-            {stats.avgScore}
+          <span className="text-lg font-bold text-primary">
+            {stats.reviewed}/{stats.total}
           </span>
         </div>
         <div className="w-full bg-base-300 rounded-full h-2">
           <div
             className="bg-primary h-2 rounded-full transition-all"
-            style={{ width: `${stats.avgScore}%` }}
+            style={{ width: `${(stats.reviewed / stats.total) * 100}%` }}
           />
         </div>
         <p className="text-xs text-base-content/50 mt-2">
-          Based on {stats.reviewed} of {stats.total} questions reviewed
+          {stats.reviewed} of {stats.total} questions reviewed
         </p>
       </div>
 
@@ -465,19 +738,6 @@ function OverallTab({
           <span className="text-xl font-bold text-warning">
             {stats.totalImprovements}
           </span>
-        </div>
-      </div>
-
-      {/* Overall Feedback */}
-      <div>
-        <h4 className="text-sm font-medium text-base-content mb-2">Summary</h4>
-        <div className="p-3 rounded-lg bg-base-200/50 border border-base-300 text-sm text-base-content/80">
-          <p>
-            Your application shows promise with clear technical capabilities.
-            Focus on adding more specific metrics and concrete examples to
-            strengthen your answers. Consider being more concise in longer
-            responses.
-          </p>
         </div>
       </div>
 
@@ -536,13 +796,15 @@ function ReviewLoading() {
 function CompactReviewCard({
   block,
   review,
+  isLoading,
   isActive,
   onClick,
   onReReview,
   onHeightChange,
 }: {
   block: PageBlock;
-  review: AIReview | undefined;
+  review: BlockReview | undefined;
+  isLoading: boolean;
   isActive: boolean;
   onClick: () => void;
   onReReview: () => void;
@@ -564,7 +826,7 @@ function CompactReviewCard({
   }, [onHeightChange]);
 
   // Loading state
-  if (review?.status === "loading") {
+  if (isLoading) {
     return (
       <div ref={cardRef}>
         <ReviewLoading />
@@ -598,33 +860,6 @@ function CompactReviewCard({
     );
   }
 
-  // Error state
-  if (review.status === "error") {
-    return (
-      <div
-        ref={cardRef}
-        className={`
-          p-3 border rounded-lg
-          ${isActive ? "border-error bg-error/5" : "border-base-300"}
-        `}
-      >
-        <div className="flex items-center gap-2 mb-1">
-          <div className="badge badge-error badge-xs">Error</div>
-        </div>
-        <p className="text-xs text-error/80">
-          {review.error || "Review failed"}
-        </p>
-        <button
-          onClick={onReReview}
-          className="mt-1 btn btn-ghost btn-xs gap-1"
-        >
-          <RefreshCw className="h-3 w-3" />
-          Retry
-        </button>
-      </div>
-    );
-  }
-
   // Completed review - compact display
   return (
     <div
@@ -635,9 +870,8 @@ function CompactReviewCard({
         ${isActive ? "border-primary bg-primary/5" : "border-base-300 hover:border-base-content/30"}
       `}
     >
-      {/* Grade badge */}
-      <div className="flex items-center justify-between mb-2">
-        <GradeBadge grade={review.grade} score={review.score} />
+      {/* Header with re-review button */}
+      <div className="flex items-center justify-end mb-2">
         <button
           onClick={(e) => {
             e.stopPropagation();
@@ -653,7 +887,7 @@ function CompactReviewCard({
       {/* Strengths */}
       {review.strengths.length > 0 && (
         <div className="space-y-1 mb-2">
-          {review.strengths.map((strength, i) => (
+          {review.strengths.map((strength: string, i: number) => (
             <div
               key={i}
               className="flex items-start gap-1.5 text-xs text-success/90"
@@ -668,7 +902,7 @@ function CompactReviewCard({
       {/* Improvements */}
       {review.improvements.length > 0 && (
         <div className="space-y-1 mb-2">
-          {review.improvements.map((improvement, i) => (
+          {review.improvements.map((improvement: string, i: number) => (
             <div
               key={i}
               className="flex items-start gap-1.5 text-xs text-warning/90"
@@ -683,7 +917,7 @@ function CompactReviewCard({
       {/* Tips */}
       {review.tips && review.tips.length > 0 && (
         <div className="space-y-1">
-          {review.tips.map((tip, i) => (
+          {review.tips.map((tip: string, i: number) => (
             <div
               key={i}
               className="flex items-start gap-1.5 text-xs text-info/90"
@@ -704,6 +938,7 @@ function CompactReviewCard({
 function DetailedTab({
   blocks,
   reviews,
+  loadingBlockIds,
   blockPositions,
   activeBlockId,
   isReviewingAll,
@@ -712,7 +947,8 @@ function DetailedTab({
   onReviewAll,
 }: {
   blocks: PageBlock[];
-  reviews: Map<string, AIReview>;
+  reviews: Map<string, BlockReview>;
+  loadingBlockIds: Set<string>;
   blockPositions: Map<string, BlockPosition>;
   activeBlockId: string | null;
   isReviewingAll: boolean;
@@ -753,12 +989,10 @@ function DetailedTab({
     return maxBottom + 24;
   }, [blocks, cardPositions, cardHeights]);
 
-  // Check if there are any completed reviews
+  // Check if there are any reviews or any loading
   const hasReviews = useMemo(() => {
-    return Array.from(reviews.values()).some(
-      (r) => r.status === "completed" || r.status === "loading",
-    );
-  }, [reviews]);
+    return reviews.size > 0 || loadingBlockIds.size > 0;
+  }, [reviews, loadingBlockIds]);
 
   // Check if there are any blocks with answers (reviewable)
   const hasAnswers = useMemo(() => {
@@ -808,7 +1042,7 @@ function DetailedTab({
   }
 
   return (
-    <div className="relative px-4 pt-2" style={{ minHeight: totalHeight }}>
+    <div className="relative px-4" style={{ minHeight: totalHeight }}>
       {blocks.length === 0 ? (
         <div className="text-center py-8 text-base-content/50 text-sm">
           No questions to review yet.
@@ -825,6 +1059,7 @@ function DetailedTab({
               <CompactReviewCard
                 block={block}
                 review={reviews.get(block.id)}
+                isLoading={loadingBlockIds.has(block.id)}
                 isActive={activeBlockId === block.id}
                 onClick={() => onBlockClick(block.id)}
                 onReReview={() => onReReview(block.id)}
@@ -841,51 +1076,17 @@ function DetailedTab({
 }
 
 /**
- * AI Review side panel with three tabs:
- * - Configure: Review settings, prompts, model selection
- * - Overall: Holistic feedback on entire application
- * - Detailed: Question by question reviews
+ * Header component for the AI Review panel - can be rendered separately
  */
-export function AIReviewPanel({
-  pageId,
-  blocks,
-  reviews,
-  blockPositions,
-  activeBlockId,
-  isReviewingAll,
-  initialTab,
+export function BlockReviewPanelHeader({
+  activeTab,
+  onTabChange,
   onClose,
-  onBlockClick,
-  onReReview,
-  onReviewAll,
-}: AIReviewPanelProps) {
-  // Load initial tab from: query param > localStorage > default ("configure")
-  const [activeTab, setActiveTab] = useState<ReviewTab>(() => {
-    // Query param takes highest priority
-    if (initialTab) return initialTab;
-
-    // Then check localStorage
-    if (typeof window !== "undefined") {
-      const stored = localStorage.getItem(`review-panel-tab-${pageId}`);
-      if (
-        stored === "configure" ||
-        stored === "overall" ||
-        stored === "detailed"
-      ) {
-        return stored;
-      }
-    }
-
-    // Default to configure
-    return "configure";
-  });
-
-  // Persist tab selection to localStorage
-  const handleTabChange = (tab: ReviewTab) => {
-    setActiveTab(tab);
-    localStorage.setItem(`review-panel-tab-${pageId}`, tab);
-  };
-
+}: {
+  activeTab: ReviewTab;
+  onTabChange: (tab: ReviewTab) => void;
+  onClose: () => void;
+}) {
   const tabs: { id: ReviewTab; label: string; icon: React.ReactNode }[] = [
     {
       id: "configure",
@@ -897,38 +1098,71 @@ export function AIReviewPanel({
   ];
 
   return (
-    <div className="h-full flex flex-col">
-      {/* Header with tabs */}
-      <div className="flex-shrink-0 border-b border-base-300">
-        <div className="flex items-center justify-between px-2 pt-2">
-          <div className="flex">
-            {tabs.map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => handleTabChange(tab.id)}
-                className={`
-                  flex items-center gap-1.5 px-3 py-2 text-sm font-medium rounded-t-lg transition-colors
-                  ${
-                    activeTab === tab.id
-                      ? "text-primary border-b-2 border-primary -mb-[1px] bg-base-100"
-                      : "text-base-content/60 hover:text-base-content"
-                  }
-                `}
-              >
-                {tab.icon}
-                {tab.label}
-              </button>
-            ))}
-          </div>
+    <div className="flex items-center justify-between px-4 py-2 h-full">
+      <div className="flex items-center gap-1">
+        {tabs.map((tab) => (
           <button
-            onClick={onClose}
-            className="btn btn-ghost btn-sm btn-square"
-            aria-label="Close review panel"
+            key={tab.id}
+            onClick={() => onTabChange(tab.id)}
+            className={`
+              flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg transition-colors
+              ${
+                activeTab === tab.id
+                  ? "text-primary bg-primary/10"
+                  : "text-base-content/60 hover:text-base-content hover:bg-base-200"
+              }
+            `}
           >
-            <X className="h-4 w-4" />
+            {tab.icon}
+            {tab.label}
           </button>
-        </div>
+        ))}
       </div>
+      <button
+        onClick={onClose}
+        className="btn btn-ghost btn-sm btn-square"
+        aria-label="Close review panel"
+      >
+        <X className="h-4 w-4" />
+      </button>
+    </div>
+  );
+}
+
+/**
+ * AI Review side panel with three tabs:
+ * - Configure: Review settings, prompts, model selection
+ * - Overall: Holistic feedback on entire application
+ * - Detailed: Question by question reviews
+ */
+export function BlockReviewPanel({
+  pageId,
+  blocks,
+  reviews,
+  loadingBlockIds,
+  blockPositions,
+  activeBlockId,
+  isReviewingAll,
+  activeTab,
+  onTabChange,
+  onClose,
+  onBlockClick,
+  onReReview,
+  onReviewAll,
+  externalHeader,
+}: AIReviewPanelProps) {
+  return (
+    <div className="h-full flex flex-col bg-base-100">
+      {/* Header - only render inline if not external */}
+      {!externalHeader && onTabChange && (
+        <div className="flex-shrink-0 border-b border-base-300 bg-base-100">
+          <BlockReviewPanelHeader
+            activeTab={activeTab}
+            onTabChange={onTabChange}
+            onClose={onClose}
+          />
+        </div>
+      )}
 
       {/* Loading indicator for review all */}
       {isReviewingAll && (
@@ -945,6 +1179,7 @@ export function AIReviewPanel({
         {activeTab === "configure" && <ConfigureTab pageId={pageId} />}
         {activeTab === "overall" && (
           <OverallTab
+            pageId={pageId}
             blocks={blocks}
             reviews={reviews}
             onReviewAll={onReviewAll}
@@ -955,6 +1190,7 @@ export function AIReviewPanel({
           <DetailedTab
             blocks={blocks}
             reviews={reviews}
+            loadingBlockIds={loadingBlockIds}
             blockPositions={blockPositions}
             activeBlockId={activeBlockId}
             isReviewingAll={isReviewingAll}
@@ -967,3 +1203,6 @@ export function AIReviewPanel({
     </div>
   );
 }
+
+// Keep the old name as an alias for backwards compatibility
+export const AIReviewPanel = BlockReviewPanel;
