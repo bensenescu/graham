@@ -1,27 +1,22 @@
 import { z } from "zod";
 
-// === Q&A Block Schema ===
-export const qaBlockSchema = z.object({
+// === Page Block Schema (normalized - stored in page_blocks table) ===
+export const pageBlockSchema = z.object({
   id: z.string(),
+  pageId: z.string(),
   question: z.string(),
   answer: z.string(),
   sortKey: z.string(),
+  createdAt: z.string().optional(),
+  updatedAt: z.string().optional(),
 });
 
-export type QABlock = z.infer<typeof qaBlockSchema>;
-
-// === Page Content Schema (JSON structure) ===
-export const pageContentSchema = z.object({
-  blocks: z.array(qaBlockSchema),
-});
-
-export type PageContent = z.infer<typeof pageContentSchema>;
+export type PageBlock = z.infer<typeof pageBlockSchema>;
 
 // === Create Page ===
 export const createPageSchema = z.object({
   id: z.string().length(36), // expect uuid
   title: z.string().min(1, "Title is required").max(255, "Title too long"),
-  content: z.string().default(""), // JSON string of PageContent
 });
 
 export type CreatePageInput = z.infer<typeof createPageSchema>;
@@ -34,7 +29,6 @@ export const updatePageSchema = z.object({
     .min(1, "Title is required")
     .max(255, "Title too long")
     .optional(),
-  content: z.string().optional(), // JSON string of PageContent
 });
 
 export type UpdatePageInput = z.infer<typeof updatePageSchema>;
@@ -46,27 +40,47 @@ export const deletePageSchema = z.object({
 
 export type DeletePageInput = z.infer<typeof deletePageSchema>;
 
-// === Helper functions ===
+// === Create Page Block ===
+export const createPageBlockSchema = z.object({
+  id: z.string().length(36),
+  pageId: z.string().uuid("Invalid page ID"),
+  question: z.string(),
+  answer: z.string().default(""),
+  sortKey: z.string(),
+});
 
-/**
- * Parse page content JSON string to PageContent object
- */
-export function parsePageContent(content: string): PageContent {
-  if (!content || content === "") {
-    return { blocks: [] };
-  }
-  try {
-    const parsed = JSON.parse(content);
-    return pageContentSchema.parse(parsed);
-  } catch {
-    // If parsing fails, return empty blocks
-    return { blocks: [] };
-  }
-}
+export type CreatePageBlockInput = z.infer<typeof createPageBlockSchema>;
 
-/**
- * Stringify PageContent object to JSON string
- */
-export function stringifyPageContent(content: PageContent): string {
-  return JSON.stringify(content);
-}
+// === Update Page Block ===
+export const updatePageBlockSchema = z.object({
+  id: z.string().uuid("Invalid block ID"),
+  question: z.string().optional(),
+  answer: z.string().optional(),
+  sortKey: z.string().optional(),
+});
+
+export type UpdatePageBlockInput = z.infer<typeof updatePageBlockSchema>;
+
+// === Delete Page Block ===
+export const deletePageBlockSchema = z.object({
+  id: z.string().uuid("Invalid block ID"),
+});
+
+export type DeletePageBlockInput = z.infer<typeof deletePageBlockSchema>;
+
+// === Batch Create Page Blocks (for template creation) ===
+export const batchCreatePageBlocksSchema = z.object({
+  pageId: z.string().uuid("Invalid page ID"),
+  blocks: z.array(
+    z.object({
+      id: z.string().length(36),
+      question: z.string(),
+      answer: z.string().default(""),
+      sortKey: z.string(),
+    }),
+  ),
+});
+
+export type BatchCreatePageBlocksInput = z.infer<
+  typeof batchCreatePageBlocksSchema
+>;

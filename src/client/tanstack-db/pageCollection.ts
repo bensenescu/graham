@@ -23,18 +23,24 @@ export const pageCollection = lazyInitForWorkers(() =>
       onInsert: async ({ transaction }) => {
         const { modified: newPage } = transaction.mutations[0];
         await createPage({
-          data: newPage,
+          data: {
+            id: newPage.id,
+            title: newPage.title,
+          },
         });
       },
       onUpdate: async ({ transaction }) => {
         const { modified } = transaction.mutations[0];
         await updatePage({
-          data: modified,
+          data: {
+            id: modified.id,
+            title: modified.title,
+          },
         });
       },
       onDelete: async ({ transaction }) => {
         const { original } = transaction.mutations[0];
-        await deletePage({ data: original });
+        await deletePage({ data: { id: original.id } });
       },
     }),
   ),

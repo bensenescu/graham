@@ -7,12 +7,10 @@ type CreatePage = {
   id: string;
   userId: string;
   title: string;
-  content?: string;
 };
 
 type UpdatePage = {
   title?: string;
-  content?: string;
   updatedAt?: string;
 };
 
@@ -25,7 +23,6 @@ async function findAllByUserId(userId: string) {
     columns: {
       id: true,
       title: true,
-      content: true,
       createdAt: true,
       updatedAt: true,
     },
@@ -43,6 +40,18 @@ async function findByIdAndUserId(id: string, userId: string) {
 }
 
 /**
+ * Find a page by ID and user ID with its blocks.
+ */
+async function findByIdAndUserIdWithBlocks(id: string, userId: string) {
+  return db.query.pages.findFirst({
+    where: and(eq(pages.id, id), eq(pages.userId, userId)),
+    with: {
+      blocks: true,
+    },
+  });
+}
+
+/**
  * Create a page.
  */
 async function create(data: CreatePage) {
@@ -50,7 +59,6 @@ async function create(data: CreatePage) {
     id: data.id,
     userId: data.userId,
     title: data.title,
-    content: data.content ?? "",
   });
 }
 
@@ -79,6 +87,7 @@ async function deleteById(id: string, userId: string) {
 export const PageRepository = {
   findAllByUserId,
   findByIdAndUserId,
+  findByIdAndUserIdWithBlocks,
   create,
   update,
   delete: deleteById,

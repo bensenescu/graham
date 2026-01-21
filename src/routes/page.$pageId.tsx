@@ -1,14 +1,13 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useLiveQuery } from "@tanstack/react-db";
+import { useLiveQuery, eq } from "@tanstack/react-db";
 import { useState, useCallback, useMemo } from "react";
 import { ArrowLeft, Trash2 } from "lucide-react";
-import { pageCollection } from "@/client/tanstack-db";
-import { QAEditor } from "@/client/components/QAEditor";
 import {
-  parsePageContent,
-  stringifyPageContent,
-  type PageContent,
-} from "@/types/schemas/pages";
+  pageCollection,
+  createPageBlockCollection,
+} from "@/client/tanstack-db";
+import { QAEditor } from "@/client/components/QAEditor";
+import type { PageBlock } from "@/types/schemas/pages";
 
 export const Route = createFileRoute("/page/$pageId")({
   component: PageEditor,
@@ -20,20 +19,23 @@ function PageEditor() {
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [titleInput, setTitleInput] = useState("");
 
-  // Live query for this specific page
-  const { data: pages, isLoading } = useLiveQuery((q) =>
-    q.from({ page: pageCollection }),
+  // Create block collection for this page
+  const blockCollection = useMemo(
+    () => createPageBlockCollection(pageId),
+    [pageId],
   );
 
-  const page = useMemo(
-    () => pages?.find((p) => p.id === pageId),
-    [pages, pageId],
+  // Live query for this specific page (filtered by ID)
+  const { data: pages, isLoading: isLoadingPages } = useLiveQuery((q) =>
+    q.from({ page: pageCollection }).where(({ page }) => eq(page.id, pageId)),
   );
 
-  // Parse the content JSON
-  const content = useMemo(() => {
-    return parsePageContent(page?.content || "");
-  }, [page?.content]);
+  // Live query for blocks
+  const { data: blocks, isLoading: isLoadingBlocks } = useLiveQuery((q) =>
+    q.from({ block: blockCollection }),
+  );
+
+  const page = pages?.[0];
 
   const handleTitleClick = useCallback(() => {
     if (page) {
@@ -63,16 +65,38 @@ function PageEditor() {
     [handleTitleSubmit],
   );
 
-  const handleContentChange = useCallback(
-    (newContent: PageContent) => {
-      if (page) {
-        pageCollection.update(pageId, (draft) => {
-          draft.content = stringifyPageContent(newContent);
-          draft.updatedAt = new Date().toISOString();
-        });
-      }
+  const handleBlockCreate = useCallback(
+    (block: PageBlock) => {
+      blockCollection.insert({
+        id: block.id,
+        pageId: block.pageId,
+        question: block.question,
+        answer: block.answer,
+        sortKey: block.sortKey,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      });
     },
-    [page, pageId],
+    [blockCollection],
+  );
+
+  const handleBlockUpdate = useCallback(
+    (id: string, updates: Partial<PageBlock>) => {
+      blockCollection.update(id, (draft) => {
+        if (updates.question !== undefined) draft.question = updates.question;
+        if (updates.answer !== undefined) draft.answer = updates.answer;
+        if (updates.sortKey !== undefined) draft.sortKey = updates.sortKey;
+        draft.updatedAt = new Date().toISOString();
+      });
+    },
+    [blockCollection],
+  );
+
+  const handleBlockDelete = useCallback(
+    (id: string) => {
+      blockCollection.delete(id);
+    },
+    [blockCollection],
   );
 
   const handleDelete = useCallback(() => {
@@ -80,7 +104,7 @@ function PageEditor() {
     navigate({ to: "/" });
   }, [pageId, navigate]);
 
-  if (isLoading) {
+  if (isLoadingPages || isLoadingBlocks) {
     return (
       <div className="h-full flex items-center justify-center">
         <span className="loading loading-spinner loading-md"></span>
@@ -150,7 +174,13 @@ function PageEditor() {
 
       {/* Q&A Editor */}
       <div className="flex-1 overflow-hidden">
-        <QAEditor content={content} onContentChange={handleContentChange} />
+        <QAEditor
+          pageId={pageId}
+          blocks={blocks ?? []}
+          onBlockCreate={handleBlockCreate}
+          onBlockUpdate={handleBlockUpdate}
+          onBlockDelete={handleBlockDelete}
+        />
       </div>
     </div>
   );

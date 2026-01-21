@@ -1,7 +1,12 @@
 import { Link, useLocation, useNavigate } from "@tanstack/react-router";
-import { FileText, Plus, ChevronRight } from "lucide-react";
+import { FileText, Plus, ChevronRight, LayoutTemplate } from "lucide-react";
 import { useLiveQuery } from "@tanstack/react-db";
 import { pageCollection } from "@/client/tanstack-db";
+import { templates } from "@/templates";
+import {
+  createPageFromTemplate,
+  createPageFromTemplateParams,
+} from "@/client/actions/createPageFromTemplate";
 
 interface SidebarNavProps {
   onNavigate?: () => void;
@@ -17,16 +22,19 @@ export function SidebarNav({ onNavigate }: SidebarNavProps) {
   const navigate = useNavigate();
   const currentPath = location.pathname;
 
-  // Get all pages
-  const { data: pages } = useLiveQuery((q) => q.from({ page: pageCollection }));
+  // Get recent pages (sorted by updatedAt desc, limited to 10)
+  const { data: recentPages } = useLiveQuery((q) =>
+    q
+      .from({ page: pageCollection })
+      .orderBy(({ page }) => page.updatedAt, "desc")
+      .limit(10),
+  );
 
-  // Sort pages by updatedAt (most recent first) and take first 10
-  const sortedPages = [...(pages ?? [])].sort((a, b) => {
-    const dateA = new Date(a.updatedAt ?? 0).getTime();
-    const dateB = new Date(b.updatedAt ?? 0).getTime();
-    return dateB - dateA;
-  });
-  const recentPages = sortedPages.slice(0, 10);
+  // Get total page count to show "See all" link
+  const { data: allPages } = useLiveQuery((q) =>
+    q.from({ page: pageCollection }),
+  );
+  const totalPageCount = allPages?.length ?? 0;
 
   // Extract page ID from URL if on a page
   const pageMatch = currentPath.match(/^\/page\/([^/]+)/);
@@ -41,11 +49,25 @@ export function SidebarNav({ onNavigate }: SidebarNavProps) {
     pageCollection.insert({
       id,
       title: "Untitled",
-      content: "",
       createdAt: now,
       updatedAt: now,
     });
     navigate({ to: "/page/$pageId", params: { pageId: id } });
+    onNavigate?.();
+  };
+
+  const handleNewPageFromTemplate = (templateId: string) => {
+    const template = templates.find((t) => t.id === templateId);
+    if (!template) return;
+
+    // Create params with pre-generated IDs
+    const params = createPageFromTemplateParams(template);
+
+    // Execute optimistic action (instant UI update + server sync)
+    createPageFromTemplate(params);
+
+    // Navigate immediately - optimistic state is already visible
+    navigate({ to: "/page/$pageId", params: { pageId: params.pageId } });
     onNavigate?.();
   };
 
@@ -95,7 +117,7 @@ export function SidebarNav({ onNavigate }: SidebarNavProps) {
         </div>
 
         {/* Recent Pages */}
-        {recentPages.length > 0 && (
+        {recentPages && recentPages.length > 0 && (
           <div className="ml-4 pl-4 border-l border-base-300">
             {recentPages.map((page) => {
               const isActivePage = page.id === activePageId;
@@ -117,7 +139,7 @@ export function SidebarNav({ onNavigate }: SidebarNavProps) {
             })}
 
             {/* See All Pages button */}
-            {sortedPages.length > 10 && (
+            {totalPageCount > 10 && (
               <Link
                 to="/"
                 onClick={onNavigate}
@@ -131,7 +153,7 @@ export function SidebarNav({ onNavigate }: SidebarNavProps) {
         )}
 
         {/* Empty state */}
-        {recentPages.length === 0 && (
+        {(!recentPages || recentPages.length === 0) && (
           <div className="ml-4 pl-4 border-l border-base-300">
             <button
               onClick={handleNewPage}
@@ -142,6 +164,26 @@ export function SidebarNav({ onNavigate }: SidebarNavProps) {
             </button>
           </div>
         )}
+
+        {/* Templates Section */}
+        <div className="mt-6">
+          <div className="flex items-center gap-3 pl-4 pr-4 py-2 text-sm text-base-content/60">
+            <LayoutTemplate className="h-5 w-5" />
+            Templates
+          </div>
+          <div className="ml-4 pl-4 border-l border-base-300">
+            {templates.map((template) => (
+              <button
+                key={template.id}
+                onClick={() => handleNewPageFromTemplate(template.id)}
+                className="flex items-center gap-2 py-2 px-2 text-sm text-base-content/70 hover:text-base-content hover:bg-base-200 rounded-lg transition-colors w-full text-left"
+              >
+                <Plus className="h-4 w-4 flex-shrink-0" />
+                <span className="truncate">{template.name}</span>
+              </button>
+            ))}
+          </div>
+        </div>
       </nav>
     </div>
   );
