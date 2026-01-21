@@ -29,6 +29,20 @@
       "when": 1769022063948,
       "tag": "0003_round_champions",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1769025583805,
+      "tag": "0004_powerful_beast",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1769025746792,
+      "tag": "0005_nervous_alex_power",
+      "breakpoints": true
     }
   ]
 }

@@ -4,3 +4,5 @@ export { pageCollection } from "./pageCollection";
 export { createPageBlockCollection } from "./pageBlockCollection";
 export { promptCollection } from "./promptCollection";
 export { createPageReviewSettingsCollection } from "./pageReviewSettingsCollection";
+export { createPageOverallReviewSettingsCollection } from "./pageOverallReviewSettingsCollection";
+export { createBlockReviewCollection } from "./blockReviewCollection";

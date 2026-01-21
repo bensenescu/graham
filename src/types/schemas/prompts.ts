@@ -95,3 +95,48 @@ export const aiModels = [
 ] as const;
 
 export type AIModelId = (typeof aiModels)[number]["id"];
+
+// === Overall Review Mode ===
+export const overallReviewModeSchema = z.enum([
+  "all_prompts",
+  "select_prompts",
+  "custom",
+]);
+
+export type OverallReviewMode = z.infer<typeof overallReviewModeSchema>;
+
+// === Page Overall Review Settings Schema ===
+export const pageOverallReviewSettingsSchema = z.object({
+  id: z.string(),
+  pageId: z.string(),
+  mode: overallReviewModeSchema,
+  customPrompt: z.string().nullable(),
+  createdAt: z.string().optional(),
+  updatedAt: z.string().optional(),
+});
+
+export type PageOverallReviewSettings = z.infer<
+  typeof pageOverallReviewSettingsSchema
+>;
+
+// === Page Overall Review Settings with Selected Prompts ===
+export const pageOverallReviewSettingsWithPromptsSchema =
+  pageOverallReviewSettingsSchema.extend({
+    selectedPrompts: z.array(promptSchema),
+  });
+
+export type PageOverallReviewSettingsWithPrompts = z.infer<
+  typeof pageOverallReviewSettingsWithPromptsSchema
+>;
+
+// === Update Page Overall Review Settings ===
+export const updatePageOverallReviewSettingsSchema = z.object({
+  pageId: z.string().uuid("Invalid page ID"),
+  mode: overallReviewModeSchema.optional(),
+  customPrompt: z.string().nullable().optional(),
+  selectedPromptIds: z.array(z.string().uuid()).optional(),
+});
+
+export type UpdatePageOverallReviewSettingsInput = z.infer<
+  typeof updatePageOverallReviewSettingsSchema
+>;

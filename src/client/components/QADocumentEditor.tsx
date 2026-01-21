@@ -18,7 +18,7 @@ import {
 } from "@dnd-kit/sortable";
 import { QADocumentBlock } from "./QADocumentBlock";
 import type { PageBlock } from "@/types/schemas/pages";
-import type { AIReview } from "@/types/schemas/reviews";
+import type { BlockReview } from "@/types/schemas/reviews";
 import {
   generateDefaultSortKey,
   generateSortKeyBetween,
@@ -28,7 +28,7 @@ interface QADocumentEditorProps {
   pageId: string;
   pageTitle?: string;
   blocks: PageBlock[];
-  reviews?: Map<string, AIReview>;
+  reviews?: Map<string, BlockReview>;
   activeBlockId?: string | null;
   showGradeBadges?: boolean;
   onBlockCreate: (block: PageBlock) => void;

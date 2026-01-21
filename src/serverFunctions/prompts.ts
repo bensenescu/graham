@@ -3,12 +3,14 @@ import { ensureUserMiddleware } from "@/middleware/ensureUser";
 import { useSessionTokenClientMiddleware } from "@every-app/sdk/tanstack";
 import { PromptService } from "@/server/services/PromptService";
 import { PageReviewSettingsService } from "@/server/services/PageReviewSettingsService";
+import { PageOverallReviewSettingsService } from "@/server/services/PageOverallReviewSettingsService";
 import {
   createPromptSchema,
   updatePromptSchema,
   deletePromptSchema,
   createPageReviewSettingsSchema,
   updatePageReviewSettingsSchema,
+  updatePageOverallReviewSettingsSchema,
 } from "@/types/schemas/prompts";
 import { z } from "zod";
 
@@ -77,4 +79,27 @@ export const initializePageReviewSettings = createServerFn()
       data.pageId,
       data.pageTitle,
     );
+  });
+
+// === Page Overall Review Settings Server Functions ===
+
+export const getPageOverallReviewSettings = createServerFn()
+  .middleware([useSessionTokenClientMiddleware, ensureUserMiddleware])
+  .inputValidator((data: unknown) =>
+    z.object({ pageId: z.string().uuid() }).parse(data),
+  )
+  .handler(async ({ data, context }) => {
+    return PageOverallReviewSettingsService.getByPageId(
+      context.userId,
+      data.pageId,
+    );
+  });
+
+export const updatePageOverallReviewSettings = createServerFn()
+  .middleware([useSessionTokenClientMiddleware, ensureUserMiddleware])
+  .inputValidator((data: unknown) =>
+    updatePageOverallReviewSettingsSchema.parse(data),
+  )
+  .handler(async ({ data, context }) => {
+    return PageOverallReviewSettingsService.update(context.userId, data);
   });
