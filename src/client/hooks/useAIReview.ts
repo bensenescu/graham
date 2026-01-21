@@ -1,15 +1,31 @@
-import { useState, useCallback, useMemo, useRef } from "react";
+import { useState, useCallback, useMemo } from "react";
 import { useLiveQuery } from "@tanstack/react-db";
-import { createOptimisticAction } from "@tanstack/react-db";
+import { useMutation } from "@tanstack/react-query";
 import type { BlockReview, ReviewSummary } from "@/types/schemas/reviews";
 import type { PageBlock } from "@/types/schemas/pages";
 import { authenticatedFetch } from "@every-app/sdk/core";
 import { createBlockReviewCollection } from "@/client/tanstack-db";
+import type { ReviewTab } from "@/client/components/AIReviewPanel";
+
+export type { ReviewTab };
 
 interface ReviewAPIResponse {
   strengths: string[];
   improvements: string[];
   tips?: string[] | null;
+}
+
+interface UseAIReviewOptions {
+  pageId: string;
+  blocks: PageBlock[];
+  promptId: string | null;
+  customInstructions?: string;
+}
+
+interface ReviewMutationVariables {
+  block: PageBlock;
+  promptId: string;
+  customInstructions?: string;
 }
 
 /**
@@ -60,17 +76,6 @@ function calculateSummary(
   };
 }
 
-interface UseAIReviewOptions {
-  pageId: string;
-  blocks: PageBlock[];
-  promptId: string | null; // The prompt to use for reviews
-  customInstructions?: string;
-}
-
-import type { ReviewTab } from "@/client/components/AIReviewPanel";
-// Re-export ReviewTab for convenience
-export type { ReviewTab };
-
 /**
  * Hook for managing AI review state and operations.
  */
@@ -92,12 +97,9 @@ export function useAIReview({
   );
 
   // Convert to a Map keyed by blockId for easy lookup
-  // Note: For now we only have one review per block (using default prompt)
-  // In the future when we support multiple prompts, we'll need a different structure
   const reviews = useMemo(() => {
     const map = new Map<string, BlockReview>();
     for (const review of reviewsArray ?? []) {
-      // Only include reviews for the current prompt
       if (promptId && review.promptId === promptId) {
         map.set(review.blockId, review);
       }
@@ -114,110 +116,83 @@ export function useAIReview({
   const [activeBlockId, setActiveBlockId] = useState<string | null>(null);
   const [requestedTab, setRequestedTab] = useState<ReviewTab | null>(null);
 
-  // Keep refs for values needed in the optimistic action
-  const customInstructionsRef = useRef(customInstructions);
-  customInstructionsRef.current = customInstructions;
-
-  const promptIdRef = useRef(promptId);
-  promptIdRef.current = promptId;
-
   // Calculate summary
   const summary = useMemo(
     () => calculateSummary(pageId, Array.from(reviews.values()), blocks.length),
     [pageId, reviews, blocks.length],
   );
 
-  // Create the optimistic action for reviewing a block
-  const reviewBlockAction = useMemo(() => {
-    return createOptimisticAction<{ block: PageBlock }>({
-      onMutate: ({ block }) => {
-        // Add to loading set (we don't insert a placeholder into the collection)
-        setLoadingBlockIds((prev) => new Set(prev).add(block.id));
-      },
-      mutationFn: async ({ block }) => {
-        const currentPromptId = promptIdRef.current;
-        if (!currentPromptId) {
-          throw new Error("No prompt selected for review");
-        }
+  // React Query mutation for reviewing a block
+  const reviewMutation = useMutation({
+    mutationFn: async ({
+      block,
+      customInstructions,
+    }: ReviewMutationVariables) => {
+      const result = await callReviewAPI(block, customInstructions);
+      return { block, result };
+    },
+    onMutate: async ({ block }) => {
+      setLoadingBlockIds((prev) => new Set(prev).add(block.id));
+    },
+    onSuccess: ({ block, result }, { promptId }) => {
+      const reviewId = crypto.randomUUID();
+      const now = new Date().toISOString();
 
-        try {
-          // Call the API to get the review
-          const result = await callReviewAPI(
-            block,
-            customInstructionsRef.current,
-          );
+      reviewCollection.insert({
+        id: reviewId,
+        blockId: block.id,
+        promptId,
+        strengths: result.strengths,
+        improvements: result.improvements,
+        tips: result.tips ?? null,
+        answerSnapshot: block.answer || null,
+        createdAt: now,
+        updatedAt: now,
+      });
 
-          // Generate an ID for the review
-          const reviewId = crypto.randomUUID();
-          const now = new Date().toISOString();
-
-          // Insert the review into the collection (this will persist via onInsert handler)
-          reviewCollection.insert({
-            id: reviewId,
-            blockId: block.id,
-            promptId: currentPromptId,
-            strengths: result.strengths,
-            improvements: result.improvements,
-            tips: result.tips ?? null,
-            answerSnapshot: block.answer || null,
-            createdAt: now,
-            updatedAt: now,
-          });
-
-          // Remove from loading set
-          setLoadingBlockIds((prev) => {
-            const next = new Set(prev);
-            next.delete(block.id);
-            return next;
-          });
-
-          return result;
-        } catch (error) {
-          // Remove from loading set on error
-          setLoadingBlockIds((prev) => {
-            const next = new Set(prev);
-            next.delete(block.id);
-            return next;
-          });
-          throw error;
-        }
-      },
-    });
-  }, [reviewCollection]);
+      setLoadingBlockIds((prev) => {
+        const next = new Set(prev);
+        next.delete(block.id);
+        return next;
+      });
+    },
+    onError: (_error, { block }) => {
+      setLoadingBlockIds((prev) => {
+        const next = new Set(prev);
+        next.delete(block.id);
+        return next;
+      });
+    },
+  });
 
   // Review a single block
   const reviewBlock = useCallback(
     async (blockId: string) => {
       const block = blocks.find((b) => b.id === blockId);
-      if (!block) return;
-
-      if (!promptId) {
-        console.error("No prompt selected for review");
-        return;
-      }
+      if (!block || !promptId) return;
 
       // Open panel, focus on this block, and switch to detailed tab
       setIsPanelOpen(true);
       setActiveBlockId(blockId);
       setRequestedTab("detailed");
 
-      // Execute the optimistic action
+      // Execute the mutation
       try {
-        await reviewBlockAction({ block });
-      } catch (error) {
-        console.error("Review failed:", error);
-        // Error is already handled in mutationFn (loading state cleared)
+        await reviewMutation.mutateAsync({
+          block,
+          promptId,
+          customInstructions,
+        });
+      } catch {
+        // Error handled in onError
       }
     },
-    [blocks, promptId, reviewBlockAction],
+    [blocks, promptId, customInstructions, reviewMutation],
   );
 
   // Review all blocks
   const reviewAll = useCallback(async () => {
-    if (!promptId) {
-      console.error("No prompt selected for review");
-      return;
-    }
+    if (!promptId) return;
 
     setIsReviewingAll(true);
     setIsPanelOpen(true);
@@ -229,16 +204,20 @@ export function useAIReview({
       await Promise.all(
         batch.map(async (block) => {
           try {
-            await reviewBlockAction({ block });
-          } catch (e) {
-            console.error(`Review failed for block ${block.id}:`, e);
+            await reviewMutation.mutateAsync({
+              block,
+              promptId,
+              customInstructions,
+            });
+          } catch {
+            // Error handled in onError
           }
         }),
       );
     }
 
     setIsReviewingAll(false);
-  }, [blocks, promptId, reviewBlockAction]);
+  }, [blocks, promptId, customInstructions, reviewMutation]);
 
   // Open panel
   const openPanel = useCallback(() => {
