@@ -1,6 +1,52 @@
 import { sqliteTable, text, index } from "drizzle-orm/sqlite-core";
 import { sql, relations } from "drizzle-orm";
 
+// === AI Review Prompts ===
+
+// Prompts table (global prompts shared across all pages)
+export const prompts = sqliteTable(
+  "prompts",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    prompt: text("prompt").notNull(),
+    createdAt: text("created_at")
+      .notNull()
+      .default(sql`(current_timestamp)`),
+    updatedAt: text("updated_at")
+      .notNull()
+      .default(sql`(current_timestamp)`),
+  },
+  (table) => [index("prompts_user_id_idx").on(table.userId)],
+);
+
+// Page Review Settings table (per-page configuration)
+export const pageReviewSettings = sqliteTable(
+  "page_review_settings",
+  {
+    id: text("id").primaryKey(),
+    pageId: text("page_id")
+      .notNull()
+      .unique()
+      .references(() => pages.id, { onDelete: "cascade" }),
+    model: text("model").notNull().default("openai-gpt-5.2-high"),
+    defaultPromptId: text("default_prompt_id").references(() => prompts.id, {
+      onDelete: "set null",
+    }),
+    customPromptIds: text("custom_prompt_ids").notNull().default("[]"), // JSON array of prompt IDs
+    createdAt: text("created_at")
+      .notNull()
+      .default(sql`(current_timestamp)`),
+    updatedAt: text("updated_at")
+      .notNull()
+      .default(sql`(current_timestamp)`),
+  },
+  (table) => [index("page_review_settings_page_id_idx").on(table.pageId)],
+);
+
 // Users table
 export const users = sqliteTable("users", {
   id: text("id").primaryKey(),
@@ -71,6 +117,27 @@ export const pageBlocksRelations = relations(pageBlocks, ({ one }) => ({
   }),
 }));
 
+export const promptsRelations = relations(prompts, ({ one }) => ({
+  user: one(users, {
+    fields: [prompts.userId],
+    references: [users.id],
+  }),
+}));
+
+export const pageReviewSettingsRelations = relations(
+  pageReviewSettings,
+  ({ one }) => ({
+    page: one(pages, {
+      fields: [pageReviewSettings.pageId],
+      references: [pages.id],
+    }),
+    defaultPrompt: one(prompts, {
+      fields: [pageReviewSettings.defaultPromptId],
+      references: [prompts.id],
+    }),
+  }),
+);
+
 // === Type Exports ===
 
 export type User = typeof users.$inferSelect;
@@ -81,3 +148,9 @@ export type NewPage = typeof pages.$inferInsert;
 
 export type PageBlock = typeof pageBlocks.$inferSelect;
 export type NewPageBlock = typeof pageBlocks.$inferInsert;
+
+export type Prompt = typeof prompts.$inferSelect;
+export type NewPrompt = typeof prompts.$inferInsert;
+
+export type PageReviewSettings = typeof pageReviewSettings.$inferSelect;
+export type NewPageReviewSettings = typeof pageReviewSettings.$inferInsert;

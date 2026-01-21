@@ -9,22 +9,29 @@ import {
   Settings2,
   FileText,
   List,
+  Plus,
+  Trash2,
+  Edit2,
 } from "lucide-react";
 import type { AIReview } from "@/types/schemas/reviews";
 import type { PageBlock } from "@/types/schemas/pages";
+import type { Prompt } from "@/types/schemas/prompts";
 import {
   type BlockPosition,
   calculateCardPositions,
 } from "@/client/hooks/useBlockPositions";
+import { usePageReviewSettings } from "@/client/hooks/usePageReviewSettings";
 
 type ReviewTab = "configure" | "overall" | "detailed";
 
 interface AIReviewPanelProps {
+  pageId: string;
   blocks: PageBlock[];
   reviews: Map<string, AIReview>;
   blockPositions: Map<string, BlockPosition>;
   activeBlockId: string | null;
   isReviewingAll: boolean;
+  initialTab?: ReviewTab;
   onClose: () => void;
   onBlockClick: (blockId: string) => void;
   onReReview: (blockId: string) => void;
@@ -32,31 +39,132 @@ interface AIReviewPanelProps {
 }
 
 /**
+ * Prompt card component
+ */
+function PromptCard({
+  prompt,
+  isDefault,
+  onEdit,
+  onDelete,
+  onSetDefault,
+}: {
+  prompt: Prompt;
+  isDefault?: boolean;
+  onEdit: () => void;
+  onDelete: () => void;
+  onSetDefault?: () => void;
+}) {
+  return (
+    <div className="p-3 rounded-lg border border-base-300 bg-base-200/30">
+      <div className="flex items-start justify-between gap-2">
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-medium truncate">{prompt.name}</span>
+            {isDefault && (
+              <span className="badge badge-primary badge-xs">Default</span>
+            )}
+          </div>
+          <p className="text-xs text-base-content/50 mt-1 line-clamp-2">
+            {prompt.prompt}
+          </p>
+        </div>
+        <div className="flex items-center gap-1 flex-shrink-0">
+          {!isDefault && onSetDefault && (
+            <button
+              onClick={onSetDefault}
+              className="btn btn-ghost btn-xs text-base-content/50"
+              title="Set as default"
+            >
+              <Sparkles className="h-3 w-3" />
+            </button>
+          )}
+          <button
+            onClick={onEdit}
+            className="btn btn-ghost btn-xs text-base-content/50"
+            title="Edit prompt"
+          >
+            <Edit2 className="h-3 w-3" />
+          </button>
+          <button
+            onClick={onDelete}
+            className="btn btn-ghost btn-xs text-error/50 hover:text-error"
+            title="Delete prompt"
+          >
+            <Trash2 className="h-3 w-3" />
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/**
  * Configure tab - Review settings, prompts, and model selection
  */
-function ConfigureTab() {
-  const [model, setModel] = useState("openai-gpt-5.2-high");
-  const [defaultPrompt, setDefaultPrompt] = useState(
-    "Review this YC application answer. Evaluate clarity, specificity, and persuasiveness. Provide actionable feedback.",
-  );
+function ConfigureTab({ pageId }: { pageId: string }) {
+  const {
+    settings,
+    defaultPrompt,
+    customPrompts,
+    availablePrompts,
+    prompts,
+    aiModels,
+    isLoading,
+    updateModel,
+    updateDefaultPromptId,
+    addCustomPrompt,
+    removeCustomPrompt,
+    createPrompt,
+    updatePrompt,
+    deletePrompt,
+  } = usePageReviewSettings(pageId);
 
-  const models = [
-    {
-      id: "openai-gpt-5.2-xhigh",
-      name: "OpenAI - GPT 5.2 xhigh",
-      description: "Highest quality, slower",
-    },
-    {
-      id: "openai-gpt-5.2-high",
-      name: "OpenAI - GPT 5.2 high",
-      description: "Balanced quality and speed",
-    },
-    {
-      id: "anthropic-opus-4.5",
-      name: "Anthropic - Opus 4.5",
-      description: "Strong reasoning",
-    },
-  ];
+  const [isCreating, setIsCreating] = useState(false);
+  const [editingPrompt, setEditingPrompt] = useState<Prompt | null>(null);
+  const [newPromptName, setNewPromptName] = useState("");
+  const [newPromptText, setNewPromptText] = useState("");
+
+  const handleCreatePrompt = () => {
+    if (!newPromptName.trim() || !newPromptText.trim()) return;
+    createPrompt(newPromptName.trim(), newPromptText.trim());
+    setNewPromptName("");
+    setNewPromptText("");
+    setIsCreating(false);
+  };
+
+  const handleUpdatePrompt = () => {
+    if (!editingPrompt || !newPromptName.trim() || !newPromptText.trim())
+      return;
+    updatePrompt(editingPrompt.id, {
+      name: newPromptName.trim(),
+      prompt: newPromptText.trim(),
+    });
+    setEditingPrompt(null);
+    setNewPromptName("");
+    setNewPromptText("");
+  };
+
+  const startEditing = (prompt: Prompt) => {
+    setEditingPrompt(prompt);
+    setNewPromptName(prompt.name);
+    setNewPromptText(prompt.prompt);
+    setIsCreating(false);
+  };
+
+  const cancelEditing = () => {
+    setEditingPrompt(null);
+    setIsCreating(false);
+    setNewPromptName("");
+    setNewPromptText("");
+  };
+
+  if (isLoading) {
+    return (
+      <div className="p-4 flex items-center justify-center">
+        <span className="loading loading-spinner loading-sm" />
+      </div>
+    );
+  }
 
   return (
     <div className="p-4 space-y-6">
@@ -66,35 +174,61 @@ function ConfigureTab() {
           AI Model
         </label>
         <select
-          value={model}
-          onChange={(e) => setModel(e.target.value)}
+          value={settings?.model ?? "openai-gpt-5.2-high"}
+          onChange={(e) => updateModel(e.target.value)}
           className="select select-bordered select-sm w-full"
         >
-          {models.map((m) => (
+          {aiModels.map((m) => (
             <option key={m.id} value={m.id}>
               {m.name}
             </option>
           ))}
         </select>
         <p className="text-xs text-base-content/50 mt-1">
-          {models.find((m) => m.id === model)?.description}
+          {aiModels.find((m) => m.id === settings?.model)?.description}
         </p>
       </div>
 
-      {/* Default Review Prompt */}
+      {/* Default Prompt */}
       <div>
         <label className="text-sm font-medium text-base-content mb-2 block">
-          Default Review Prompt
+          Default Prompt
         </label>
-        <textarea
-          value={defaultPrompt}
-          onChange={(e) => setDefaultPrompt(e.target.value)}
-          className="textarea textarea-bordered textarea-sm w-full h-24 text-sm"
-          placeholder="Enter your default review prompt..."
-        />
-        <p className="text-xs text-base-content/50 mt-1">
-          This prompt will be used when reviewing all answers.
-        </p>
+        {defaultPrompt ? (
+          <PromptCard
+            prompt={defaultPrompt}
+            isDefault
+            onEdit={() => startEditing(defaultPrompt)}
+            onDelete={() => {
+              deletePrompt(defaultPrompt.id);
+              updateDefaultPromptId(null);
+            }}
+          />
+        ) : (
+          <div className="p-3 rounded-lg border border-dashed border-base-content/20 text-center">
+            <p className="text-sm text-base-content/50">
+              No default prompt set
+            </p>
+            {availablePrompts.length > 0 && (
+              <select
+                className="select select-bordered select-xs mt-2"
+                onChange={(e) => {
+                  if (e.target.value) updateDefaultPromptId(e.target.value);
+                }}
+                defaultValue=""
+              >
+                <option value="" disabled>
+                  Select a prompt...
+                </option>
+                {availablePrompts.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name}
+                  </option>
+                ))}
+              </select>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Custom Prompts */}
@@ -103,35 +237,106 @@ function ConfigureTab() {
           <label className="text-sm font-medium text-base-content">
             Custom Prompts
           </label>
-          <button className="btn btn-ghost btn-xs">+ Add</button>
+          <button
+            onClick={() => {
+              setIsCreating(true);
+              setEditingPrompt(null);
+              setNewPromptName("");
+              setNewPromptText("");
+            }}
+            className="btn btn-ghost btn-xs gap-1"
+          >
+            <Plus className="h-3 w-3" />
+            Add
+          </button>
         </div>
+
         <div className="space-y-2">
-          <div className="p-2 rounded border border-base-300 bg-base-200/30">
-            <div className="flex items-center justify-between">
-              <span className="text-sm font-medium">Conciseness Check</span>
-              <button className="btn btn-ghost btn-xs text-base-content/50">
-                Edit
-              </button>
-            </div>
-            <p className="text-xs text-base-content/50 mt-1 line-clamp-1">
-              Check if the answer is concise and under the character limit...
+          {customPrompts.map((prompt) => (
+            <PromptCard
+              key={prompt.id}
+              prompt={prompt}
+              onEdit={() => startEditing(prompt)}
+              onDelete={() => {
+                removeCustomPrompt(prompt.id);
+                deletePrompt(prompt.id);
+              }}
+              onSetDefault={() => {
+                if (defaultPrompt) {
+                  addCustomPrompt(defaultPrompt.id);
+                }
+                removeCustomPrompt(prompt.id);
+                updateDefaultPromptId(prompt.id);
+              }}
+            />
+          ))}
+
+          {customPrompts.length === 0 && !isCreating && (
+            <p className="text-xs text-base-content/50 text-center py-2">
+              No custom prompts yet
             </p>
-          </div>
-          <div className="p-2 rounded border border-base-300 bg-base-200/30">
-            <div className="flex items-center justify-between">
-              <span className="text-sm font-medium">
-                YC Partner Perspective
-              </span>
-              <button className="btn btn-ghost btn-xs text-base-content/50">
-                Edit
-              </button>
-            </div>
-            <p className="text-xs text-base-content/50 mt-1 line-clamp-1">
-              Review from the perspective of a YC partner looking for...
-            </p>
-          </div>
+          )}
         </div>
       </div>
+
+      {/* Create/Edit Prompt Form */}
+      {(isCreating || editingPrompt) && (
+        <div className="p-3 rounded-lg border border-primary/30 bg-primary/5 space-y-3">
+          <h4 className="text-sm font-medium">
+            {editingPrompt ? "Edit Prompt" : "New Prompt"}
+          </h4>
+          <input
+            type="text"
+            value={newPromptName}
+            onChange={(e) => setNewPromptName(e.target.value)}
+            placeholder="Prompt name..."
+            className="input input-bordered input-sm w-full"
+          />
+          <textarea
+            value={newPromptText}
+            onChange={(e) => setNewPromptText(e.target.value)}
+            placeholder="Enter your prompt..."
+            className="textarea textarea-bordered textarea-sm w-full h-24 text-sm"
+          />
+          <div className="flex justify-end gap-2">
+            <button onClick={cancelEditing} className="btn btn-ghost btn-xs">
+              Cancel
+            </button>
+            <button
+              onClick={editingPrompt ? handleUpdatePrompt : handleCreatePrompt}
+              className="btn btn-primary btn-xs"
+              disabled={!newPromptName.trim() || !newPromptText.trim()}
+            >
+              {editingPrompt ? "Save" : "Create"}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Add existing prompt */}
+      {availablePrompts.length > 0 && !isCreating && !editingPrompt && (
+        <div>
+          <label className="text-sm font-medium text-base-content mb-2 block">
+            Add Existing Prompt
+          </label>
+          <select
+            className="select select-bordered select-sm w-full"
+            onChange={(e) => {
+              if (e.target.value) addCustomPrompt(e.target.value);
+            }}
+            value=""
+          >
+            <option value="" disabled>
+              Select a prompt to add...
+            </option>
+            {availablePrompts.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.name}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
     </div>
   );
 }
@@ -642,17 +847,44 @@ function DetailedTab({
  * - Detailed: Question by question reviews
  */
 export function AIReviewPanel({
+  pageId,
   blocks,
   reviews,
   blockPositions,
   activeBlockId,
   isReviewingAll,
+  initialTab,
   onClose,
   onBlockClick,
   onReReview,
   onReviewAll,
 }: AIReviewPanelProps) {
-  const [activeTab, setActiveTab] = useState<ReviewTab>("detailed");
+  // Load initial tab from: query param > localStorage > default ("configure")
+  const [activeTab, setActiveTab] = useState<ReviewTab>(() => {
+    // Query param takes highest priority
+    if (initialTab) return initialTab;
+
+    // Then check localStorage
+    if (typeof window !== "undefined") {
+      const stored = localStorage.getItem(`review-panel-tab-${pageId}`);
+      if (
+        stored === "configure" ||
+        stored === "overall" ||
+        stored === "detailed"
+      ) {
+        return stored;
+      }
+    }
+
+    // Default to configure
+    return "configure";
+  });
+
+  // Persist tab selection to localStorage
+  const handleTabChange = (tab: ReviewTab) => {
+    setActiveTab(tab);
+    localStorage.setItem(`review-panel-tab-${pageId}`, tab);
+  };
 
   const tabs: { id: ReviewTab; label: string; icon: React.ReactNode }[] = [
     {
@@ -673,7 +905,7 @@ export function AIReviewPanel({
             {tabs.map((tab) => (
               <button
                 key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
+                onClick={() => handleTabChange(tab.id)}
                 className={`
                   flex items-center gap-1.5 px-3 py-2 text-sm font-medium rounded-t-lg transition-colors
                   ${
@@ -710,7 +942,7 @@ export function AIReviewPanel({
 
       {/* Tab content */}
       <div className="flex-1 overflow-y-auto">
-        {activeTab === "configure" && <ConfigureTab />}
+        {activeTab === "configure" && <ConfigureTab pageId={pageId} />}
         {activeTab === "overall" && (
           <OverallTab
             blocks={blocks}

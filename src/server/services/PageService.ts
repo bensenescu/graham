@@ -1,4 +1,6 @@
 import { PageRepository } from "../repositories/PageRepository";
+import { PromptRepository } from "../repositories/PromptRepository";
+import { PageReviewSettingsRepository } from "../repositories/PageReviewSettingsRepository";
 import type {
   CreatePageInput,
   UpdatePageInput,
@@ -14,13 +16,33 @@ async function getAll(userId: string) {
 }
 
 /**
- * Create a page.
+ * Create a page with default review settings.
  */
 async function create(userId: string, data: CreatePageInput) {
+  // Create the page
   await PageRepository.create({
     id: data.id,
     userId,
     title: data.title,
+  });
+
+  // Create default prompt for this page
+  const promptId = crypto.randomUUID();
+  await PromptRepository.create({
+    id: promptId,
+    userId,
+    name: `${data.title} - Default`,
+    prompt: "",
+  });
+
+  // Create page review settings with the default prompt
+  const settingsId = crypto.randomUUID();
+  await PageReviewSettingsRepository.create({
+    id: settingsId,
+    pageId: data.id,
+    model: "openai-gpt-5.2-high",
+    defaultPromptId: promptId,
+    customPromptIds: [],
   });
 
   return { success: true };

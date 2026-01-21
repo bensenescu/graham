@@ -53,7 +53,7 @@ export const createPageFromTemplate =
       });
     },
     mutationFn: async ({ template, pageId, blocks }) => {
-      // Create the page on the server first
+      // Create the page on the server first (also creates default review settings)
       // (onInsert is skipped because we're in an optimistic action)
       await createPage({
         data: {
