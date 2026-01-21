@@ -1,40 +1,40 @@
 import { queryCollectionOptions } from "@tanstack/query-db-collection";
 import { queryClient } from "./queryClient";
 import {
-  createTodo,
-  deleteTodo,
-  getAllTodos,
-  updateTodo,
-} from "@/serverFunctions/todos";
+  createPage,
+  deletePage,
+  getAllPages,
+  updatePage,
+} from "@/serverFunctions/pages";
 import { createCollection } from "@tanstack/react-db";
 import { lazyInitForWorkers } from "@every-app/sdk/cloudflare";
 
-export const todoCollection = lazyInitForWorkers(() =>
+export const pageCollection = lazyInitForWorkers(() =>
   createCollection(
     queryCollectionOptions({
-      queryKey: ["todos"],
+      queryKey: ["pages"],
       queryFn: async () => {
-        const todos = await getAllTodos();
-        return todos.todos;
+        const result = await getAllPages();
+        return result.pages;
       },
       queryClient,
       getKey: (item) => item.id,
       // Handle all CRUD operations
       onInsert: async ({ transaction }) => {
-        const { modified: newTodo } = transaction.mutations[0];
-        await createTodo({
-          data: newTodo,
+        const { modified: newPage } = transaction.mutations[0];
+        await createPage({
+          data: newPage,
         });
       },
       onUpdate: async ({ transaction }) => {
         const { modified } = transaction.mutations[0];
-        await updateTodo({
+        await updatePage({
           data: modified,
         });
       },
       onDelete: async ({ transaction }) => {
         const { original } = transaction.mutations[0];
-        await deleteTodo({ data: original });
+        await deletePage({ data: original });
       },
     }),
   ),

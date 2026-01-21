@@ -4,21 +4,17 @@ import {
   HeadContent,
   Scripts,
   createRootRoute,
-  Outlet,
-  useLocation,
 } from "@tanstack/react-router";
 import { TanStackRouterDevtools } from "@tanstack/react-router-devtools";
 import { PersistQueryClientProvider } from "@tanstack/react-query-persist-client";
 import * as React from "react";
 import { DefaultCatchBoundary } from "@/client/components/DefaultCatchBoundary";
 import { NotFound } from "@/client/components/NotFound";
+import { AppShell } from "@/client/components/AppShell";
 import appCss from "@/client/styles/app.css?url";
 import { Toaster } from "sonner";
-import { Sidebar } from "@/client/components/Sidebar";
-import { TabBar } from "@/client/components/TabBar";
 import { EmbeddedAppProvider } from "@every-app/sdk/tanstack";
-import { todoCollection, queryClient, persister } from "@/client/tanstack-db";
-import { useLiveQuery } from "@tanstack/react-db";
+import { queryClient, persister } from "@/client/tanstack-db";
 
 export const Route = createRootRoute({
   head: () => ({
@@ -37,6 +33,16 @@ export const Route = createRootRoute({
       {
         name: "apple-mobile-web-app-status-bar-style",
         content: "black-translucent",
+      },
+      {
+        name: "theme-color",
+        content: "#242424",
+        media: "(prefers-color-scheme: dark)",
+      },
+      {
+        name: "theme-color",
+        content: "#f7f7f7",
+        media: "(prefers-color-scheme: light)",
       },
     ],
     links: [
@@ -63,37 +69,11 @@ export const Route = createRootRoute({
     ],
     scripts: [],
   }),
-  component: AppLayout,
+  component: AppShell,
   errorComponent: DefaultCatchBoundary,
   notFoundComponent: () => <NotFound />,
   shellComponent: RootDocument,
 });
-
-function AppLayout() {
-  const location = useLocation();
-
-  // Always fetch todos regardless of route so that they are preloaded
-  useLiveQuery((q) => q.from({ todo: todoCollection }));
-
-  return (
-    <div className="flex flex-col md:flex-row h-screen bg-base-200">
-      {/* Desktop: Sidebar */}
-      <div className="hidden md:block">
-        <Sidebar currentPath={location.pathname} />
-      </div>
-
-      {/* Main content */}
-      <div className="main-content flex-1 overflow-auto md:pb-0">
-        <Outlet />
-      </div>
-
-      {/* Mobile: TabBar */}
-      <div className="md:hidden">
-        <TabBar currentPath={location.pathname} />
-      </div>
-    </div>
-  );
-}
 
 function RootDocument({ children }: { children: React.ReactNode }) {
   return (
