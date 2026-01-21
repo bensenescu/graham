@@ -1,32 +1,50 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useLiveQuery } from "@tanstack/react-db";
-import { useState, useMemo } from "react";
-import { toast } from "sonner";
-import { Plus, Info } from "lucide-react";
-import { CreateTodoModal } from "@/client/components/CreateTodoModal";
-import { todoCollection } from "@/client/tanstack-db";
-import { TodoItem } from "@/client/components/TodoItem";
+import { useMemo } from "react";
+import { Plus, FileText, Trash2 } from "lucide-react";
+import { pageCollection } from "@/client/tanstack-db";
 
 export const Route = createFileRoute("/")({
   component: Home,
 });
 
 function Home() {
-  const [newTodoTitle, setNewTodoTitle] = useState<string>("");
-  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const navigate = useNavigate();
 
   // Live query that updates automatically when data changes
   const {
-    data: todos,
+    data: pages,
     isLoading,
     isError,
-  } = useLiveQuery((q) => q.from({ todo: todoCollection }));
+  } = useLiveQuery((q) => q.from({ page: pageCollection }));
 
-  // Derive active and completed todos from query data
-  const activeTodos = useMemo(
-    () => todos?.filter((todo) => !todo.completed) ?? [],
-    [todos],
-  );
+  // Sort pages by updatedAt (most recent first)
+  const sortedPages = useMemo(() => {
+    return [...(pages ?? [])].sort((a, b) => {
+      const dateA = new Date(a.updatedAt ?? 0).getTime();
+      const dateB = new Date(b.updatedAt ?? 0).getTime();
+      return dateB - dateA;
+    });
+  }, [pages]);
+
+  const handleNewPage = () => {
+    const id = crypto.randomUUID();
+    const now = new Date().toISOString();
+    pageCollection.insert({
+      id,
+      title: "Untitled",
+      content: "",
+      createdAt: now,
+      updatedAt: now,
+    });
+    navigate({ to: "/page/$pageId", params: { pageId: id } });
+  };
+
+  const handleDeletePage = (e: React.MouseEvent, pageId: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    pageCollection.delete(pageId);
+  };
 
   if (isLoading) {
     return null;
@@ -35,94 +53,86 @@ function Home() {
   if (isError) {
     return (
       <div className="p-4">
-        <p className="text-error">Todo live query error.</p>
+        <p className="text-error">Failed to load pages.</p>
       </div>
     );
   }
 
   return (
-    <>
-      <div className="px-4 pb-24 md:pt-4 md:pb-0 overflow-auto">
-        <h1 className="text-xl font-semibold text-base-content py-3 md:hidden">
-          Todos
-        </h1>
-
-        {/* Template starter alert */}
-        <div className="alert alert-info mb-4">
-          <Info className="w-5 h-5" />
-          <div>
-            <span className="font-medium">This the starter template.</span>{" "}
-            <a
-              href="https://everyapp.dev/docs/build-an-app/create-app/"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="underline hover:opacity-80"
-            >
-              See the docs
-            </a>{" "}
-            to see an example prompt for building an app and what features are
-            available to you.
-          </div>
+    <div className="h-full overflow-auto">
+      <div className="px-4 pb-24 md:pt-4 md:pb-4 max-w-4xl mx-auto">
+        {/* Header - desktop only */}
+        <div className="hidden md:flex items-center justify-between py-4">
+          <h1 className="text-2xl font-bold text-base-content">Pages</h1>
+          <button onClick={handleNewPage} className="btn btn-primary gap-2">
+            <Plus className="h-4 w-4" />
+            New Page
+          </button>
         </div>
 
-        {/* Desktop: inline form for creating todos */}
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            if (newTodoTitle.trim()) {
-              todoCollection.insert({
-                id: crypto.randomUUID(),
-                title: newTodoTitle.trim(),
-                completed: false,
-              });
-              toast("Todo created");
-              setNewTodoTitle("");
-            }
-          }}
-          className="hidden md:block space-y-4"
-        >
-          <div className="flex gap-2">
-            <input
-              type="text"
-              name="title"
-              placeholder="New todo..."
-              value={newTodoTitle}
-              onChange={(e) => setNewTodoTitle(e.target.value)}
-              autoFocus
-              className="input flex-1"
-              aria-label="New todo title"
-            />
-            <button
-              type="submit"
-              disabled={!newTodoTitle.trim()}
-              className="btn btn-primary"
-              aria-label="Add new todo"
-            >
-              Add
+        {/* Page list */}
+        {sortedPages.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-16 text-center">
+            <FileText className="h-16 w-16 text-base-content/30 mb-4" />
+            <h2 className="text-xl font-semibold text-base-content mb-2">
+              No pages yet
+            </h2>
+            <p className="text-base-content/60 mb-6">
+              Create your first page to get started writing.
+            </p>
+            <button onClick={handleNewPage} className="btn btn-primary gap-2">
+              <Plus className="h-4 w-4" />
+              Create Page
             </button>
           </div>
-        </form>
-
-        <div className="md:mt-4 space-y-2">
-          {activeTodos.map((todo) => (
-            <TodoItem key={todo.id} todo={todo} />
-          ))}
-        </div>
+        ) : (
+          <div className="space-y-2">
+            {sortedPages.map((page) => (
+              <Link
+                key={page.id}
+                to="/page/$pageId"
+                params={{ pageId: page.id }}
+                className="block bg-base-100 rounded-lg border border-base-300 p-4 hover:border-primary/50 transition-colors group"
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex-1 min-w-0">
+                    <h3 className="font-medium text-base-content truncate">
+                      {page.title || "Untitled"}
+                    </h3>
+                    <p className="text-sm text-base-content/60 mt-1">
+                      {new Date(page.updatedAt).toLocaleDateString(undefined, {
+                        month: "short",
+                        day: "numeric",
+                        year:
+                          new Date(page.updatedAt).getFullYear() !==
+                          new Date().getFullYear()
+                            ? "numeric"
+                            : undefined,
+                      })}
+                    </p>
+                  </div>
+                  <button
+                    onClick={(e) => handleDeletePage(e, page.id)}
+                    className="btn btn-ghost btn-sm btn-square opacity-0 group-hover:opacity-100 transition-opacity text-error"
+                    aria-label="Delete page"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                </div>
+              </Link>
+            ))}
+          </div>
+        )}
       </div>
 
-      {/* Mobile: FAB for creating todos */}
+      {/* Mobile: FAB for creating pages */}
       <button
-        onClick={() => setIsCreateModalOpen(true)}
+        onClick={handleNewPage}
         className="md:hidden fixed bottom-24 right-4 z-40 w-14 h-14 bg-primary text-primary-content rounded-xl flex items-center justify-center shadow-lg border border-base-content/10"
-        aria-label="Add new todo"
+        aria-label="Create new page"
       >
         <Plus className="w-6 h-6" />
       </button>
-
-      <CreateTodoModal
-        isOpen={isCreateModalOpen}
-        onClose={() => setIsCreateModalOpen(false)}
-      />
-    </>
+    </div>
   );
 }
