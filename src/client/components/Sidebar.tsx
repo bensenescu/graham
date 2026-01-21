@@ -1,12 +1,7 @@
-import { Link, useLocation, useNavigate } from "@tanstack/react-router";
-import { FileText, Plus, ChevronRight, LayoutTemplate } from "lucide-react";
+import { Link, useLocation } from "@tanstack/react-router";
+import { FileText, Plus, ChevronRight } from "lucide-react";
 import { useLiveQuery } from "@tanstack/react-db";
 import { pageCollection } from "@/client/tanstack-db";
-import { templates } from "@/templates";
-import {
-  createPageFromTemplate,
-  createPageFromTemplateParams,
-} from "@/client/actions/createPageFromTemplate";
 
 interface SidebarNavProps {
   onNavigate?: () => void;
@@ -19,7 +14,6 @@ interface SidebarNavProps {
  */
 export function SidebarNav({ onNavigate }: SidebarNavProps) {
   const location = useLocation();
-  const navigate = useNavigate();
   const currentPath = location.pathname;
 
   // Get recent pages (sorted by updatedAt desc, limited to 10)
@@ -42,34 +36,6 @@ export function SidebarNav({ onNavigate }: SidebarNavProps) {
 
   const isOnPagesPage = currentPath === "/";
   const isPageSectionActive = isOnPagesPage || currentPath.startsWith("/page/");
-
-  const handleNewPage = () => {
-    const id = crypto.randomUUID();
-    const now = new Date().toISOString();
-    pageCollection.insert({
-      id,
-      title: "Untitled",
-      createdAt: now,
-      updatedAt: now,
-    });
-    navigate({ to: "/page/$pageId", params: { pageId: id } });
-    onNavigate?.();
-  };
-
-  const handleNewPageFromTemplate = (templateId: string) => {
-    const template = templates.find((t) => t.id === templateId);
-    if (!template) return;
-
-    // Create params with pre-generated IDs
-    const params = createPageFromTemplateParams(template);
-
-    // Execute optimistic action (instant UI update + server sync)
-    createPageFromTemplate(params);
-
-    // Navigate immediately - optimistic state is already visible
-    navigate({ to: "/page/$pageId", params: { pageId: params.pageId } });
-    onNavigate?.();
-  };
 
   return (
     <div className="bg-base-100 h-full flex flex-col">
@@ -107,13 +73,16 @@ export function SidebarNav({ onNavigate }: SidebarNavProps) {
             />
             Pages
           </Link>
-          <button
-            onClick={handleNewPage}
-            className="btn btn-ghost btn-xs btn-square"
-            aria-label="New Page"
-          >
-            <Plus className="h-4 w-4" />
-          </button>
+          {recentPages && recentPages.length > 0 && (
+            <Link
+              to="/new"
+              onClick={onNavigate}
+              className="btn btn-ghost btn-xs btn-square"
+              aria-label="New Page"
+            >
+              <Plus className="h-4 w-4" />
+            </Link>
+          )}
         </div>
 
         {/* Recent Pages */}
@@ -151,39 +120,6 @@ export function SidebarNav({ onNavigate }: SidebarNavProps) {
             )}
           </div>
         )}
-
-        {/* Empty state */}
-        {(!recentPages || recentPages.length === 0) && (
-          <div className="ml-4 pl-4 border-l border-base-300">
-            <button
-              onClick={handleNewPage}
-              className="flex items-center gap-2 py-2 px-2 text-sm text-base-content/50 hover:text-base-content hover:bg-base-200 rounded-lg transition-colors"
-            >
-              <Plus className="h-4 w-4" />
-              <span>Create your first page</span>
-            </button>
-          </div>
-        )}
-
-        {/* Templates Section */}
-        <div className="mt-6">
-          <div className="flex items-center gap-3 pl-4 pr-4 py-2 text-sm text-base-content/60">
-            <LayoutTemplate className="h-5 w-5" />
-            Templates
-          </div>
-          <div className="ml-4 pl-4 border-l border-base-300">
-            {templates.map((template) => (
-              <button
-                key={template.id}
-                onClick={() => handleNewPageFromTemplate(template.id)}
-                className="flex items-center gap-2 py-2 px-2 text-sm text-base-content/70 hover:text-base-content hover:bg-base-200 rounded-lg transition-colors w-full text-left"
-              >
-                <Plus className="h-4 w-4 flex-shrink-0" />
-                <span className="truncate">{template.name}</span>
-              </button>
-            ))}
-          </div>
-        </div>
       </nav>
     </div>
   );

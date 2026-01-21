@@ -11,6 +11,8 @@ import type { PageBlock } from "@/types/schemas/pages";
 
 export const Route = createFileRoute("/page/$pageId")({
   component: PageEditor,
+  // Remount component when pageId changes to reset all state
+  remountDeps: ({ params }) => params.pageId,
 });
 
 function PageEditor() {

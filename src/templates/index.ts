@@ -35,28 +35,8 @@ export const ycApplicationTemplate: Template = {
 
     // Company
     {
-      question: "Company name",
-      section: "Company",
-    },
-    {
       question: "Describe what your company does in 50 characters or less.",
       section: "Company",
-    },
-    {
-      question: "Company URL, if any",
-      section: "Company",
-      placeholder: "https://",
-    },
-    {
-      question: "Please provide a link to the product, if any.",
-      section: "Company",
-      placeholder: "https://",
-    },
-    {
-      question:
-        "If login credentials are required for the link above, enter them here.",
-      section: "Company",
-      placeholder: "username / password",
     },
     {
       question:
@@ -65,12 +45,7 @@ export const ycApplicationTemplate: Template = {
     },
     {
       question:
-        "Where do you live now, and where would the company be based after YC?",
-      section: "Company",
-      placeholder: "City A, Country A / City B, Country B",
-    },
-    {
-      question: "Explain your decision regarding location.",
+        "Where do you live now, and where would the company be based after YC? Explain your decision regarding location.",
       section: "Company",
     },
 
