@@ -1,0 +1,30 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "every-graham",
+  "main": "@tanstack/react-start/server-entry",
+  "compatibility_date": "2025-09-02",
+  "compatibility_flags": ["nodejs_compat"],
+  "observability": {
+    "enabled": true,
+  },
+  "services": [
+    {
+      "binding": "EVERY_APP_GATEWAY",
+      "service": "every-app-gateway",
+    },
+  ],
+  "kv_namespaces": [
+    {
+      "binding": "KV",
+      "id": "ef9e379e660d4a6596bb2264e5bbbd39",
+    },
+  ],
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "every-graham",
+      "database_id": "98c1adbf-c0fa-408e-9754-7c22915d2e05",
+      "migrations_dir": "drizzle",
+    },
+  ],
+}
