@@ -137,3 +137,128 @@ export function calculateCardPositions(
 
   return cardPositions;
 }
+
+/**
+ * Calculate extra bottom spacing needed for Q&A blocks to align with review cards.
+ * When a review card is taller than its corresponding Q&A block, the Q&A block
+ * needs extra bottom spacing so the next block starts below the review card.
+ *
+ * IMPORTANT: This function assumes blockPositions are CURRENT measured positions
+ * (which may already include previously applied spacing). It calculates what
+ * ADDITIONAL spacing (if any) each block needs based on current state.
+ *
+ * @param blockIds - Array of block IDs in display order
+ * @param blockPositions - Map of CURRENT block positions from useBlockPositions
+ * @param cardHeights - Map of measured review card heights
+ * @param minGap - Minimum gap between elements (default: 8px)
+ * @returns Map of blockId -> extra bottom spacing needed
+ */
+export function calculateBlockSpacing(
+  blockIds: string[],
+  blockPositions: Map<string, BlockPosition>,
+  cardHeights: Map<string, number>,
+  minGap: number = 8,
+): Map<string, number> {
+  const blockSpacing = new Map<string, number>();
+
+  // First pass: calculate where cards end up with collision detection
+  // Cards try to align with block tops but may be pushed down if they'd overlap
+  const cardPositions = new Map<string, number>();
+  let lastCardBottom = 0;
+
+  for (const blockId of blockIds) {
+    const blockPos = blockPositions.get(blockId);
+    if (!blockPos) continue;
+
+    // Card tries to align with block top, but can't overlap previous card
+    const cardTop = Math.max(blockPos.top, lastCardBottom + minGap);
+    cardPositions.set(blockId, cardTop);
+
+    const cardHeight = cardHeights.get(blockId) ?? 0;
+    if (cardHeight > 0) {
+      lastCardBottom = cardTop + cardHeight;
+    }
+  }
+
+  // Second pass: calculate spacing needed for each block
+  for (let i = 0; i < blockIds.length; i++) {
+    const blockId = blockIds[i];
+    const blockPos = blockPositions.get(blockId);
+
+    if (!blockPos) {
+      blockSpacing.set(blockId, 0);
+      continue;
+    }
+
+    const cardTop = cardPositions.get(blockId);
+    const cardHeight = cardHeights.get(blockId);
+
+    if (cardTop === undefined || cardHeight === undefined || cardHeight === 0) {
+      blockSpacing.set(blockId, 0);
+      continue;
+    }
+
+    const blockBottom = blockPos.top + blockPos.height;
+    const cardBottom = cardTop + cardHeight;
+
+    // If card extends below block, we need spacing
+    // But we also need to check: will the next block start below our card?
+    const nextBlockId = blockIds[i + 1];
+    const nextBlockPos = nextBlockId
+      ? blockPositions.get(nextBlockId)
+      : undefined;
+
+    if (nextBlockPos) {
+      // Next block already exists at some position
+      // If next block is above where it should be (card bottom + gap), add spacing
+      const idealNextTop = cardBottom + minGap;
+      if (nextBlockPos.top < idealNextTop) {
+        blockSpacing.set(blockId, idealNextTop - nextBlockPos.top);
+      } else {
+        blockSpacing.set(blockId, 0);
+      }
+    } else {
+      // No next block, just ensure card fits
+      const extraSpacing = Math.max(0, cardBottom - blockBottom + minGap);
+      blockSpacing.set(blockId, extraSpacing);
+    }
+  }
+
+  return blockSpacing;
+}
+
+/**
+ * Calculate card positions with collision detection.
+ * Cards align with their block tops, but are pushed down if they'd overlap previous cards.
+ *
+ * @param blockIds - Array of block IDs in display order
+ * @param blockPositions - Map of CURRENT block positions
+ * @param cardHeights - Map of measured review card heights
+ * @param minGap - Minimum gap between cards (default: 8px)
+ * @returns Map of blockId -> card top position
+ */
+export function calculateAdjustedCardPositions(
+  blockIds: string[],
+  blockPositions: Map<string, BlockPosition>,
+  cardHeights: Map<string, number>,
+  minGap: number = 8,
+): Map<string, number> {
+  const cardPositions = new Map<string, number>();
+  let lastCardBottom = 0;
+
+  for (const blockId of blockIds) {
+    const blockPos = blockPositions.get(blockId);
+    if (!blockPos) continue;
+
+    // Card tries to align with block top, but can't overlap previous card
+    const cardTop = Math.max(blockPos.top, lastCardBottom + minGap);
+    cardPositions.set(blockId, cardTop);
+
+    const cardHeight = cardHeights.get(blockId) ?? 0;
+    if (cardHeight > 0) {
+      lastCardBottom = cardTop + cardHeight;
+    }
+  }
+
+  return cardPositions;
+}

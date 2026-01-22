@@ -57,3 +57,81 @@ This is useful when:
 - You want predictable "fresh page" behavior on navigation
 
 The `remountDeps` function receives `{ params, search, loaderDeps, routeId }` and should return a JSON-serializable value. The component remounts when this value changes.
+
+## API Routes with TanStack Start
+
+When creating API routes in TanStack Start, use `createFileRoute` with the `server.handlers` pattern. Do **not** use `createOptimisticAction` from `@tanstack/react-db` for API calls - it doesn't work correctly with TanStack Start's server function handling.
+
+### Creating an API Route
+
+```typescript
+// src/routes/api/my-endpoint.ts
+import { createFileRoute } from "@tanstack/react-router";
+
+export const Route = createFileRoute("/api/my-endpoint")({
+  server: {
+    handlers: {
+      POST: async ({ request }) => {
+        // Parse request body
+        const data = await request.json();
+
+        // Do your work...
+        const result = {
+          /* ... */
+        };
+
+        return new Response(JSON.stringify(result), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        });
+      },
+    },
+  },
+});
+```
+
+### Calling the API from Client
+
+Use `useMutation` from `@tanstack/react-query` combined with `authenticatedFetch` from `@every-app/sdk/core`:
+
+```typescript
+import { useMutation } from "@tanstack/react-query";
+import { authenticatedFetch } from "@every-app/sdk/core";
+
+// Define mutation variables type
+interface MyMutationVariables {
+  data: string;
+}
+
+// In your component/hook
+const mutation = useMutation({
+  mutationFn: async ({ data }: MyMutationVariables) => {
+    const response = await authenticatedFetch("/api/my-endpoint", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ data }),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || `Request failed: ${response.status}`);
+    }
+
+    return response.json();
+  },
+  onMutate: async (variables) => {
+    // Optimistic updates (optional)
+  },
+  onSuccess: (data, variables) => {
+    // Handle success
+  },
+  onError: (error, variables) => {
+    // Handle error
+  },
+});
+
+// Call the mutation
+await mutation.mutateAsync({ data: "example" });
+```
+
+Reference: See `src/client/hooks/useAIReview.ts` for a complete example of this pattern.

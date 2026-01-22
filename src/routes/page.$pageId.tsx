@@ -23,7 +23,10 @@ import {
 } from "@/client/components/AIReviewPanel";
 import { ResizablePanelLayout } from "@/client/components/ResizablePanelLayout";
 import { useAIReview } from "@/client/hooks/useAIReview";
-import { useBlockPositions } from "@/client/hooks/useBlockPositions";
+import {
+  useBlockPositions,
+  calculateBlockSpacing,
+} from "@/client/hooks/useBlockPositions";
 import { usePageReviewSettings } from "@/client/hooks/usePageReviewSettings";
 import type { PageBlock } from "@/types/schemas/pages";
 
@@ -168,6 +171,19 @@ function PageEditor() {
   // Track block positions for syncing review panel
   const blockPositions = useBlockPositions(scrollContainerRef, blockIds);
 
+  // Track card heights from the review panel (for calculating Q&A block spacing)
+  const [cardHeights, setCardHeights] = useState<Map<string, number>>(
+    () => new Map(),
+  );
+
+  // Callback when card heights change in the review panel
+  const handleCardHeightsChange = useCallback(
+    (heights: Map<string, number>) => {
+      setCardHeights(heights);
+    },
+    [],
+  );
+
   // Get page review settings and prompts
   const { defaultPrompt } = usePageReviewSettings(pageId);
 
@@ -213,6 +229,15 @@ function PageEditor() {
 
   // Only use synchronized scrolling when detailed tab is active AND has content
   const useSyncScroll = activeTab === "detailed" && detailedTabHasContent;
+
+  // Calculate extra spacing needed for Q&A blocks to align with review cards
+  // Only apply when detailed tab is active and has content
+  const blockSpacing = useMemo(() => {
+    if (!useSyncScroll) {
+      return undefined;
+    }
+    return calculateBlockSpacing(blockIds, blockPositions, cardHeights, 8);
+  }, [useSyncScroll, blockIds, blockPositions, cardHeights]);
 
   const handleTitleChange = useCallback(
     (title: string) => {
@@ -440,7 +465,9 @@ function PageEditor() {
             onBlockClick={handlePanelBlockClick}
             onReReview={reviewBlock}
             onReviewAll={reviewAll}
+            onCardHeightsChange={handleCardHeightsChange}
             externalHeader
+            disableInternalScroll={useSyncScroll}
           />
         }
       >
@@ -451,6 +478,7 @@ function PageEditor() {
           reviews={reviews}
           activeBlockId={activeBlockId}
           showGradeBadges={false}
+          blockSpacing={blockSpacing}
           onBlockCreate={handleBlockCreate}
           onBlockUpdate={handleBlockUpdate}
           onBlockDelete={handleBlockDelete}

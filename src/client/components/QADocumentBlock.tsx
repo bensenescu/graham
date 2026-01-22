@@ -9,6 +9,8 @@ interface QADocumentBlockProps {
   block: PageBlock;
   review?: BlockReview;
   isActive?: boolean;
+  /** Extra bottom spacing to align with taller review cards */
+  extraBottomSpacing?: number;
   onQuestionChange: (id: string, question: string) => void;
   onAnswerChange: (id: string, answer: string) => void;
   onDelete: (id: string) => void;
@@ -68,6 +70,7 @@ export function QADocumentBlock({
   block,
   review,
   isActive = false,
+  extraBottomSpacing = 0,
   onQuestionChange,
   onAnswerChange,
   onDelete,
@@ -89,6 +92,8 @@ export function QADocumentBlock({
     transform: CSS.Transform.toString(transform),
     transition,
     opacity: isDragging ? 0.5 : 1,
+    // Add extra bottom spacing when review card is taller than this block
+    marginBottom: extraBottomSpacing > 0 ? extraBottomSpacing : undefined,
   };
 
   const handleQuestionKeyDown = useCallback(
