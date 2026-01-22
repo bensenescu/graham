@@ -31,6 +31,8 @@ interface QADocumentEditorProps {
   reviews?: Map<string, BlockReview>;
   activeBlockId?: string | null;
   showGradeBadges?: boolean;
+  /** Extra bottom spacing per block (to align with taller review cards) */
+  blockSpacing?: Map<string, number>;
   onBlockCreate: (block: PageBlock) => void;
   onBlockUpdate: (id: string, updates: Partial<PageBlock>) => void;
   onBlockDelete: (id: string) => void;
@@ -53,6 +55,7 @@ export function QADocumentEditor({
   reviews,
   activeBlockId,
   showGradeBadges = false,
+  blockSpacing,
   onBlockCreate,
   onBlockUpdate,
   onBlockDelete,
@@ -270,6 +273,7 @@ export function QADocumentEditor({
                       showGradeBadges ? reviews?.get(block.id) : undefined
                     }
                     isActive={activeBlockId === block.id}
+                    extraBottomSpacing={blockSpacing?.get(block.id)}
                     onQuestionChange={handleQuestionChange}
                     onAnswerChange={handleAnswerChange}
                     onDelete={handleDelete}

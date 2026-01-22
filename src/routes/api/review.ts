@@ -27,11 +27,12 @@ const reviewResponseSchema = z.object({
 const BASE_SYSTEM_PROMPT = `You are an expert application reviewer. Your job is to evaluate answers to application questions and provide constructive feedback.
 
 For each question and answer pair, evaluate the response and provide:
-1. Strengths: The single most important thing the answer does well (exactly 1 bullet point)
-2. Improvements: The most critical issues that need to be fixed (exactly 2 bullet points, prioritized by importance)
-3. Tips: One actionable suggestion for making the answer stronger (exactly 1 bullet point, optional - only include if there's a genuinely useful tip)
+1. Strengths: What the answer does well (at most 1 bullet point - only include if genuinely noteworthy)
+2. Improvements: Critical issues that need to be fixed (at most 2 bullet points, prioritized by importance - only include truly important issues)
+3. Tips: An actionable suggestion for making the answer stronger (at most 1 bullet point - only include if there's a genuinely useful tip)
 
-Be direct and constructive. Focus on actionable feedback that will help improve the answer.`;
+Be direct and constructive. Focus on actionable feedback that will help improve the answer.
+IMPORTANT: Only include comments that provide genuine insight. Do not add filler or generic feedback. It's better to have fewer, high-quality comments than to fill every category.`;
 
 // Timeout for AI review requests (1 minute)
 const REVIEW_TIMEOUT_MS = 60_000;
@@ -84,8 +85,25 @@ export const Route = createFileRoute("/api/review")({
           const { blockId, question, answer, customInstructions } =
             validationResult.data;
 
+          // Skip review for empty answers
+          if (!answer || answer.trim() === "") {
+            console.log(
+              `[Review ${requestId}] Skipping review for block ${blockId} - empty answer`,
+            );
+            return new Response(
+              JSON.stringify({
+                error: "Cannot review empty answer",
+                details: "Please provide an answer before requesting a review.",
+              }),
+              {
+                status: 400,
+                headers: { "Content-Type": "application/json" },
+              },
+            );
+          }
+
           console.log(
-            `[Review ${requestId}] Processing block ${blockId}, question length: ${question.length}, answer length: ${answer?.length || 0}`,
+            `[Review ${requestId}] Processing block ${blockId}, question length: ${question.length}, answer length: ${answer.length}`,
           );
 
           // Build the system prompt: base prompt + optional custom instructions
@@ -127,14 +145,14 @@ export const Route = createFileRoute("/api/review")({
 
 **Answer:** ${answer || "(No answer provided)"}
 
-Provide your evaluation in JSON format with EXACTLY this structure:
+Provide your evaluation in JSON format with this structure:
 {
-  "strengths": ["exactly 1 string - the most important strength"],
-  "improvements": ["exactly 2 strings - the most critical issues, prioritized"],
-  "tips": ["exactly 1 string - one actionable suggestion"] (optional, omit if not needed)
+  "strengths": ["at most 1 string - only if genuinely noteworthy"],
+  "improvements": ["at most 2 strings - only truly important issues, prioritized"],
+  "tips": ["at most 1 string - only if genuinely useful"] (optional)
 }
 
-IMPORTANT: Keep feedback concise. Strengths must have exactly 1 item. Improvements must have exactly 2 items. Tips must have exactly 1 item or be omitted entirely.`,
+IMPORTANT: Only include comments that are genuinely insightful. Empty arrays are acceptable if there's nothing meaningful to say in a category. Do not add filler or generic feedback.`,
                 },
               ],
               providerOptions: {

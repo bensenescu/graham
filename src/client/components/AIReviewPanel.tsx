@@ -19,7 +19,7 @@ import type { PageBlock } from "@/types/schemas/pages";
 import type { Prompt, OverallReviewMode } from "@/types/schemas/prompts";
 import {
   type BlockPosition,
-  calculateCardPositions,
+  calculateAdjustedCardPositions,
 } from "@/client/hooks/useBlockPositions";
 import { usePageReviewSettings } from "@/client/hooks/usePageReviewSettings";
 import { usePageOverallReviewSettings } from "@/client/hooks/usePageOverallReviewSettings";
@@ -45,6 +45,10 @@ interface AIReviewPanelProps {
   onReviewAll: () => void;
   /** If true, header is rendered externally and not inside the panel */
   externalHeader?: boolean;
+  /** Called when card heights change in the detailed tab */
+  onCardHeightsChange?: (cardHeights: Map<string, number>) => void;
+  /** When true, disables internal scrolling (for synchronized scroll with parent) */
+  disableInternalScroll?: boolean;
 }
 
 /**
@@ -721,21 +725,29 @@ function OverallTab({
 
       {/* Summary Stats */}
       <div className="grid grid-cols-2 gap-3">
-        <div className="p-3 rounded-lg bg-success/10 border border-success/20">
+        <div className="p-3 rounded-lg bg-base-200 border border-base-300">
           <div className="flex items-center gap-2 mb-1">
-            <Check className="h-4 w-4 text-success" />
-            <span className="text-sm font-medium text-success">Strengths</span>
+            <div className="p-1 rounded bg-success/20">
+              <Check className="h-3.5 w-3.5 text-success" />
+            </div>
+            <span className="text-sm font-medium text-base-content/70">
+              Strengths
+            </span>
           </div>
-          <span className="text-xl font-bold text-success">
+          <span className="text-2xl font-bold text-base-content">
             {stats.totalStrengths}
           </span>
         </div>
-        <div className="p-3 rounded-lg bg-warning/10 border border-warning/20">
+        <div className="p-3 rounded-lg bg-base-200 border border-base-300">
           <div className="flex items-center gap-2 mb-1">
-            <AlertTriangle className="h-4 w-4 text-warning" />
-            <span className="text-sm font-medium text-warning">To Improve</span>
+            <div className="p-1 rounded bg-warning/20">
+              <AlertTriangle className="h-3.5 w-3.5 text-warning" />
+            </div>
+            <span className="text-sm font-medium text-base-content/70">
+              To Improve
+            </span>
           </div>
-          <span className="text-xl font-bold text-warning">
+          <span className="text-2xl font-bold text-base-content">
             {stats.totalImprovements}
           </span>
         </div>
@@ -886,46 +898,52 @@ function CompactReviewCard({
 
       {/* Strengths */}
       {review.strengths.length > 0 && (
-        <div className="space-y-1 mb-2">
-          {review.strengths.map((strength: string, i: number) => (
-            <div
-              key={i}
-              className="flex items-start gap-1.5 text-xs text-success/90"
-            >
-              <Check className="h-3 w-3 flex-shrink-0 mt-0.5" />
-              <span>{strength}</span>
-            </div>
-          ))}
+        <div className="space-y-1.5 mb-3">
+          <div className="flex items-center gap-1.5 text-xs font-medium text-base-content/70">
+            <Check className="h-3.5 w-3.5 text-success" />
+            <span>Strengths</span>
+          </div>
+          <ul className="space-y-1 pl-5">
+            {review.strengths.map((strength: string, i: number) => (
+              <li key={i} className="text-xs text-base-content/80 list-disc">
+                {strength}
+              </li>
+            ))}
+          </ul>
         </div>
       )}
 
       {/* Improvements */}
       {review.improvements.length > 0 && (
-        <div className="space-y-1 mb-2">
-          {review.improvements.map((improvement: string, i: number) => (
-            <div
-              key={i}
-              className="flex items-start gap-1.5 text-xs text-warning/90"
-            >
-              <AlertTriangle className="h-3 w-3 flex-shrink-0 mt-0.5" />
-              <span>{improvement}</span>
-            </div>
-          ))}
+        <div className="space-y-1.5 mb-3">
+          <div className="flex items-center gap-1.5 text-xs font-medium text-base-content/70">
+            <AlertTriangle className="h-3.5 w-3.5 text-warning" />
+            <span>Areas to Improve</span>
+          </div>
+          <ul className="space-y-1 pl-5">
+            {review.improvements.map((improvement: string, i: number) => (
+              <li key={i} className="text-xs text-base-content/80 list-disc">
+                {improvement}
+              </li>
+            ))}
+          </ul>
         </div>
       )}
 
       {/* Tips */}
       {review.tips && review.tips.length > 0 && (
-        <div className="space-y-1">
-          {review.tips.map((tip: string, i: number) => (
-            <div
-              key={i}
-              className="flex items-start gap-1.5 text-xs text-info/90"
-            >
-              <Lightbulb className="h-3 w-3 flex-shrink-0 mt-0.5" />
-              <span>{tip}</span>
-            </div>
-          ))}
+        <div className="space-y-1.5">
+          <div className="flex items-center gap-1.5 text-xs font-medium text-base-content/70">
+            <Lightbulb className="h-3.5 w-3.5 text-info" />
+            <span>Tips</span>
+          </div>
+          <ul className="space-y-1 pl-5">
+            {review.tips.map((tip: string, i: number) => (
+              <li key={i} className="text-xs text-base-content/80 list-disc">
+                {tip}
+              </li>
+            ))}
+          </ul>
         </div>
       )}
     </div>
@@ -945,6 +963,7 @@ function DetailedTab({
   onBlockClick,
   onReReview,
   onReviewAll,
+  onCardHeightsChange,
 }: {
   blocks: PageBlock[];
   reviews: Map<string, BlockReview>;
@@ -955,6 +974,7 @@ function DetailedTab({
   onBlockClick: (blockId: string) => void;
   onReReview: (blockId: string) => void;
   onReviewAll: () => void;
+  onCardHeightsChange?: (cardHeights: Map<string, number>) => void;
 }) {
   // Track measured heights of each card
   const [cardHeights, setCardHeights] = useState<Map<string, number>>(
@@ -972,10 +992,20 @@ function DetailedTab({
     [],
   );
 
-  // Calculate card positions with collision detection
+  // Report card heights to parent when they change
+  useEffect(() => {
+    onCardHeightsChange?.(cardHeights);
+  }, [cardHeights, onCardHeightsChange]);
+
+  // Calculate card positions with collision detection and spacing adjustment
   const cardPositions = useMemo(() => {
     const blockIds = blocks.map((b) => b.id);
-    return calculateCardPositions(blockIds, blockPositions, cardHeights, 8);
+    return calculateAdjustedCardPositions(
+      blockIds,
+      blockPositions,
+      cardHeights,
+      8,
+    );
   }, [blocks, blockPositions, cardHeights]);
 
   // Calculate total height needed for the container
@@ -1041,10 +1071,14 @@ function DetailedTab({
     );
   }
 
+  // Position cards absolutely to align with their corresponding Q&A blocks.
+  // The relative container must start at the same Y position as the scroll container content
+  // so that card `top` values (which are block positions measured from scroll container top)
+  // position cards correctly.
   return (
-    <div className="relative px-4" style={{ minHeight: totalHeight }}>
+    <div className="relative" style={{ minHeight: totalHeight }}>
       {blocks.length === 0 ? (
-        <div className="text-center py-8 text-base-content/50 text-sm">
+        <div className="text-center py-8 text-base-content/50 text-sm px-4">
           No questions to review yet.
         </div>
       ) : (
@@ -1150,6 +1184,8 @@ export function BlockReviewPanel({
   onReReview,
   onReviewAll,
   externalHeader,
+  onCardHeightsChange,
+  disableInternalScroll = false,
 }: AIReviewPanelProps) {
   return (
     <div className="h-full flex flex-col bg-base-100">
@@ -1175,7 +1211,9 @@ export function BlockReviewPanel({
       )}
 
       {/* Tab content */}
-      <div className="flex-1 overflow-y-auto">
+      <div
+        className={`flex-1 ${disableInternalScroll ? "" : "overflow-y-auto"}`}
+      >
         {activeTab === "configure" && <ConfigureTab pageId={pageId} />}
         {activeTab === "overall" && (
           <OverallTab
@@ -1197,6 +1235,7 @@ export function BlockReviewPanel({
             onBlockClick={onBlockClick}
             onReReview={onReReview}
             onReviewAll={onReviewAll}
+            onCardHeightsChange={onCardHeightsChange}
           />
         )}
       </div>
