@@ -13,6 +13,7 @@ import { Route as NewRouteImport } from './routes/new'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as PagePageIdRouteImport } from './routes/page.$pageId'
 import { Route as ApiReviewRouteImport } from './routes/api/review'
+import { Route as ApiOverallReviewRouteImport } from './routes/api/overall-review'
 
 const NewRoute = NewRouteImport.update({
   id: '/new',
@@ -34,16 +35,23 @@ const ApiReviewRoute = ApiReviewRouteImport.update({
   path: '/api/review',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiOverallReviewRoute = ApiOverallReviewRouteImport.update({
+  id: '/api/overall-review',
+  path: '/api/overall-review',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/new': typeof NewRoute
+  '/api/overall-review': typeof ApiOverallReviewRoute
   '/api/review': typeof ApiReviewRoute
   '/page/$pageId': typeof PagePageIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/new': typeof NewRoute
+  '/api/overall-review': typeof ApiOverallReviewRoute
   '/api/review': typeof ApiReviewRoute
   '/page/$pageId': typeof PagePageIdRoute
 }
@@ -51,20 +59,33 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/new': typeof NewRoute
+  '/api/overall-review': typeof ApiOverallReviewRoute
   '/api/review': typeof ApiReviewRoute
   '/page/$pageId': typeof PagePageIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/new' | '/api/review' | '/page/$pageId'
+  fullPaths:
+    | '/'
+    | '/new'
+    | '/api/overall-review'
+    | '/api/review'
+    | '/page/$pageId'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/new' | '/api/review' | '/page/$pageId'
-  id: '__root__' | '/' | '/new' | '/api/review' | '/page/$pageId'
+  to: '/' | '/new' | '/api/overall-review' | '/api/review' | '/page/$pageId'
+  id:
+    | '__root__'
+    | '/'
+    | '/new'
+    | '/api/overall-review'
+    | '/api/review'
+    | '/page/$pageId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   NewRoute: typeof NewRoute
+  ApiOverallReviewRoute: typeof ApiOverallReviewRoute
   ApiReviewRoute: typeof ApiReviewRoute
   PagePageIdRoute: typeof PagePageIdRoute
 }
@@ -99,12 +120,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiReviewRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/overall-review': {
+      id: '/api/overall-review'
+      path: '/api/overall-review'
+      fullPath: '/api/overall-review'
+      preLoaderRoute: typeof ApiOverallReviewRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   NewRoute: NewRoute,
+  ApiOverallReviewRoute: ApiOverallReviewRoute,
   ApiReviewRoute: ApiReviewRoute,
   PagePageIdRoute: PagePageIdRoute,
 }

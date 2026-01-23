@@ -1,11 +1,8 @@
-import { useRef, useEffect, useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { toast } from "sonner";
 import {
   X,
   RefreshCw,
-  Check,
-  AlertTriangle,
-  Lightbulb,
   Sparkles,
   Settings2,
   FileText,
@@ -15,9 +12,9 @@ import {
 } from "lucide-react";
 import type { BlockReview } from "@/types/schemas/reviews";
 import type { PageBlock } from "@/types/schemas/pages";
-import type { Prompt, OverallReviewMode } from "@/types/schemas/prompts";
+import type { Prompt } from "@/types/schemas/prompts";
 import { usePageReviewSettings } from "@/client/hooks/usePageReviewSettings";
-import { usePageOverallReviewSettings } from "@/client/hooks/usePageOverallReviewSettings";
+import { useOverallReview } from "@/client/hooks/useOverallReview";
 
 export type ReviewTab = "settings" | "overall";
 
@@ -413,78 +410,81 @@ function ConfigureTab({
 function OverallTab({
   pageId,
   blocks,
-  reviews,
-  onReviewAll,
-  isReviewingAll,
 }: {
   pageId: string;
   blocks: PageBlock[];
-  reviews: Map<string, BlockReview>;
-  onReviewAll: () => void;
-  isReviewingAll: boolean;
 }) {
+  const { customPrompts, defaultPrompt } = usePageReviewSettings(pageId);
+
   const {
-    settings,
-    prompts,
-    selectedPrompts,
-    availablePrompts,
-    updateMode,
-    updateCustomPrompt,
-    addSelectedPrompt,
-    removeSelectedPrompt,
-  } = usePageOverallReviewSettings(pageId);
+    overallReview,
+    isLoading,
+    isGenerating,
+    displayText,
+    error,
+    hasAnswers,
+    generateOverallReview,
+    stopGenerating,
+  } = useOverallReview({
+    pageId,
+    blocks,
+    customInstructions: defaultPrompt?.prompt,
+  });
 
-  const reviewsArray = useMemo(() => Array.from(reviews.values()), [reviews]);
+  // Check if page has custom prompts (beyond just the default)
+  const hasCustomPrompts = customPrompts.length > 0;
 
-  const hasAnswers = useMemo(() => {
-    return blocks.some((b) => b.answer && b.answer.trim().length > 0);
-  }, [blocks]);
+  // State for selected prompt (only used when hasCustomPrompts is true)
+  const [selectedPromptId, setSelectedPromptId] = useState<string | null>(null);
 
-  // Calculate overall stats
-  const stats = useMemo(() => {
-    if (reviewsArray.length === 0) return null;
-    const totalStrengths = reviewsArray.reduce(
-      (sum, r) => sum + r.strengths.length,
-      0,
+  // All available prompts for selection
+  const allPrompts = useMemo(() => {
+    const prompts: Array<{ id: string; name: string; prompt: string }> = [];
+    if (defaultPrompt) {
+      prompts.push(defaultPrompt);
+    }
+    prompts.push(...customPrompts);
+    return prompts;
+  }, [defaultPrompt, customPrompts]);
+
+  // Get the currently selected prompt (or default if none selected)
+  const currentPrompt = useMemo(() => {
+    if (selectedPromptId) {
+      return allPrompts.find((p) => p.id === selectedPromptId) ?? defaultPrompt;
+    }
+    return defaultPrompt;
+  }, [selectedPromptId, allPrompts, defaultPrompt]);
+
+  // Handle generate button click
+  const handleGenerate = useCallback(() => {
+    generateOverallReview(
+      currentPrompt?.id ?? null,
+      currentPrompt?.prompt ?? null,
     );
-    const totalImprovements = reviewsArray.reduce(
-      (sum, r) => sum + r.improvements.length,
-      0,
-    );
-    return {
-      totalStrengths,
-      totalImprovements,
-      reviewed: reviewsArray.length,
-      total: blocks.length,
-    };
-  }, [reviewsArray, blocks.length]);
+  }, [generateOverallReview, currentPrompt]);
 
-  const currentMode = (settings?.mode ?? "all_prompts") as OverallReviewMode;
-
-  const modes: { id: OverallReviewMode; label: string }[] = [
-    { id: "all_prompts", label: "All" },
-    { id: "select_prompts", label: "Select" },
-    { id: "custom", label: "Custom" },
-  ];
-
-  // Determine context text based on mode
-  const getContextText = () => {
-    if (currentMode === "all_prompts") {
-      return `All ${prompts.length} prompt${prompts.length !== 1 ? "s" : ""} will be used as context for the overall review.`;
-    }
-    if (currentMode === "select_prompts") {
-      if (selectedPrompts.length === 0) {
-        return "Select which prompts to use as context.";
-      }
-      return `${selectedPrompts.length} prompt${selectedPrompts.length !== 1 ? "s" : ""} selected as context.`;
-    }
-    if (currentMode === "custom") {
-      return "Use a custom prompt for the overall review.";
-    }
-    return "";
+  // Format the date for display
+  const formatDate = (dateString: string | undefined) => {
+    if (!dateString) return "";
+    const date = new Date(dateString);
+    return date.toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+    });
   };
 
-  if (!stats) {
+  if (isLoading) {
+    return (
+      <div className="p-4 flex items-center justify-center">
+        <span className="loading loading-spinner loading-sm" />
+      </div>
+    );
+  }
+
+  // No content yet and not generating - show empty state with generate button
+  if (!displayText && !isGenerating) {
     return (
       <div className="p-4 space-y-5">
         {/* Header */}
@@ -497,108 +497,43 @@ function OverallTab({
           </p>
         </div>
 
-        {/* Prompts to Consider - Label + Badge Selector */}
-        <div className="space-y-3">
-          <div className="flex items-center justify-between">
-            <span className="text-sm font-medium text-base-content">
-              Prompts to Consider
-            </span>
-            <div className="flex rounded-lg border border-base-300 p-0.5 bg-base-200/50">
-              {modes.map((mode) => (
-                <button
-                  key={mode.id}
-                  onClick={() => updateMode(mode.id)}
-                  className={`
-                    px-3 py-1 text-xs font-medium rounded-md transition-all
-                    ${
-                      currentMode === mode.id
-                        ? "bg-primary text-primary-content shadow-sm"
-                        : "text-base-content/60 hover:text-base-content"
-                    }
-                  `}
-                >
-                  {mode.label}
-                </button>
+        {/* Prompt selector - only show if page has custom prompts */}
+        {hasCustomPrompts && (
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-base-content">
+              Review Prompt
+            </label>
+            <select
+              value={selectedPromptId ?? defaultPrompt?.id ?? ""}
+              onChange={(e) => setSelectedPromptId(e.target.value || null)}
+              className="select select-bordered select-sm w-full"
+            >
+              {allPrompts.map((prompt) => (
+                <option key={prompt.id} value={prompt.id}>
+                  {prompt.name}
+                  {prompt.id === defaultPrompt?.id ? " (Default)" : ""}
+                </option>
               ))}
-            </div>
+            </select>
           </div>
+        )}
 
-          {/* Context text */}
-          <p className="text-xs text-base-content/50">{getContextText()}</p>
-
-          {/* Select Prompts Mode - show badges */}
-          {currentMode === "select_prompts" && (
-            <div className="space-y-2">
-              {selectedPrompts.length > 0 && (
-                <div className="flex flex-wrap gap-1.5">
-                  {selectedPrompts.map((prompt: Prompt) => (
-                    <div
-                      key={prompt.id}
-                      className="badge badge-sm bg-base-300 border-base-300 gap-1 pr-0.5"
-                    >
-                      <span className="truncate max-w-[100px]">
-                        {prompt.name}
-                      </span>
-                      <button
-                        onClick={() => removeSelectedPrompt(prompt.id)}
-                        className="hover:text-error transition-colors p-0.5"
-                      >
-                        <X className="h-3 w-3" />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              {availablePrompts.length > 0 && (
-                <div className="dropdown">
-                  <button
-                    tabIndex={0}
-                    className="btn btn-xs btn-ghost gap-1 text-base-content/60 hover:text-primary -ml-1"
-                  >
-                    <Plus className="h-3 w-3" />
-                    Add prompt
-                  </button>
-                  <ul
-                    tabIndex={0}
-                    className="dropdown-content z-20 menu p-1 shadow-lg bg-base-100 rounded-lg border border-base-300 w-48 mt-1 max-h-40 overflow-y-auto"
-                  >
-                    {availablePrompts.map((prompt) => (
-                      <li key={prompt.id}>
-                        <button
-                          onClick={() => addSelectedPrompt(prompt.id)}
-                          className="text-sm"
-                        >
-                          <span className="truncate">{prompt.name}</span>
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Custom Mode - show textarea */}
-          {currentMode === "custom" && (
-            <textarea
-              value={settings?.customPrompt ?? ""}
-              onChange={(e) => updateCustomPrompt(e.target.value || null)}
-              placeholder="Enter your custom overall review prompt..."
-              className="textarea textarea-bordered textarea-sm w-full h-20 text-sm"
-            />
-          )}
-        </div>
+        {/* Error message */}
+        {error && (
+          <div className="p-3 rounded-lg bg-error/10 border border-error/20">
+            <p className="text-sm text-error">{error}</p>
+          </div>
+        )}
 
         {/* CTA */}
         {hasAnswers ? (
           <button
-            onClick={onReviewAll}
-            disabled={isReviewingAll}
+            onClick={handleGenerate}
+            disabled={isGenerating}
             className="btn btn-primary btn-sm gap-2"
           >
             <Sparkles className="h-4 w-4" />
-            {isReviewingAll ? "Reviewing..." : "Review All Answers"}
+            Generate Overall Review
           </button>
         ) : (
           <div className="p-3 rounded-lg bg-base-200/50 border border-base-300/50">
@@ -611,161 +546,89 @@ function OverallTab({
     );
   }
 
+  // Has content (either streaming or saved) - show the summary
   return (
     <div className="p-4 space-y-5">
-      {/* Prompts to Consider - Label + Badge Selector */}
-      <div className="space-y-3">
-        <div className="flex items-center justify-between">
-          <span className="text-sm font-medium text-base-content">
-            Prompts to Consider
-          </span>
-          <div className="flex rounded-lg border border-base-300 p-0.5 bg-base-200/50">
-            {modes.map((mode) => (
-              <button
-                key={mode.id}
-                onClick={() => updateMode(mode.id)}
-                className={`
-                  px-3 py-1 text-xs font-medium rounded-md transition-all
-                  ${
-                    currentMode === mode.id
-                      ? "bg-primary text-primary-content shadow-sm"
-                      : "text-base-content/60 hover:text-base-content"
-                  }
-                `}
-              >
-                {mode.label}
-              </button>
+      {/* Header with regenerate/stop */}
+      <div className="flex items-start justify-between gap-2">
+        <div>
+          <h3 className="text-sm font-medium text-base-content mb-1">
+            Overall Review
+          </h3>
+          {overallReview?.updatedAt && !isGenerating ? (
+            <p className="text-xs text-base-content/50">
+              Generated {formatDate(overallReview.updatedAt)}
+            </p>
+          ) : null}
+        </div>
+        {isGenerating ? (
+          <button
+            onClick={stopGenerating}
+            className="btn btn-ghost btn-xs gap-1 text-error"
+            title="Stop generating"
+          >
+            <X className="h-3.5 w-3.5" />
+          </button>
+        ) : (
+          <button
+            onClick={handleGenerate}
+            className="btn btn-ghost btn-xs gap-1"
+            title="Regenerate review"
+          >
+            <RefreshCw className="h-3.5 w-3.5" />
+          </button>
+        )}
+      </div>
+
+      {/* Prompt selector - only show if page has custom prompts and not generating */}
+      {hasCustomPrompts && !isGenerating && (
+        <div className="space-y-2">
+          <label className="text-sm font-medium text-base-content">
+            Review Prompt
+          </label>
+          <select
+            value={
+              selectedPromptId ??
+              overallReview?.promptId ??
+              defaultPrompt?.id ??
+              ""
+            }
+            onChange={(e) => setSelectedPromptId(e.target.value || null)}
+            className="select select-bordered select-sm w-full"
+          >
+            {allPrompts.map((prompt) => (
+              <option key={prompt.id} value={prompt.id}>
+                {prompt.name}
+                {prompt.id === defaultPrompt?.id ? " (Default)" : ""}
+              </option>
             ))}
-          </div>
+          </select>
         </div>
+      )}
 
-        {/* Context text */}
-        <p className="text-xs text-base-content/50">{getContextText()}</p>
+      {/* Error message */}
+      {error && (
+        <div className="p-3 rounded-lg bg-error/10 border border-error/20">
+          <p className="text-sm text-error">{error}</p>
+        </div>
+      )}
 
-        {/* Select Prompts Mode - show badges */}
-        {currentMode === "select_prompts" && (
-          <div className="space-y-2">
-            {selectedPrompts.length > 0 && (
-              <div className="flex flex-wrap gap-1.5">
-                {selectedPrompts.map((prompt: Prompt) => (
-                  <div
-                    key={prompt.id}
-                    className="badge badge-sm bg-base-300 border-base-300 gap-1 pr-0.5"
-                  >
-                    <span className="truncate max-w-[100px]">
-                      {prompt.name}
-                    </span>
-                    <button
-                      onClick={() => removeSelectedPrompt(prompt.id)}
-                      className="hover:text-error transition-colors p-0.5"
-                    >
-                      <X className="h-3 w-3" />
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {availablePrompts.length > 0 && (
-              <div className="dropdown">
-                <button
-                  tabIndex={0}
-                  className="btn btn-xs btn-ghost gap-1 text-base-content/60 hover:text-primary -ml-1"
-                >
-                  <Plus className="h-3 w-3" />
-                  Add prompt
-                </button>
-                <ul
-                  tabIndex={0}
-                  className="dropdown-content z-20 menu p-1 shadow-lg bg-base-100 rounded-lg border border-base-300 w-48 mt-1 max-h-40 overflow-y-auto"
-                >
-                  {availablePrompts.map((prompt) => (
-                    <li key={prompt.id}>
-                      <button
-                        onClick={() => addSelectedPrompt(prompt.id)}
-                        className="text-sm"
-                      >
-                        <span className="truncate">{prompt.name}</span>
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Custom Mode - show textarea */}
-        {currentMode === "custom" && (
-          <textarea
-            value={settings?.customPrompt ?? ""}
-            onChange={(e) => updateCustomPrompt(e.target.value || null)}
-            placeholder="Enter your custom overall review prompt..."
-            className="textarea textarea-bordered textarea-sm w-full h-20 text-sm"
-          />
-        )}
-      </div>
-
-      {/* Progress */}
+      {/* Summary content */}
       <div className="p-4 rounded-lg bg-base-200/50 border border-base-300">
-        <div className="flex items-center justify-between mb-3">
-          <span className="text-sm font-medium text-base-content">
-            Review Progress
-          </span>
-          <span className="text-lg font-bold text-primary">
-            {stats.reviewed}/{stats.total}
-          </span>
-        </div>
-        <div className="w-full bg-base-300 rounded-full h-2">
-          <div
-            className="bg-primary h-2 rounded-full transition-all"
-            style={{ width: `${(stats.reviewed / stats.total) * 100}%` }}
-          />
-        </div>
-        <p className="text-xs text-base-content/50 mt-2">
-          {stats.reviewed} of {stats.total} questions reviewed
-        </p>
-      </div>
-
-      {/* Summary Stats */}
-      <div className="grid grid-cols-2 gap-3">
-        <div className="p-3 rounded-lg bg-base-200 border border-base-300">
-          <div className="flex items-center gap-2 mb-1">
-            <div className="p-1 rounded bg-success/20">
-              <Check className="h-3.5 w-3.5 text-success" />
-            </div>
-            <span className="text-sm font-medium text-base-content/70">
-              Strengths
-            </span>
-          </div>
-          <span className="text-2xl font-bold text-base-content">
-            {stats.totalStrengths}
-          </span>
-        </div>
-        <div className="p-3 rounded-lg bg-base-200 border border-base-300">
-          <div className="flex items-center gap-2 mb-1">
-            <div className="p-1 rounded bg-warning/20">
-              <AlertTriangle className="h-3.5 w-3.5 text-warning" />
-            </div>
-            <span className="text-sm font-medium text-base-content/70">
-              To Improve
-            </span>
-          </div>
-          <span className="text-2xl font-bold text-base-content">
-            {stats.totalImprovements}
-          </span>
+        <div className="prose prose-sm max-w-none text-base-content/80">
+          {displayText ? (
+            displayText
+              .split("\n\n")
+              .map((paragraph: string, index: number) => (
+                <p key={index} className="mb-3 last:mb-0">
+                  {paragraph}
+                </p>
+              ))
+          ) : (
+            <p className="text-base-content/50 italic">Generating review...</p>
+          )}
         </div>
       </div>
-
-      {/* Re-review button */}
-      <button
-        onClick={onReviewAll}
-        disabled={isReviewingAll}
-        className="btn btn-ghost btn-sm gap-2 w-full"
-      >
-        <RefreshCw className="h-4 w-4" />
-        {isReviewingAll ? "Reviewing..." : "Re-review All"}
-      </button>
     </div>
   );
 }
@@ -891,13 +754,7 @@ export function BlockReviewPanel({
           <ConfigureTab pageId={pageId} onDeletePage={onDeletePage} />
         )}
         {activeTab === "overall" && (
-          <OverallTab
-            pageId={pageId}
-            blocks={blocks}
-            reviews={reviews}
-            onReviewAll={onReviewAll}
-            isReviewingAll={isReviewingAll}
-          />
+          <OverallTab pageId={pageId} blocks={blocks} />
         )}
       </div>
     </div>

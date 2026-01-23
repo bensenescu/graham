@@ -43,6 +43,13 @@
       "when": 1769025746792,
       "tag": "0005_nervous_alex_power",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1769138447995,
+      "tag": "0006_living_rattler",
+      "breakpoints": true
     }
   ]
 }

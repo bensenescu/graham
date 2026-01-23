@@ -158,6 +158,11 @@ function PageEditor() {
     setActiveTab(tab);
   }, []);
 
+  const handleOpenOverallTab = useCallback(() => {
+    setActiveTab("overall");
+    setIsPanelOpen(true);
+  }, []);
+
   if (isLoadingPages || isLoadingBlocks) {
     return (
       <div className="h-full flex items-center justify-center">
@@ -236,7 +241,6 @@ function PageEditor() {
         sidePanelHeader={sidePanelHeader}
         sidePanel={sidePanel}
         storageKey="page-review-panel-width"
-        sidePanelIndependentScroll
       >
         <QADocumentEditor
           pageId={pageId}
@@ -263,6 +267,7 @@ function PageEditor() {
         hasBlocks={sortedBlocks.length > 0}
         isPanelOpen={isPanelOpen}
         onOpenPanel={handlePanelOpen}
+        onOpenOverallTab={handleOpenOverallTab}
       />
     </div>
   );

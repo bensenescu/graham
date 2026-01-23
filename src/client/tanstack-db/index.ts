@@ -6,3 +6,4 @@ export { promptCollection } from "./promptCollection";
 export { createPageReviewSettingsCollection } from "./pageReviewSettingsCollection";
 export { createPageOverallReviewSettingsCollection } from "./pageOverallReviewSettingsCollection";
 export { createBlockReviewCollection } from "./blockReviewCollection";
+export { createPageOverallReviewCollection } from "./pageOverallReviewCollection";
