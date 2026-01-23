@@ -136,11 +136,11 @@ export function QABlock({
           />
         </div>
 
-        {/* Delete button - appears on hover */}
+        {/* Delete button - appears on hover or focus-within */}
         {!isOnly && (
           <button
             onClick={() => onDelete(block.id)}
-            className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity btn btn-ghost btn-xs btn-square text-error"
+            className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity btn btn-ghost btn-xs btn-square text-error"
             aria-label="Delete Q&A block"
           >
             <Trash2 className="h-4 w-4" />
