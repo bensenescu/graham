@@ -46,3 +46,38 @@ export const reviewAPIResponseSchema = z.object({
 });
 
 export type ReviewAPIResponse = z.infer<typeof reviewAPIResponseSchema>;
+
+// === Page Overall Review Schema (narrative summary for entire page) ===
+export const pageOverallReviewSchema = z.object({
+  id: z.string(),
+  pageId: z.string(),
+  promptId: z.string().nullable(), // which prompt was used (null for custom)
+  customPrompt: z.string().nullable(), // if custom prompt was used
+  summary: z.string(), // the narrative summary from LLM
+  createdAt: z.string().optional(),
+  updatedAt: z.string().optional(),
+});
+
+export type PageOverallReview = z.infer<typeof pageOverallReviewSchema>;
+
+// === Upsert Page Overall Review ===
+export const upsertPageOverallReviewSchema = z.object({
+  id: z.string(),
+  pageId: z.string(),
+  promptId: z.string().nullable().optional(),
+  customPrompt: z.string().nullable().optional(),
+  summary: z.string(),
+});
+
+export type UpsertPageOverallReviewInput = z.infer<
+  typeof upsertPageOverallReviewSchema
+>;
+
+// === API Response from overall review endpoint ===
+export const overallReviewAPIResponseSchema = z.object({
+  summary: z.string(),
+});
+
+export type OverallReviewAPIResponse = z.infer<
+  typeof overallReviewAPIResponseSchema
+>;

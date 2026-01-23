@@ -3,7 +3,6 @@ import {
   useCallback,
   useRef,
   useEffect,
-  forwardRef,
   type ReactNode,
 } from "react";
 
@@ -30,35 +29,26 @@ interface ResizablePanelLayoutProps {
   maxMainWidth?: number;
   /** Default width of main content as percentage (default: 50) */
   defaultMainWidth?: number;
-  /** When true, side panel scrolls independently instead of syncing with main content */
-  sidePanelIndependentScroll?: boolean;
 }
 
 /**
  * A layout component with a resizable side panel.
- * Uses a single scroll container so both panels scroll together (1:1 sync).
+ * Both panels scroll independently.
  * Width preference is persisted to localStorage.
  */
-export const ResizablePanelLayout = forwardRef<
-  HTMLDivElement,
-  ResizablePanelLayoutProps
->(function ResizablePanelLayout(
-  {
-    children,
-    sidePanel,
-    mainHeader,
-    sidePanelHeader,
-    isPanelOpen,
-    onPanelClose,
-    onPanelOpen,
-    storageKey = "panel-width",
-    minMainWidth = 33,
-    maxMainWidth = 66,
-    defaultMainWidth = 50,
-    sidePanelIndependentScroll = false,
-  },
-  ref,
-) {
+export function ResizablePanelLayout({
+  children,
+  sidePanel,
+  mainHeader,
+  sidePanelHeader,
+  isPanelOpen,
+  onPanelClose,
+  onPanelOpen,
+  storageKey = "panel-width",
+  minMainWidth = 33,
+  maxMainWidth = 66,
+  defaultMainWidth = 50,
+}: ResizablePanelLayoutProps) {
   // Load initial width from localStorage or use default
   const [mainWidthPercent, setMainWidthPercent] = useState(() => {
     if (typeof window === "undefined") return defaultMainWidth;
@@ -172,69 +162,66 @@ export const ResizablePanelLayout = forwardRef<
         </div>
       )}
 
-      {/* Single scroll container for both panels */}
-      <div ref={ref} className="flex-1 overflow-y-auto overflow-x-hidden">
-        <div className="flex min-h-full">
-          {/* Main content - animates width */}
-          <div
-            className="flex-shrink-0 transition-[width] duration-300 ease-out"
-            style={{ width: isPanelOpen ? `${mainWidthPercent}%` : "100%" }}
-          >
-            {children}
-          </div>
+      {/* Content area - each panel scrolls independently */}
+      <div className="flex-1 flex overflow-hidden">
+        {/* Main content - scrolls independently */}
+        <div
+          className="flex-shrink-0 overflow-y-auto transition-[width] duration-300 ease-out"
+          style={{ width: isPanelOpen ? `${mainWidthPercent}%` : "100%" }}
+        >
+          {children}
+        </div>
 
-          {/* Resize handle - sticky to viewport, fades in/out */}
-          <div
-            onMouseDown={handleMouseDown}
-            className={`
-              sticky top-0 h-screen w-1 cursor-col-resize flex-shrink-0 z-10
-              bg-base-300 hover:bg-primary/50
-              transition-all duration-300 ease-out
-              ${isDragging ? "bg-primary" : ""}
-              ${isPanelOpen ? "opacity-100" : "opacity-0 pointer-events-none"}
-            `}
-            role="separator"
-            aria-orientation="vertical"
-            aria-label="Resize panel"
-          >
-            {/* Visual grip indicator */}
-            <div className="h-full w-full flex items-center justify-center">
-              <div
-                className={`
-                  w-0.5 h-8 rounded-full
-                  ${isDragging ? "bg-primary-content" : "bg-base-content/20"}
-                `}
-              />
-            </div>
-          </div>
-
-          {/* Side panel - slides in/out from right */}
-          <div
-            className={`
-              flex-shrink-0 bg-base-100
-              transition-all duration-300 ease-out
-              ${isPanelOpen ? "opacity-100" : "opacity-0"}
-              ${sidePanelIndependentScroll ? "sticky top-0 h-screen overflow-y-auto" : ""}
-            `}
-            style={{
-              width: isPanelOpen ? `calc(${panelWidthPercent}% - 4px)` : "0px",
-            }}
-          >
+        {/* Resize handle */}
+        <div
+          onMouseDown={handleMouseDown}
+          className={`
+            h-full w-1 cursor-col-resize flex-shrink-0 z-10
+            bg-base-300 hover:bg-primary/50
+            transition-all duration-300 ease-out
+            ${isDragging ? "bg-primary" : ""}
+            ${isPanelOpen ? "opacity-100" : "opacity-0 pointer-events-none w-0"}
+          `}
+          role="separator"
+          aria-orientation="vertical"
+          aria-label="Resize panel"
+        >
+          {/* Visual grip indicator */}
+          <div className="h-full w-full flex items-center justify-center">
             <div
               className={`
-                transition-transform duration-300 ease-out
-                ${isPanelOpen ? "translate-x-0" : "translate-x-8"}
+                w-0.5 h-8 rounded-full
+                ${isDragging ? "bg-primary-content" : "bg-base-content/20"}
               `}
-              style={{
-                width: `calc(${panelWidthPercent}vw - 4px)`,
-                minWidth: "300px",
-              }}
-            >
-              {sidePanel}
-            </div>
+            />
+          </div>
+        </div>
+
+        {/* Side panel - scrolls independently */}
+        <div
+          className={`
+            flex-shrink-0 overflow-y-auto bg-base-100
+            transition-all duration-300 ease-out
+            ${isPanelOpen ? "opacity-100" : "opacity-0"}
+          `}
+          style={{
+            width: isPanelOpen ? `calc(${panelWidthPercent}% - 4px)` : "0px",
+          }}
+        >
+          <div
+            className={`
+              transition-transform duration-300 ease-out
+              ${isPanelOpen ? "translate-x-0" : "translate-x-8"}
+            `}
+            style={{
+              width: `calc(${panelWidthPercent}vw - 4px)`,
+              minWidth: "300px",
+            }}
+          >
+            {sidePanel}
           </div>
         </div>
       </div>
     </div>
   );
-});
+}

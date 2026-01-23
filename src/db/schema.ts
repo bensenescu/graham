@@ -137,6 +137,30 @@ export const pageOverallReviewSelectedPrompts = sqliteTable(
   ],
 );
 
+// Page Overall Reviews table (AI-generated narrative summary for entire page)
+export const pageOverallReviews = sqliteTable(
+  "page_overall_reviews",
+  {
+    id: text("id").primaryKey(),
+    pageId: text("page_id")
+      .notNull()
+      .unique()
+      .references(() => pages.id, { onDelete: "cascade" }),
+    promptId: text("prompt_id").references(() => prompts.id, {
+      onDelete: "set null",
+    }), // which prompt was used (null for custom)
+    customPrompt: text("custom_prompt"), // if custom prompt was used
+    summary: text("summary").notNull(), // the narrative summary from LLM
+    createdAt: text("created_at")
+      .notNull()
+      .default(sql`(current_timestamp)`),
+    updatedAt: text("updated_at")
+      .notNull()
+      .default(sql`(current_timestamp)`),
+  },
+  (table) => [index("page_overall_reviews_page_id_idx").on(table.pageId)],
+);
+
 // Block Reviews table (AI-generated reviews for each block/prompt combination)
 export const blockReviews = sqliteTable(
   "block_reviews",
@@ -248,6 +272,20 @@ export const pageOverallReviewSelectedPromptsRelations = relations(
   }),
 );
 
+export const pageOverallReviewsRelations = relations(
+  pageOverallReviews,
+  ({ one }) => ({
+    page: one(pages, {
+      fields: [pageOverallReviews.pageId],
+      references: [pages.id],
+    }),
+    prompt: one(prompts, {
+      fields: [pageOverallReviews.promptId],
+      references: [prompts.id],
+    }),
+  }),
+);
+
 // === Type Exports ===
 
 export type User = typeof users.$inferSelect;
@@ -277,3 +315,6 @@ export type PageOverallReviewSelectedPrompt =
   typeof pageOverallReviewSelectedPrompts.$inferSelect;
 export type NewPageOverallReviewSelectedPrompt =
   typeof pageOverallReviewSelectedPrompts.$inferInsert;
+
+export type PageOverallReview = typeof pageOverallReviews.$inferSelect;
+export type NewPageOverallReview = typeof pageOverallReviews.$inferInsert;

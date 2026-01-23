@@ -1,4 +1,5 @@
-import { Eye, EyeOff, Sparkles, Settings2 } from "lucide-react";
+import { useState } from "react";
+import { Eye, EyeOff, Sparkles, Settings2, FileText } from "lucide-react";
 
 interface FloatingControlsProps {
   /** Whether inline AI reviews are visible */
@@ -17,6 +18,8 @@ interface FloatingControlsProps {
   isPanelOpen: boolean;
   /** Open the settings panel */
   onOpenPanel: () => void;
+  /** Open the panel to the Overall tab */
+  onOpenOverallTab: () => void;
 }
 
 /**
@@ -32,60 +35,87 @@ export function FloatingControls({
   hasBlocks,
   isPanelOpen,
   onOpenPanel,
+  onOpenOverallTab,
 }: FloatingControlsProps) {
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
+
   // Hide when side panel is open
   if (isPanelOpen) {
     return null;
   }
 
+  const handleReviewAllClick = () => {
+    if (hasReviews) {
+      // Show confirmation if re-reviewing
+      setShowConfirmModal(true);
+    } else {
+      // No existing reviews, proceed directly
+      onReviewAll();
+    }
+  };
+
+  const handleConfirmReview = () => {
+    setShowConfirmModal(false);
+    onReviewAll();
+  };
+
   return (
-    <div className="fixed top-24 right-6 z-30">
-      <div className="flex flex-col gap-1 p-1.5 rounded-xl bg-base-100 border border-base-300 shadow-lg min-w-[150px]">
-        {/* Review All / Re-review All button */}
-        <button
-          onClick={onReviewAll}
-          disabled={isReviewingAll || !hasBlocks}
-          className="btn btn-sm btn-ghost justify-start gap-2 text-left"
-        >
-          {isReviewingAll ? (
-            <>
-              <span className="loading loading-spinner loading-xs" />
-              <span className="text-xs">Reviewing...</span>
-            </>
-          ) : (
-            <>
-              <Sparkles className="h-4 w-4 text-primary" />
-              <span className="text-xs">
-                {hasReviews ? "Re-review All" : "Review All"}
-              </span>
-            </>
-          )}
-        </button>
+    <>
+      <div className="fixed top-20 right-6 z-30">
+        <div className="flex flex-col gap-1 p-1.5 rounded-xl bg-base-100 border border-base-300 shadow-lg min-w-[150px]">
+          {/* Toggle inline reviews */}
+          <button
+            onClick={onToggleInlineReviews}
+            className={`
+              btn btn-sm btn-ghost justify-start gap-2 text-left
+              ${showInlineReviews ? "text-base-content" : "text-base-content/50"}
+            `}
+            title={showInlineReviews ? "Hide AI reviews" : "Show AI reviews"}
+          >
+            {showInlineReviews ? (
+              <>
+                <EyeOff className="h-4 w-4" />
+                <span className="text-xs">Hide Reviews</span>
+              </>
+            ) : (
+              <>
+                <Eye className="h-4 w-4" />
+                <span className="text-xs">Show Reviews</span>
+              </>
+            )}
+          </button>
 
-        {/* Toggle inline reviews */}
-        <button
-          onClick={onToggleInlineReviews}
-          className={`
-            btn btn-sm btn-ghost justify-start gap-2 text-left
-            ${showInlineReviews ? "text-base-content" : "text-base-content/50"}
-          `}
-          title={showInlineReviews ? "Hide AI reviews" : "Show AI reviews"}
-        >
-          {showInlineReviews ? (
-            <>
-              <EyeOff className="h-4 w-4" />
-              <span className="text-xs">Hide Reviews</span>
-            </>
-          ) : (
-            <>
-              <Eye className="h-4 w-4" />
-              <span className="text-xs">Show Reviews</span>
-            </>
-          )}
-        </button>
+          {/* Overall Review button */}
+          <button
+            onClick={onOpenOverallTab}
+            className="btn btn-sm btn-ghost justify-start gap-2 text-left"
+          >
+            <FileText className="h-4 w-4" />
+            <span className="text-xs">Overall Review</span>
+          </button>
 
-        {/* Open Settings Panel */}
-        {!isPanelOpen && (
+          {/* Review All / Re-review All button */}
+          <button
+            onClick={handleReviewAllClick}
+            disabled={isReviewingAll || !hasBlocks}
+            className="btn btn-sm btn-ghost justify-start gap-2 text-left"
+          >
+            {isReviewingAll ? (
+              <>
+                <span className="loading loading-spinner loading-xs" />
+                <span className="text-xs">Reviewing...</span>
+              </>
+            ) : (
+              <>
+                <Sparkles className="h-4 w-4 text-primary" />
+                <span className="text-xs">
+                  {hasReviews ? "Re-review All" : "Review All"}
+                </span>
+              </>
+            )}
+          </button>
+
+          {/* Open Settings Panel */}
           <button
             onClick={onOpenPanel}
             className="btn btn-sm btn-ghost justify-start gap-2 text-left"
@@ -93,8 +123,41 @@ export function FloatingControls({
             <Settings2 className="h-4 w-4" />
             <span className="text-xs">Settings</span>
           </button>
-        )}
+        </div>
       </div>
-    </div>
+
+      {/* Confirmation Modal for Re-review */}
+      {showConfirmModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          {/* Backdrop */}
+          <div
+            className="absolute inset-0 bg-black/50"
+            onClick={() => setShowConfirmModal(false)}
+          />
+          {/* Modal */}
+          <div className="relative bg-base-100 rounded-lg shadow-xl p-6 max-w-sm mx-4 border border-base-300">
+            <h3 className="text-lg font-semibold mb-2">Re-review All?</h3>
+            <p className="text-sm text-base-content/70 mb-4">
+              This will replace all existing reviews with new ones. Are you sure
+              you want to continue?
+            </p>
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={() => setShowConfirmModal(false)}
+                className="btn btn-sm btn-ghost"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleConfirmReview}
+                className="btn btn-sm btn-primary"
+              >
+                Re-review All
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   );
 }
