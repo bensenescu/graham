@@ -9,7 +9,6 @@ import {
   Sparkles,
   Settings2,
   FileText,
-  List,
   Plus,
   Trash2,
   Edit2,
@@ -17,38 +16,26 @@ import {
 import type { BlockReview } from "@/types/schemas/reviews";
 import type { PageBlock } from "@/types/schemas/pages";
 import type { Prompt, OverallReviewMode } from "@/types/schemas/prompts";
-import {
-  type BlockPosition,
-  calculateAdjustedCardPositions,
-} from "@/client/hooks/useBlockPositions";
 import { usePageReviewSettings } from "@/client/hooks/usePageReviewSettings";
 import { usePageOverallReviewSettings } from "@/client/hooks/usePageOverallReviewSettings";
 
-export type ReviewTab = "configure" | "overall" | "detailed";
+export type ReviewTab = "settings" | "overall";
 
 interface AIReviewPanelProps {
   pageId: string;
   blocks: PageBlock[];
   reviews: Map<string, BlockReview>;
-  blockPositions: Map<string, BlockPosition>;
-  activeBlockId: string | null;
   isReviewingAll: boolean;
-  /** Set of block IDs currently being reviewed (for loading state) */
-  loadingBlockIds: Set<string>;
   /** Current active tab - controlled from parent */
   activeTab: ReviewTab;
   /** Called when tab changes */
   onTabChange?: (tab: ReviewTab) => void;
   onClose: () => void;
-  onBlockClick: (blockId: string) => void;
-  onReReview: (blockId: string) => void;
   onReviewAll: () => void;
+  /** Called when delete page is requested */
+  onDeletePage: () => void;
   /** If true, header is rendered externally and not inside the panel */
   externalHeader?: boolean;
-  /** Called when card heights change in the detailed tab */
-  onCardHeightsChange?: (cardHeights: Map<string, number>) => void;
-  /** When true, disables internal scrolling (for synchronized scroll with parent) */
-  disableInternalScroll?: boolean;
 }
 
 /**
@@ -114,7 +101,13 @@ function PromptCard({
 /**
  * Configure tab - Review settings, prompts, and model selection
  */
-function ConfigureTab({ pageId }: { pageId: string }) {
+function ConfigureTab({
+  pageId,
+  onDeletePage,
+}: {
+  pageId: string;
+  onDeletePage: () => void;
+}) {
   const {
     settings,
     defaultPrompt,
@@ -399,6 +392,17 @@ function ConfigureTab({ pageId }: { pageId: string }) {
           </div>
         </div>
       )}
+
+      {/* Delete Page */}
+      <div className="pt-4 border-t border-base-300">
+        <button
+          onClick={onDeletePage}
+          className="btn btn-ghost btn-sm gap-2 text-base-content/60 hover:text-error"
+        >
+          <Trash2 className="h-4 w-4" />
+          Delete Page
+        </button>
+      </div>
     </div>
   );
 }
@@ -788,328 +792,6 @@ function GradeBadge({ grade, score }: { grade: string; score: number }) {
 }
 
 /**
- * Loading state for a review in progress
- */
-function ReviewLoading() {
-  return (
-    <div className="p-3 border border-base-300 rounded-lg bg-base-200/50">
-      <div className="flex items-center gap-2">
-        <span className="loading loading-spinner loading-xs" />
-        <span className="text-sm text-base-content/60">Analyzing...</span>
-      </div>
-    </div>
-  );
-}
-
-/**
- * Compact review card without question title.
- * Designed to be positioned alongside the corresponding Q&A block.
- */
-function CompactReviewCard({
-  block,
-  review,
-  isLoading,
-  isActive,
-  onClick,
-  onReReview,
-  onHeightChange,
-}: {
-  block: PageBlock;
-  review: BlockReview | undefined;
-  isLoading: boolean;
-  isActive: boolean;
-  onClick: () => void;
-  onReReview: () => void;
-  onHeightChange: (height: number) => void;
-}) {
-  const cardRef = useRef<HTMLDivElement>(null);
-
-  // Report height changes
-  useEffect(() => {
-    if (cardRef.current) {
-      const observer = new ResizeObserver((entries) => {
-        for (const entry of entries) {
-          onHeightChange(entry.contentRect.height);
-        }
-      });
-      observer.observe(cardRef.current);
-      return () => observer.disconnect();
-    }
-  }, [onHeightChange]);
-
-  // Loading state
-  if (isLoading) {
-    return (
-      <div ref={cardRef}>
-        <ReviewLoading />
-      </div>
-    );
-  }
-
-  // No review yet - show placeholder only if there's an answer
-  if (!review) {
-    if (!block.answer) {
-      // No answer - don't show anything
-      return <div ref={cardRef} />;
-    }
-    // Has answer but no review - show review button with dotted border
-    return (
-      <div
-        ref={cardRef}
-        onClick={onClick}
-        className={`
-          p-3 border border-dashed rounded-lg cursor-pointer transition-all
-          flex items-center justify-center
-          ${isActive ? "border-primary bg-primary/5" : "border-base-content/20 hover:border-primary/50 hover:bg-primary/5"}
-        `}
-      >
-        <span
-          className={`text-sm ${isActive ? "text-primary" : "text-base-content/50 hover:text-primary"}`}
-        >
-          Review
-        </span>
-      </div>
-    );
-  }
-
-  // Completed review - compact display
-  return (
-    <div
-      ref={cardRef}
-      onClick={onClick}
-      className={`
-        p-3 border rounded-lg cursor-pointer transition-all
-        ${isActive ? "border-primary bg-primary/5" : "border-base-300 hover:border-base-content/30"}
-      `}
-    >
-      {/* Header with re-review button */}
-      <div className="flex items-center justify-end mb-2">
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            onReReview();
-          }}
-          className="btn btn-ghost btn-xs gap-1 text-base-content/40 hover:text-base-content"
-          title="Re-review"
-        >
-          <RefreshCw className="h-3 w-3" />
-        </button>
-      </div>
-
-      {/* Strengths */}
-      {review.strengths.length > 0 && (
-        <div className="space-y-1.5 mb-3">
-          <div className="flex items-center gap-1.5 text-xs font-medium text-base-content/70">
-            <Check className="h-3.5 w-3.5 text-success" />
-            <span>Strengths</span>
-          </div>
-          <ul className="space-y-1 pl-5">
-            {review.strengths.map((strength: string, i: number) => (
-              <li key={i} className="text-xs text-base-content/80 list-disc">
-                {strength}
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-
-      {/* Improvements */}
-      {review.improvements.length > 0 && (
-        <div className="space-y-1.5 mb-3">
-          <div className="flex items-center gap-1.5 text-xs font-medium text-base-content/70">
-            <AlertTriangle className="h-3.5 w-3.5 text-warning" />
-            <span>Areas to Improve</span>
-          </div>
-          <ul className="space-y-1 pl-5">
-            {review.improvements.map((improvement: string, i: number) => (
-              <li key={i} className="text-xs text-base-content/80 list-disc">
-                {improvement}
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-
-      {/* Tips */}
-      {review.tips && review.tips.length > 0 && (
-        <div className="space-y-1.5">
-          <div className="flex items-center gap-1.5 text-xs font-medium text-base-content/70">
-            <Lightbulb className="h-3.5 w-3.5 text-info" />
-            <span>Tips</span>
-          </div>
-          <ul className="space-y-1 pl-5">
-            {review.tips.map((tip: string, i: number) => (
-              <li key={i} className="text-xs text-base-content/80 list-disc">
-                {tip}
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-    </div>
-  );
-}
-
-/**
- * Detailed tab - Question by question reviews
- */
-function DetailedTab({
-  blocks,
-  reviews,
-  loadingBlockIds,
-  blockPositions,
-  activeBlockId,
-  isReviewingAll,
-  onBlockClick,
-  onReReview,
-  onReviewAll,
-  onCardHeightsChange,
-}: {
-  blocks: PageBlock[];
-  reviews: Map<string, BlockReview>;
-  loadingBlockIds: Set<string>;
-  blockPositions: Map<string, BlockPosition>;
-  activeBlockId: string | null;
-  isReviewingAll: boolean;
-  onBlockClick: (blockId: string) => void;
-  onReReview: (blockId: string) => void;
-  onReviewAll: () => void;
-  onCardHeightsChange?: (cardHeights: Map<string, number>) => void;
-}) {
-  // Track measured heights of each card
-  const [cardHeights, setCardHeights] = useState<Map<string, number>>(
-    () => new Map(),
-  );
-
-  const handleCardHeightChange = useCallback(
-    (blockId: string, height: number) => {
-      setCardHeights((prev) => {
-        const next = new Map(prev);
-        next.set(blockId, height);
-        return next;
-      });
-    },
-    [],
-  );
-
-  // Report card heights to parent when they change
-  useEffect(() => {
-    onCardHeightsChange?.(cardHeights);
-  }, [cardHeights, onCardHeightsChange]);
-
-  // Calculate card positions with collision detection and spacing adjustment
-  const cardPositions = useMemo(() => {
-    const blockIds = blocks.map((b) => b.id);
-    return calculateAdjustedCardPositions(
-      blockIds,
-      blockPositions,
-      cardHeights,
-      8,
-    );
-  }, [blocks, blockPositions, cardHeights]);
-
-  // Calculate total height needed for the container
-  const totalHeight = useMemo(() => {
-    let maxBottom = 0;
-    for (const block of blocks) {
-      const top = cardPositions.get(block.id) ?? 0;
-      const height = cardHeights.get(block.id) ?? 80;
-      maxBottom = Math.max(maxBottom, top + height);
-    }
-    return maxBottom + 24;
-  }, [blocks, cardPositions, cardHeights]);
-
-  // Check if there are any reviews or any loading
-  const hasReviews = useMemo(() => {
-    return reviews.size > 0 || loadingBlockIds.size > 0;
-  }, [reviews, loadingBlockIds]);
-
-  // Check if there are any blocks with answers (reviewable)
-  const hasAnswers = useMemo(() => {
-    return blocks.some((b) => b.answer && b.answer.trim().length > 0);
-  }, [blocks]);
-
-  // Empty state
-  if (!hasReviews && !isReviewingAll) {
-    return (
-      <div className="p-4">
-        <div className="flex items-start gap-3 mb-5">
-          <div>
-            <h3 className="text-sm font-medium text-base-content mb-1">
-              No reviews yet
-            </h3>
-            <p className="text-sm text-base-content/60">
-              Get question-by-question feedback on your answers.
-            </p>
-          </div>
-        </div>
-
-        {hasAnswers ? (
-          <div className="space-y-4">
-            <button
-              onClick={onReviewAll}
-              disabled={isReviewingAll}
-              className="btn btn-primary btn-sm gap-2"
-            >
-              <Sparkles className="h-4 w-4" />
-              Review All Answers
-            </button>
-            <p className="text-xs text-base-content/50 leading-relaxed">
-              You can also review individual questions from the{" "}
-              <span className="font-medium text-base-content/70">menu</span> on
-              each question.
-            </p>
-          </div>
-        ) : (
-          <div className="p-3 rounded-lg bg-base-200/50 border border-base-300/50">
-            <p className="text-sm text-base-content/50">
-              Add some answers to your questions to get started.
-            </p>
-          </div>
-        )}
-      </div>
-    );
-  }
-
-  // Position cards absolutely to align with their corresponding Q&A blocks.
-  // The relative container must start at the same Y position as the scroll container content
-  // so that card `top` values (which are block positions measured from scroll container top)
-  // position cards correctly.
-  return (
-    <div className="relative" style={{ minHeight: totalHeight }}>
-      {blocks.length === 0 ? (
-        <div className="text-center py-8 text-base-content/50 text-sm px-4">
-          No questions to review yet.
-        </div>
-      ) : (
-        blocks.map((block) => {
-          const top = cardPositions.get(block.id) ?? 0;
-          return (
-            <div
-              key={block.id}
-              className="absolute left-4 right-4 transition-all duration-150"
-              style={{ top }}
-            >
-              <CompactReviewCard
-                block={block}
-                review={reviews.get(block.id)}
-                isLoading={loadingBlockIds.has(block.id)}
-                isActive={activeBlockId === block.id}
-                onClick={() => onBlockClick(block.id)}
-                onReReview={() => onReReview(block.id)}
-                onHeightChange={(height) =>
-                  handleCardHeightChange(block.id, height)
-                }
-              />
-            </div>
-          );
-        })
-      )}
-    </div>
-  );
-}
-
-/**
  * Header component for the AI Review panel - can be rendered separately
  */
 export function BlockReviewPanelHeader({
@@ -1123,12 +805,11 @@ export function BlockReviewPanelHeader({
 }) {
   const tabs: { id: ReviewTab; label: string; icon: React.ReactNode }[] = [
     {
-      id: "configure",
-      label: "Configure",
+      id: "settings",
+      label: "Settings",
       icon: <Settings2 className="h-4 w-4" />,
     },
     { id: "overall", label: "Overall", icon: <FileText className="h-4 w-4" /> },
-    { id: "detailed", label: "Detailed", icon: <List className="h-4 w-4" /> },
   ];
 
   return (
@@ -1173,19 +854,13 @@ export function BlockReviewPanel({
   pageId,
   blocks,
   reviews,
-  loadingBlockIds,
-  blockPositions,
-  activeBlockId,
   isReviewingAll,
   activeTab,
   onTabChange,
   onClose,
-  onBlockClick,
-  onReReview,
   onReviewAll,
+  onDeletePage,
   externalHeader,
-  onCardHeightsChange,
-  disableInternalScroll = false,
 }: AIReviewPanelProps) {
   return (
     <div className="h-full flex flex-col bg-base-100">
@@ -1211,10 +886,10 @@ export function BlockReviewPanel({
       )}
 
       {/* Tab content */}
-      <div
-        className={`flex-1 ${disableInternalScroll ? "" : "overflow-y-auto"}`}
-      >
-        {activeTab === "configure" && <ConfigureTab pageId={pageId} />}
+      <div className="flex-1 overflow-y-auto">
+        {activeTab === "settings" && (
+          <ConfigureTab pageId={pageId} onDeletePage={onDeletePage} />
+        )}
         {activeTab === "overall" && (
           <OverallTab
             pageId={pageId}
@@ -1222,20 +897,6 @@ export function BlockReviewPanel({
             reviews={reviews}
             onReviewAll={onReviewAll}
             isReviewingAll={isReviewingAll}
-          />
-        )}
-        {activeTab === "detailed" && (
-          <DetailedTab
-            blocks={blocks}
-            reviews={reviews}
-            loadingBlockIds={loadingBlockIds}
-            blockPositions={blockPositions}
-            activeBlockId={activeBlockId}
-            isReviewingAll={isReviewingAll}
-            onBlockClick={onBlockClick}
-            onReReview={onReReview}
-            onReviewAll={onReviewAll}
-            onCardHeightsChange={onCardHeightsChange}
           />
         )}
       </div>

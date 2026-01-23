@@ -5,9 +5,6 @@ import type { BlockReview, ReviewSummary } from "@/types/schemas/reviews";
 import type { PageBlock } from "@/types/schemas/pages";
 import { authenticatedFetch } from "@every-app/sdk/core";
 import { createBlockReviewCollection } from "@/client/tanstack-db";
-import type { ReviewTab } from "@/client/components/AIReviewPanel";
-
-export type { ReviewTab };
 
 interface ReviewAPIResponse {
   strengths: string[];
@@ -78,6 +75,7 @@ function calculateSummary(
 
 /**
  * Hook for managing AI review state and operations.
+ * Reviews are displayed inline within each Q&A block.
  */
 export function useAIReview({
   pageId,
@@ -97,11 +95,22 @@ export function useAIReview({
   );
 
   // Convert to a Map keyed by blockId for easy lookup
+  // If promptId is set, filter to only reviews for that prompt
+  // If promptId is null, show the most recent review for each block
   const reviews = useMemo(() => {
     const map = new Map<string, BlockReview>();
     for (const review of reviewsArray ?? []) {
-      if (promptId && review.promptId === promptId) {
-        map.set(review.blockId, review);
+      if (promptId) {
+        // Filter by specific prompt
+        if (review.promptId === promptId) {
+          map.set(review.blockId, review);
+        }
+      } else {
+        // No prompt filter - show most recent review per block
+        const existing = map.get(review.blockId);
+        if (!existing || review.updatedAt > existing.updatedAt) {
+          map.set(review.blockId, review);
+        }
       }
     }
     return map;
@@ -112,9 +121,6 @@ export function useAIReview({
     new Set(),
   );
   const [isReviewingAll, setIsReviewingAll] = useState(false);
-  const [isPanelOpen, setIsPanelOpen] = useState(false);
-  const [activeBlockId, setActiveBlockId] = useState<string | null>(null);
-  const [requestedTab, setRequestedTab] = useState<ReviewTab | null>(null);
 
   // Calculate summary
   const summary = useMemo(
@@ -171,12 +177,6 @@ export function useAIReview({
       const block = blocks.find((b) => b.id === blockId);
       if (!block || !promptId) return;
 
-      // Open panel, focus on this block, and switch to detailed tab
-      setIsPanelOpen(true);
-      setActiveBlockId(blockId);
-      setRequestedTab("detailed");
-
-      // Execute the mutation
       try {
         await reviewMutation.mutateAsync({
           block,
@@ -195,9 +195,8 @@ export function useAIReview({
     if (!promptId) return;
 
     setIsReviewingAll(true);
-    setIsPanelOpen(true);
 
-    // Review blocks sequentially with some parallelism
+    // Review blocks in batches for parallelism
     const batchSize = 3;
     for (let i = 0; i < blocks.length; i += batchSize) {
       const batch = blocks.slice(i, i + batchSize);
@@ -219,26 +218,6 @@ export function useAIReview({
     setIsReviewingAll(false);
   }, [blocks, promptId, customInstructions, reviewMutation]);
 
-  // Open panel
-  const openPanel = useCallback(() => {
-    setIsPanelOpen(true);
-  }, []);
-
-  // Close panel
-  const closePanel = useCallback(() => {
-    setIsPanelOpen(false);
-  }, []);
-
-  // Set active block (for bi-directional sync)
-  const setActiveBlock = useCallback((blockId: string | null) => {
-    setActiveBlockId(blockId);
-  }, []);
-
-  // Clear the requested tab (called by panel after it has switched)
-  const clearRequestedTab = useCallback(() => {
-    setRequestedTab(null);
-  }, []);
-
   // Check if a block is currently loading
   const isBlockLoading = useCallback(
     (blockId: string) => loadingBlockIds.has(blockId),
@@ -248,17 +227,10 @@ export function useAIReview({
   return {
     reviews,
     summary,
-    isPanelOpen,
     isReviewingAll,
-    activeBlockId,
-    requestedTab,
     loadingBlockIds,
     reviewBlock,
     reviewAll,
-    openPanel,
-    closePanel,
-    setActiveBlock,
-    clearRequestedTab,
     isBlockLoading,
   };
 }

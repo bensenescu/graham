@@ -1,16 +1,18 @@
-import { useRef, useEffect, useCallback, useState } from "react";
-import { GripVertical, Trash2, Sparkles, MoreVertical } from "lucide-react";
+import { useRef, useEffect, useCallback } from "react";
+import { GripVertical, Trash2, MoreVertical, Sparkles } from "lucide-react";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import type { PageBlock } from "@/types/schemas/pages";
 import type { BlockReview } from "@/types/schemas/reviews";
+import { InlineBlockReview } from "./InlineBlockReview";
 
 interface QADocumentBlockProps {
   block: PageBlock;
   review?: BlockReview;
+  isReviewLoading?: boolean;
   isActive?: boolean;
-  /** Extra bottom spacing to align with taller review cards */
-  extraBottomSpacing?: number;
+  /** Whether to show inline reviews */
+  showInlineReviews?: boolean;
   onQuestionChange: (id: string, question: string) => void;
   onAnswerChange: (id: string, answer: string) => void;
   onDelete: (id: string) => void;
@@ -69,8 +71,9 @@ function AutoResizeTextarea({
 export function QADocumentBlock({
   block,
   review,
+  isReviewLoading = false,
   isActive = false,
-  extraBottomSpacing = 0,
+  showInlineReviews = true,
   onQuestionChange,
   onAnswerChange,
   onDelete,
@@ -92,8 +95,6 @@ export function QADocumentBlock({
     transform: CSS.Transform.toString(transform),
     transition,
     opacity: isDragging ? 0.5 : 1,
-    // Add extra bottom spacing when review card is taller than this block
-    marginBottom: extraBottomSpacing > 0 ? extraBottomSpacing : undefined,
   };
 
   const handleQuestionKeyDown = useCallback(
@@ -152,12 +153,6 @@ export function QADocumentBlock({
               placeholder="What question are you exploring?"
               className="text-base font-semibold text-base-content placeholder:text-base-content/40 leading-relaxed"
             />
-            {/* Review indicator if review exists */}
-            {review && (
-              <div className="flex-shrink-0 mt-1">
-                <div className="badge badge-success badge-sm">Reviewed</div>
-              </div>
-            )}
           </div>
 
           {/* Answer */}
@@ -171,6 +166,11 @@ export function QADocumentBlock({
               className="text-base text-base-content/80 placeholder:text-base-content/40 leading-relaxed"
             />
           </div>
+
+          {/* Inline Review */}
+          {showInlineReviews && (
+            <InlineBlockReview review={review} isLoading={isReviewLoading} />
+          )}
         </div>
 
         {/* Actions dropdown - appears on hover */}
@@ -190,10 +190,20 @@ export function QADocumentBlock({
               <li>
                 <button
                   onClick={() => onReviewRequest(block.id)}
+                  disabled={isReviewLoading}
                   className="flex items-center gap-2 text-sm"
                 >
-                  <Sparkles className="h-4 w-4" />
-                  Review Question
+                  {isReviewLoading ? (
+                    <>
+                      <span className="loading loading-spinner loading-xs" />
+                      Reviewing...
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="h-4 w-4" />
+                      {review ? "Re-review" : "Review"}
+                    </>
+                  )}
                 </button>
               </li>
             )}
