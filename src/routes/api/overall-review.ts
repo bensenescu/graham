@@ -132,9 +132,9 @@ export const Route = createFileRoute("/api/overall-review")({
             `[OverallReview ${requestId}] Starting AI stream at ${Date.now() - startTime}ms...`,
           );
 
-          // Stream the overall review using GPT-5.2
+          // Stream the overall review using GPT-5.2 with reasoning summaries
           const result = streamText({
-            model: openaiProvider("gpt-5.2"),
+            model: openaiProvider.responses("gpt-5.2"),
             system: finalSystemPrompt,
             messages: [
               {
@@ -147,16 +147,55 @@ ${qaContent}`,
             providerOptions: {
               openai: {
                 reasoningEffort: "high",
+                reasoningSummary: "detailed", // Stream thinking notes
               },
             },
           });
 
           console.log(
-            `[OverallReview ${requestId}] Returning streaming response`,
+            `[OverallReview ${requestId}] Returning streaming response with reasoning`,
           );
 
-          // Return the streaming text response
-          return result.toTextStreamResponse();
+          // Create a custom stream that sends reasoning and text parts separately
+          // Format: JSON lines with { type: "reasoning" | "text", content: string }
+          const encoder = new TextEncoder();
+          const stream = new ReadableStream({
+            async start(controller) {
+              try {
+                for await (const part of result.fullStream) {
+                  if (part.type === "reasoning-delta") {
+                    // Send reasoning chunk
+                    const data = JSON.stringify({
+                      type: "reasoning",
+                      content: part.text,
+                    });
+                    controller.enqueue(encoder.encode(data + "\n"));
+                  } else if (part.type === "text-delta") {
+                    // Send text chunk
+                    const data = JSON.stringify({
+                      type: "text",
+                      content: part.text,
+                    });
+                    controller.enqueue(encoder.encode(data + "\n"));
+                  }
+                }
+                controller.close();
+              } catch (error) {
+                console.error(
+                  `[OverallReview ${requestId}] Stream error:`,
+                  error,
+                );
+                controller.error(error);
+              }
+            },
+          });
+
+          return new Response(stream, {
+            headers: {
+              "Content-Type": "text/plain; charset=utf-8",
+              "Transfer-Encoding": "chunked",
+            },
+          });
         } catch (error) {
           const totalTime = Date.now() - startTime;
 

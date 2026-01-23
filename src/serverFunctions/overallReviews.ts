@@ -6,6 +6,18 @@ import { upsertPageOverallReviewSchema } from "@/types/schemas/reviews";
 import { z } from "zod";
 
 /**
+ * Get all overall reviews for the user's pages.
+ */
+export const getAllPageOverallReviews = createServerFn()
+  .middleware([useSessionTokenClientMiddleware, ensureUserMiddleware])
+  .handler(async ({ context }) => {
+    const reviews = await PageOverallReviewRepository.findAllByUserId(
+      context.userId,
+    );
+    return { reviews };
+  });
+
+/**
  * Get the overall review for a page.
  */
 export const getPageOverallReview = createServerFn()

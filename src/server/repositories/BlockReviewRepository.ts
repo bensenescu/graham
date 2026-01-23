@@ -1,16 +1,48 @@
 import { db } from "@/db";
-import { blockReviews, pageBlocks } from "@/db/schema";
+import { blockReviews, pageBlocks, pages } from "@/db/schema";
 import { eq, and, inArray } from "drizzle-orm";
 
 type UpsertBlockReview = {
   id: string;
   blockId: string;
   promptId: string;
-  strengths: string[];
-  improvements: string[];
-  tips: string[] | null;
+  suggestion: string | null;
   answerSnapshot: string | null;
 };
+
+/**
+ * Find all reviews for blocks belonging to a user's pages.
+ */
+async function findAllByUserId(userId: string) {
+  // Get all page IDs for the user
+  const userPages = await db.query.pages.findMany({
+    where: eq(pages.userId, userId),
+    columns: { id: true },
+  });
+
+  if (userPages.length === 0) {
+    return [];
+  }
+
+  const pageIds = userPages.map((p) => p.id);
+
+  // Get all block IDs for those pages
+  const blocks = await db.query.pageBlocks.findMany({
+    where: inArray(pageBlocks.pageId, pageIds),
+    columns: { id: true },
+  });
+
+  if (blocks.length === 0) {
+    return [];
+  }
+
+  const blockIds = blocks.map((b) => b.id);
+
+  // Get all reviews for those blocks
+  return db.query.blockReviews.findMany({
+    where: inArray(blockReviews.blockId, blockIds),
+  });
+}
 
 /**
  * Find a review by ID.
@@ -75,9 +107,7 @@ async function upsert(data: UpsertBlockReview) {
     await db
       .update(blockReviews)
       .set({
-        strengths: JSON.stringify(data.strengths),
-        improvements: JSON.stringify(data.improvements),
-        tips: data.tips ? JSON.stringify(data.tips) : null,
+        suggestion: data.suggestion,
         answerSnapshot: data.answerSnapshot,
         updatedAt: new Date().toISOString(),
       })
@@ -91,9 +121,7 @@ async function upsert(data: UpsertBlockReview) {
       id: data.id,
       blockId: data.blockId,
       promptId: data.promptId,
-      strengths: JSON.stringify(data.strengths),
-      improvements: JSON.stringify(data.improvements),
-      tips: data.tips ? JSON.stringify(data.tips) : null,
+      suggestion: data.suggestion,
       answerSnapshot: data.answerSnapshot,
       createdAt: now,
       updatedAt: now,
@@ -118,6 +146,7 @@ async function deleteByBlockId(blockId: string) {
 }
 
 export const BlockReviewRepository = {
+  findAllByUserId,
   findById,
   findByBlockAndPrompt,
   findByBlockId,

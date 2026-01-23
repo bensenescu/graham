@@ -45,6 +45,12 @@ export const deletePrompt = createServerFn()
 
 // === Page Review Settings Server Functions ===
 
+export const getAllPageReviewSettings = createServerFn()
+  .middleware([useSessionTokenClientMiddleware, ensureUserMiddleware])
+  .handler(async ({ context }) => {
+    return PageReviewSettingsService.getAll(context.userId);
+  });
+
 export const getPageReviewSettings = createServerFn()
   .middleware([useSessionTokenClientMiddleware, ensureUserMiddleware])
   .inputValidator((data: unknown) =>
@@ -82,6 +88,12 @@ export const initializePageReviewSettings = createServerFn()
   });
 
 // === Page Overall Review Settings Server Functions ===
+
+export const getAllPageOverallReviewSettings = createServerFn()
+  .middleware([useSessionTokenClientMiddleware, ensureUserMiddleware])
+  .handler(async ({ context }) => {
+    return PageOverallReviewSettingsService.getAll(context.userId);
+  });
 
 export const getPageOverallReviewSettings = createServerFn()
   .middleware([useSessionTokenClientMiddleware, ensureUserMiddleware])

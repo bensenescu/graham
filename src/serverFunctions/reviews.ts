@@ -6,19 +6,14 @@ import { upsertBlockReviewSchema } from "@/types/schemas/reviews";
 import { z } from "zod";
 
 /**
- * Helper to parse JSON fields from DB records.
+ * Get all block reviews for the user's pages.
  */
-function parseReviewFromDb(
-  review: Awaited<ReturnType<typeof BlockReviewRepository.findById>>,
-) {
-  if (!review) return null;
-  return {
-    ...review,
-    strengths: JSON.parse(review.strengths) as string[],
-    improvements: JSON.parse(review.improvements) as string[],
-    tips: review.tips ? (JSON.parse(review.tips) as string[]) : null,
-  };
-}
+export const getAllBlockReviews = createServerFn()
+  .middleware([useSessionTokenClientMiddleware, ensureUserMiddleware])
+  .handler(async ({ context }) => {
+    const reviews = await BlockReviewRepository.findAllByUserId(context.userId);
+    return { reviews };
+  });
 
 /**
  * Get all reviews for blocks on a page.
@@ -30,14 +25,7 @@ export const getBlockReviewsForPage = createServerFn()
   )
   .handler(async ({ data }) => {
     const reviews = await BlockReviewRepository.findByPageId(data.pageId);
-    return {
-      reviews: reviews.map((r) => ({
-        ...r,
-        strengths: JSON.parse(r.strengths) as string[],
-        improvements: JSON.parse(r.improvements) as string[],
-        tips: r.tips ? (JSON.parse(r.tips) as string[]) : null,
-      })),
-    };
+    return { reviews };
   });
 
 /**
@@ -51,12 +39,9 @@ export const upsertBlockReview = createServerFn()
       id: data.id,
       blockId: data.blockId,
       promptId: data.promptId,
-      strengths: data.strengths,
-      improvements: data.improvements,
-      tips: data.tips ?? null,
+      suggestion: data.suggestion ?? null,
       answerSnapshot: data.answerSnapshot ?? null,
     });
-    // Result already has parsed arrays from the repository
     return { review: result };
   });
 

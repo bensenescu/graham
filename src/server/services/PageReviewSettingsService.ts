@@ -7,6 +7,14 @@ import type {
 } from "@/types/schemas/prompts";
 
 /**
+ * Get all review settings for the user's pages.
+ */
+async function getAll(userId: string) {
+  const settings = await PageReviewSettingsRepository.findAllByUserId(userId);
+  return { settings };
+}
+
+/**
  * Get review settings for a page.
  */
 async function getByPageId(userId: string, pageId: string) {
@@ -117,6 +125,7 @@ async function initializeForPage(
 }
 
 export const PageReviewSettingsService = {
+  getAll,
   getByPageId,
   upsert,
   update,

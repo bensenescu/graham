@@ -126,39 +126,41 @@ export function ResizablePanelLayout({
 
   return (
     <div ref={containerRef} className="h-full flex flex-col overflow-hidden">
-      {/* Header row - main header gets pushed when panel opens */}
-      {mainHeader && (
+      {/* Header row - renders main header and/or side panel header */}
+      {(mainHeader || (sidePanelHeader && isPanelOpen)) && (
         <div className="flex-shrink-0 flex">
-          {/* Main header - animates width */}
-          <div
-            className="flex-shrink-0 transition-[width] duration-300 ease-out overflow-hidden"
-            style={{ width: isPanelOpen ? `${mainWidthPercent}%` : "100%" }}
-          >
-            {mainHeader}
-          </div>
+          {/* Main header - animates width (only if provided) */}
+          {mainHeader && (
+            <div
+              className="flex-shrink-0 transition-[width] duration-300 ease-out overflow-hidden"
+              style={{ width: isPanelOpen ? `${mainWidthPercent}%` : "100%" }}
+            >
+              {mainHeader}
+            </div>
+          )}
+
+          {/* Spacer to push side panel header to the right when no main header */}
+          {!mainHeader && isPanelOpen && (
+            <div
+              className="flex-shrink-0 transition-[width] duration-300 ease-out"
+              style={{ width: `${mainWidthPercent}%` }}
+            />
+          )}
 
           {/* Spacer for resize handle */}
-          <div
-            className={`
-              w-1 flex-shrink-0 bg-base-300 border-b border-base-300
-              transition-opacity duration-300 ease-out
-              ${isPanelOpen ? "opacity-100" : "opacity-0 w-0"}
-            `}
-          />
+          {isPanelOpen && (
+            <div className="w-1 flex-shrink-0 bg-base-300 border-b border-base-300" />
+          )}
 
-          {/* Side panel header - fixed at top, aligns with main header */}
-          <div
-            className={`
-              flex-shrink-0 bg-base-100 border-b border-base-300
-              transition-all duration-300 ease-out overflow-hidden
-              ${isPanelOpen ? "opacity-100" : "opacity-0"}
-            `}
-            style={{
-              width: isPanelOpen ? `calc(${panelWidthPercent}% - 4px)` : "0px",
-            }}
-          >
-            {sidePanelHeader}
-          </div>
+          {/* Side panel header - fixed at top */}
+          {sidePanelHeader && isPanelOpen && (
+            <div
+              className="flex-shrink-0 bg-base-100 border-b border-base-300"
+              style={{ width: `calc(${panelWidthPercent}% - 4px)` }}
+            >
+              {sidePanelHeader}
+            </div>
+          )}
         </div>
       )}
 

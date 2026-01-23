@@ -169,9 +169,7 @@ export const blockReviews = sqliteTable(
     promptId: text("prompt_id")
       .notNull()
       .references(() => prompts.id, { onDelete: "cascade" }),
-    strengths: text("strengths").notNull(), // JSON array
-    improvements: text("improvements").notNull(), // JSON array
-    tips: text("tips"), // JSON array, nullable
+    suggestion: text("suggestion"), // Markdown feedback, nullable (null = no suggestions)
     answerSnapshot: text("answer_snapshot"), // Snapshot of answer at review time
     createdAt: text("created_at")
       .notNull()

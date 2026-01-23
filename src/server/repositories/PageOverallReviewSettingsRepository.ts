@@ -2,8 +2,9 @@ import { db } from "@/db";
 import {
   pageOverallReviewSettings,
   pageOverallReviewSelectedPrompts,
+  pages,
 } from "@/db/schema";
-import { eq } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import type { OverallReviewMode } from "@/types/schemas/prompts";
 
 type CreatePageOverallReviewSettings = {
@@ -17,6 +18,40 @@ type UpdatePageOverallReviewSettings = {
   mode?: OverallReviewMode;
   selectedPromptIds?: string[];
 };
+
+/**
+ * Find all overall review settings for a user's pages.
+ */
+async function findAllByUserId(userId: string) {
+  // Get all page IDs for the user
+  const userPages = await db.query.pages.findMany({
+    where: eq(pages.userId, userId),
+    columns: { id: true },
+  });
+
+  if (userPages.length === 0) {
+    return [];
+  }
+
+  const pageIds = userPages.map((p) => p.id);
+
+  const settingsList = await db.query.pageOverallReviewSettings.findMany({
+    where: inArray(pageOverallReviewSettings.pageId, pageIds),
+    with: {
+      selectedPrompts: {
+        with: {
+          prompt: true,
+        },
+      },
+    },
+  });
+
+  // Transform to flatten the selected prompts
+  return settingsList.map((settings) => ({
+    ...settings,
+    selectedPrompts: settings.selectedPrompts.map((sp) => sp.prompt),
+  }));
+}
 
 /**
  * Find overall review settings by page ID, including selected prompts.
@@ -153,6 +188,7 @@ async function deleteByPageId(pageId: string) {
 }
 
 export const PageOverallReviewSettingsRepository = {
+  findAllByUserId,
   findByPageId,
   create,
   update,

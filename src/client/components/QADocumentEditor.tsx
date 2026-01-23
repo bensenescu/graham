@@ -67,7 +67,6 @@ export function QADocumentEditor({
   // Local state for editing
   const [localBlocks, setLocalBlocks] = useState<PageBlock[]>(blocks);
   const [localTitle, setLocalTitle] = useState(pageTitle || "");
-  const debounceTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const sensors = useDraggableSensors();
 
@@ -87,15 +86,20 @@ export function QADocumentEditor({
     }
   }, [pageTitle]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Handle title change with callback to parent
+  // Handle title change - only update local state while typing
   const handleTitleChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
-      const newTitle = e.target.value;
-      setLocalTitle(newTitle);
-      onTitleChange?.(newTitle);
+      setLocalTitle(e.target.value);
     },
-    [onTitleChange],
+    [],
   );
+
+  // Save title on blur
+  const handleTitleBlur = useCallback(() => {
+    if (localTitle !== pageTitle) {
+      onTitleChange?.(localTitle);
+    }
+  }, [localTitle, pageTitle, onTitleChange]);
 
   // Sort blocks by sortKey
   const sortedBlocks = useMemo(() => {
@@ -104,37 +108,19 @@ export function QADocumentEditor({
     );
   }, [localBlocks]);
 
-  // Debounced save to parent
-  const debouncedUpdate = useCallback(
-    (id: string, updates: Partial<PageBlock>) => {
-      if (debounceTimeoutRef.current) {
-        clearTimeout(debounceTimeoutRef.current);
-      }
-      debounceTimeoutRef.current = setTimeout(() => {
-        onBlockUpdate(id, updates);
-      }, 500);
+  // Direct update to parent (called on blur from block component)
+  const handleQuestionChange = useCallback(
+    (id: string, question: string) => {
+      onBlockUpdate(id, { question });
     },
     [onBlockUpdate],
   );
 
-  const handleQuestionChange = useCallback(
-    (id: string, question: string) => {
-      setLocalBlocks((prev) =>
-        prev.map((block) => (block.id === id ? { ...block, question } : block)),
-      );
-      debouncedUpdate(id, { question });
-    },
-    [debouncedUpdate],
-  );
-
   const handleAnswerChange = useCallback(
     (id: string, answer: string) => {
-      setLocalBlocks((prev) =>
-        prev.map((block) => (block.id === id ? { ...block, answer } : block)),
-      );
-      debouncedUpdate(id, { answer });
+      onBlockUpdate(id, { answer });
     },
-    [debouncedUpdate],
+    [onBlockUpdate],
   );
 
   const handleDelete = useCallback(
@@ -233,15 +219,17 @@ export function QADocumentEditor({
   );
 
   return (
-    <div ref={containerRef} className="py-6 px-4 min-h-screen">
+    <div ref={containerRef} className="pt-6 pb-6 px-6 min-h-screen">
       <div className="max-w-3xl mx-auto bg-base-100 rounded-lg px-4 py-2 border border-base-300 min-h-[calc(100vh-6rem)]">
         {/* Page title - editable */}
         <input
           type="text"
           value={localTitle}
           onChange={handleTitleChange}
+          onBlur={handleTitleBlur}
           placeholder="Untitled"
-          className="w-full text-2xl font-bold text-base-content bg-transparent border-none outline-none pt-4 pb-2 placeholder:text-base-content/40"
+          style={{ fontSize: "1.5rem", lineHeight: "2rem" }}
+          className="w-full font-bold text-base-content bg-transparent border-none outline-none pt-4 pb-2 placeholder:text-base-content/40"
         />
 
         {sortedBlocks.length === 0 ? (

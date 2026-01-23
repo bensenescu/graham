@@ -1,24 +1,23 @@
 import { queryCollectionOptions } from "@tanstack/query-db-collection";
 import { queryClient } from "./queryClient";
 import {
-  getBlockReviewsForPage,
+  getAllBlockReviews,
   upsertBlockReview,
   deleteBlockReview,
 } from "@/serverFunctions/reviews";
 import { createCollection } from "@tanstack/react-db";
+import { lazyInitForWorkers } from "@every-app/sdk/cloudflare";
 
-// Factory function to create a block review collection for a specific page
-export function createBlockReviewCollection(pageId: string) {
-  return createCollection(
+export const blockReviewCollection = lazyInitForWorkers(() =>
+  createCollection(
     queryCollectionOptions({
-      queryKey: ["blockReviews", pageId],
+      queryKey: ["blockReviews"],
       queryFn: async () => {
-        const result = await getBlockReviewsForPage({ data: { pageId } });
+        const result = await getAllBlockReviews();
         return result.reviews;
       },
       queryClient,
       getKey: (item) => item.id,
-      // Handle all CRUD operations
       onInsert: async ({ transaction }) => {
         const { modified: review } = transaction.mutations[0];
         await upsertBlockReview({
@@ -26,9 +25,7 @@ export function createBlockReviewCollection(pageId: string) {
             id: review.id,
             blockId: review.blockId,
             promptId: review.promptId,
-            strengths: review.strengths,
-            improvements: review.improvements,
-            tips: review.tips,
+            suggestion: review.suggestion,
             answerSnapshot: review.answerSnapshot,
           },
         });
@@ -40,9 +37,7 @@ export function createBlockReviewCollection(pageId: string) {
             id: review.id,
             blockId: review.blockId,
             promptId: review.promptId,
-            strengths: review.strengths,
-            improvements: review.improvements,
-            tips: review.tips,
+            suggestion: review.suggestion,
             answerSnapshot: review.answerSnapshot,
           },
         });
@@ -52,5 +47,5 @@ export function createBlockReviewCollection(pageId: string) {
         await deleteBlockReview({ data: { id: original.id } });
       },
     }),
-  );
-}
+  ),
+);

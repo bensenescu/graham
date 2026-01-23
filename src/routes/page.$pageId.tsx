@@ -1,12 +1,7 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useLiveQuery, eq } from "@tanstack/react-db";
 import { useCallback, useMemo, useRef, useState } from "react";
-import { Menu } from "lucide-react";
-import { useDrawer } from "@/client/contexts/DrawerContext";
-import {
-  pageCollection,
-  createPageBlockCollection,
-} from "@/client/tanstack-db";
+import { pageCollection, pageBlockCollection } from "@/client/tanstack-db";
 import { QADocumentEditor } from "@/client/components/QADocumentEditor";
 import { ResizablePanelLayout } from "@/client/components/ResizablePanelLayout";
 import { FloatingControls } from "@/client/components/FloatingControls";
@@ -28,7 +23,6 @@ export const Route = createFileRoute("/page/$pageId")({
 function PageEditor() {
   const { pageId } = Route.useParams();
   const navigate = useNavigate();
-  const { open: openDrawer } = useDrawer();
   const titleDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Panel state
@@ -50,20 +44,16 @@ function PageEditor() {
     });
   }, []);
 
-  // Create block collection for this page
-  const blockCollection = useMemo(
-    () => createPageBlockCollection(pageId),
-    [pageId],
-  );
-
   // Live query for this specific page (filtered by ID)
   const { data: pages, isLoading: isLoadingPages } = useLiveQuery((q) =>
     q.from({ page: pageCollection }).where(({ page }) => eq(page.id, pageId)),
   );
 
-  // Live query for blocks
+  // Live query for blocks (filtered by pageId from the singleton collection)
   const { data: blocks, isLoading: isLoadingBlocks } = useLiveQuery((q) =>
-    q.from({ block: blockCollection }),
+    q
+      .from({ block: pageBlockCollection })
+      .where(({ block }) => eq(block.pageId, pageId)),
   );
 
   const page = pages?.[0];
@@ -106,39 +96,33 @@ function PageEditor() {
     [pageId],
   );
 
-  const handleBlockCreate = useCallback(
-    (block: PageBlock) => {
-      blockCollection.insert({
-        id: block.id,
-        pageId: block.pageId,
-        question: block.question,
-        answer: block.answer,
-        sortKey: block.sortKey,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      });
-    },
-    [blockCollection],
-  );
+  const handleBlockCreate = useCallback((block: PageBlock) => {
+    pageBlockCollection.insert({
+      id: block.id,
+      pageId: block.pageId,
+      question: block.question,
+      answer: block.answer,
+      sortKey: block.sortKey,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    });
+  }, []);
 
   const handleBlockUpdate = useCallback(
     (id: string, updates: Partial<PageBlock>) => {
-      blockCollection.update(id, (draft) => {
+      pageBlockCollection.update(id, (draft) => {
         if (updates.question !== undefined) draft.question = updates.question;
         if (updates.answer !== undefined) draft.answer = updates.answer;
         if (updates.sortKey !== undefined) draft.sortKey = updates.sortKey;
         draft.updatedAt = new Date().toISOString();
       });
     },
-    [blockCollection],
+    [],
   );
 
-  const handleBlockDelete = useCallback(
-    (id: string) => {
-      blockCollection.delete(id);
-    },
-    [blockCollection],
-  );
+  const handleBlockDelete = useCallback((id: string) => {
+    pageBlockCollection.delete(id);
+  }, []);
 
   const handleDelete = useCallback(() => {
     pageCollection.delete(pageId);
@@ -190,22 +174,6 @@ function PageEditor() {
     );
   }
 
-  // Header component for the main content area
-  const mainHeader = (
-    <div className="border-b border-base-300 bg-base-100 px-4 py-3 flex items-center gap-3 w-full">
-      <button
-        onMouseEnter={openDrawer}
-        onClick={openDrawer}
-        className="btn btn-ghost btn-sm btn-square"
-        aria-label="Open menu"
-      >
-        <Menu className="h-5 w-5" />
-      </button>
-
-      <h1 className="flex-1 font-semibold text-lg text-base-content">Graham</h1>
-    </div>
-  );
-
   // Side panel header
   const sidePanelHeader = (
     <BlockReviewPanelHeader
@@ -220,12 +188,9 @@ function PageEditor() {
     <BlockReviewPanel
       pageId={pageId}
       blocks={sortedBlocks}
-      reviews={reviews}
-      isReviewingAll={isReviewingAll}
       activeTab={activeTab}
       onTabChange={handleTabChange}
       onClose={handlePanelClose}
-      onReviewAll={reviewAll}
       onDeletePage={handleDelete}
       externalHeader
     />
@@ -237,7 +202,6 @@ function PageEditor() {
         isPanelOpen={isPanelOpen}
         onPanelOpen={handlePanelOpen}
         onPanelClose={handlePanelClose}
-        mainHeader={mainHeader}
         sidePanelHeader={sidePanelHeader}
         sidePanel={sidePanel}
         storageKey="page-review-panel-width"

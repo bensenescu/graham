@@ -1,6 +1,6 @@
 import { db } from "@/db";
-import { pageOverallReviews } from "@/db/schema";
-import { eq } from "drizzle-orm";
+import { pageOverallReviews, pages } from "@/db/schema";
+import { eq, inArray } from "drizzle-orm";
 
 type UpsertPageOverallReview = {
   id: string;
@@ -8,6 +8,27 @@ type UpsertPageOverallReview = {
   promptId: string | null;
   summary: string;
 };
+
+/**
+ * Find all overall reviews for a user's pages.
+ */
+async function findAllByUserId(userId: string) {
+  // Get all page IDs for the user
+  const userPages = await db.query.pages.findMany({
+    where: eq(pages.userId, userId),
+    columns: { id: true },
+  });
+
+  if (userPages.length === 0) {
+    return [];
+  }
+
+  const pageIds = userPages.map((p) => p.id);
+
+  return db.query.pageOverallReviews.findMany({
+    where: inArray(pageOverallReviews.pageId, pageIds),
+  });
+}
 
 /**
  * Find an overall review by ID.
@@ -78,6 +99,7 @@ async function deleteByPageId(pageId: string) {
 }
 
 export const PageOverallReviewRepository = {
+  findAllByUserId,
   findById,
   findByPageId,
   upsert,

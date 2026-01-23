@@ -1,25 +1,23 @@
 import { queryCollectionOptions } from "@tanstack/query-db-collection";
 import { queryClient } from "./queryClient";
 import {
-  getPageOverallReview,
+  getAllPageOverallReviews,
   upsertPageOverallReview,
   deletePageOverallReview,
 } from "@/serverFunctions/overallReviews";
 import { createCollection } from "@tanstack/react-db";
+import { lazyInitForWorkers } from "@every-app/sdk/cloudflare";
 
-// Factory function to create a page overall review collection for a specific page
-export function createPageOverallReviewCollection(pageId: string) {
-  return createCollection(
+export const pageOverallReviewCollection = lazyInitForWorkers(() =>
+  createCollection(
     queryCollectionOptions({
-      queryKey: ["pageOverallReview", pageId],
+      queryKey: ["pageOverallReviews"],
       queryFn: async () => {
-        const result = await getPageOverallReview({ data: { pageId } });
-        // Return as array (either empty or with one item)
-        return result.review ? [result.review] : [];
+        const result = await getAllPageOverallReviews();
+        return result.reviews;
       },
       queryClient,
       getKey: (item) => item.id,
-      // Handle all CRUD operations
       onInsert: async ({ transaction }) => {
         const { modified: review } = transaction.mutations[0];
         await upsertPageOverallReview({
@@ -47,5 +45,5 @@ export function createPageOverallReviewCollection(pageId: string) {
         await deletePageOverallReview({ data: { id: original.id } });
       },
     }),
-  );
-}
+  ),
+);

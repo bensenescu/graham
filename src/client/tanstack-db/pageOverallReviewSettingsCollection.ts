@@ -1,20 +1,19 @@
 import { queryCollectionOptions } from "@tanstack/query-db-collection";
 import { queryClient } from "./queryClient";
 import {
-  getPageOverallReviewSettings,
+  getAllPageOverallReviewSettings,
   updatePageOverallReviewSettings,
 } from "@/serverFunctions/prompts";
 import { createCollection } from "@tanstack/react-db";
+import { lazyInitForWorkers } from "@every-app/sdk/cloudflare";
 
-// Factory function to create an overall review settings collection for a specific page
-export function createPageOverallReviewSettingsCollection(pageId: string) {
-  return createCollection(
+export const pageOverallReviewSettingsCollection = lazyInitForWorkers(() =>
+  createCollection(
     queryCollectionOptions({
-      queryKey: ["pageOverallReviewSettings", pageId],
+      queryKey: ["pageOverallReviewSettings"],
       queryFn: async () => {
-        const result = await getPageOverallReviewSettings({ data: { pageId } });
-        // Return as array for collection (will have 0 or 1 item)
-        return result.settings ? [result.settings] : [];
+        const result = await getAllPageOverallReviewSettings();
+        return result.settings;
       },
       queryClient,
       getKey: (item) => item.id,
@@ -31,5 +30,5 @@ export function createPageOverallReviewSettingsCollection(pageId: string) {
         });
       },
     }),
-  );
-}
+  ),
+);

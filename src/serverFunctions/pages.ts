@@ -43,6 +43,12 @@ export const deletePage = createServerFn()
 
 // === Page Block Server Functions ===
 
+export const getAllPageBlocks = createServerFn()
+  .middleware([useSessionTokenClientMiddleware, ensureUserMiddleware])
+  .handler(async ({ context }) => {
+    return PageBlockService.getAll(context.userId);
+  });
+
 export const getPageBlocks = createServerFn()
   .middleware([useSessionTokenClientMiddleware, ensureUserMiddleware])
   .inputValidator((data: unknown) =>

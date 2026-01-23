@@ -1,15 +1,16 @@
 import { useState, useCallback, useMemo } from "react";
-import { useLiveQuery } from "@tanstack/react-db";
+import { useLiveQuery, eq } from "@tanstack/react-db";
 import { useMutation } from "@tanstack/react-query";
 import type { BlockReview, ReviewSummary } from "@/types/schemas/reviews";
 import type { PageBlock } from "@/types/schemas/pages";
 import { authenticatedFetch } from "@every-app/sdk/core";
-import { createBlockReviewCollection } from "@/client/tanstack-db";
+import {
+  blockReviewCollection,
+  pageBlockCollection,
+} from "@/client/tanstack-db";
 
 interface ReviewAPIResponse {
-  strengths: string[];
-  improvements: string[];
-  tips?: string[] | null;
+  suggestion: string | null;
 }
 
 interface UseAIReviewOptions {
@@ -83,23 +84,34 @@ export function useAIReview({
   promptId,
   customInstructions,
 }: UseAIReviewOptions) {
-  // Create the collection for this page
-  const reviewCollection = useMemo(
-    () => createBlockReviewCollection(pageId),
-    [pageId],
+  // Get all block IDs for this page to filter reviews
+  const { data: pageBlocks } = useLiveQuery((q) =>
+    q
+      .from({ block: pageBlockCollection })
+      .where(({ block }) => eq(block.pageId, pageId)),
   );
 
-  // Get reviews from the collection
-  const { data: reviewsArray } = useLiveQuery((q) =>
-    q.from({ review: reviewCollection }),
+  const pageBlockIds = useMemo(
+    () => new Set((pageBlocks ?? []).map((b) => b.id)),
+    [pageBlocks],
   );
+
+  // Get reviews from the singleton collection (all reviews)
+  const { data: allReviews } = useLiveQuery((q) =>
+    q.from({ review: blockReviewCollection }),
+  );
+
+  // Filter reviews to only those for blocks on this page
+  const reviewsArray = useMemo(() => {
+    return (allReviews ?? []).filter((r) => pageBlockIds.has(r.blockId));
+  }, [allReviews, pageBlockIds]);
 
   // Convert to a Map keyed by blockId for easy lookup
   // If promptId is set, filter to only reviews for that prompt
   // If promptId is null, show the most recent review for each block
   const reviews = useMemo(() => {
     const map = new Map<string, BlockReview>();
-    for (const review of reviewsArray ?? []) {
+    for (const review of reviewsArray) {
       if (promptId) {
         // Filter by specific prompt
         if (review.promptId === promptId) {
@@ -144,13 +156,11 @@ export function useAIReview({
       const reviewId = crypto.randomUUID();
       const now = new Date().toISOString();
 
-      reviewCollection.insert({
+      blockReviewCollection.insert({
         id: reviewId,
         blockId: block.id,
         promptId,
-        strengths: result.strengths,
-        improvements: result.improvements,
-        tips: result.tips ?? null,
+        suggestion: result.suggestion,
         answerSnapshot: block.answer || null,
         createdAt: now,
         updatedAt: now,

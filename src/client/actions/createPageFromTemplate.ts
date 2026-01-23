@@ -1,8 +1,9 @@
 import { createOptimisticAction } from "@tanstack/react-db";
 import {
   pageCollection,
-  createPageBlockCollection,
+  pageBlockCollection,
   promptCollection,
+  pageReviewSettingsCollection,
 } from "@/client/tanstack-db";
 import { createPage, batchCreatePageBlocks } from "@/serverFunctions/pages";
 import type { Template } from "@/templates";
@@ -37,12 +38,9 @@ export const createPageFromTemplate =
         updatedAt: now,
       });
 
-      // Get or create the block collection for this page
-      const blockCollection = createPageBlockCollection(pageId);
-
-      // Optimistically insert all blocks
+      // Optimistically insert all blocks into the singleton collection
       blocks.forEach((block) => {
-        blockCollection.insert({
+        pageBlockCollection.insert({
           id: block.id,
           pageId,
           question: block.question,
@@ -73,8 +71,10 @@ export const createPageFromTemplate =
 
       // Refetch to sync optimistic state with server
       await pageCollection.utils.refetch();
-      // Also refetch prompts since a new default prompt was created
+      await pageBlockCollection.utils.refetch();
+      // Also refetch prompts and settings since a new default prompt was created
       await promptCollection.utils.refetch();
+      await pageReviewSettingsCollection.utils.refetch();
     },
   });
 

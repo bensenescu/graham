@@ -1,6 +1,6 @@
 import { db } from "@/db";
-import { pageReviewSettings } from "@/db/schema";
-import { eq } from "drizzle-orm";
+import { pageReviewSettings, pages } from "@/db/schema";
+import { eq, inArray } from "drizzle-orm";
 
 type CreatePageReviewSettings = {
   id: string;
@@ -14,6 +14,27 @@ type UpdatePageReviewSettings = {
   defaultPromptId?: string | null;
   updatedAt?: string;
 };
+
+/**
+ * Find all review settings for pages owned by a user.
+ */
+async function findAllByUserId(userId: string) {
+  // Get all page IDs for the user
+  const userPages = await db.query.pages.findMany({
+    where: eq(pages.userId, userId),
+    columns: { id: true },
+  });
+
+  if (userPages.length === 0) {
+    return [];
+  }
+
+  const pageIds = userPages.map((p) => p.id);
+
+  return db.query.pageReviewSettings.findMany({
+    where: inArray(pageReviewSettings.pageId, pageIds),
+  });
+}
 
 /**
  * Find review settings by page ID.
@@ -85,6 +106,7 @@ async function deleteByPageId(pageId: string) {
 }
 
 export const PageReviewSettingsRepository = {
+  findAllByUserId,
   findByPageId,
   create,
   update,

@@ -1,8 +1,8 @@
 import { useMemo, useCallback } from "react";
-import { useLiveQuery } from "@tanstack/react-db";
+import { useLiveQuery, eq } from "@tanstack/react-db";
 import {
   promptCollection,
-  createPageReviewSettingsCollection,
+  pageReviewSettingsCollection,
 } from "@/client/tanstack-db";
 import { aiModels } from "@/types/schemas/prompts";
 
@@ -10,20 +10,17 @@ import { aiModels } from "@/types/schemas/prompts";
  * Hook for managing page review settings and prompts.
  */
 export function usePageReviewSettings(pageId: string) {
-  // Create the settings collection for this page
-  const settingsCollection = useMemo(
-    () => createPageReviewSettingsCollection(pageId),
-    [pageId],
-  );
-
   // Get all prompts for the user
   const { data: prompts, isLoading: isLoadingPrompts } = useLiveQuery((q) =>
     q.from({ prompt: promptCollection }),
   );
 
-  // Get review settings for this page
+  // Get review settings for this page (filtered from the singleton collection)
   const { data: settingsArray, isLoading: isLoadingSettings } = useLiveQuery(
-    (q) => q.from({ settings: settingsCollection }),
+    (q) =>
+      q
+        .from({ settings: pageReviewSettingsCollection })
+        .where(({ settings }) => eq(settings.pageId, pageId)),
   );
 
   const settings = settingsArray?.[0] ?? null;
@@ -39,22 +36,22 @@ export function usePageReviewSettings(pageId: string) {
   const updateModel = useCallback(
     (model: string) => {
       if (!settings) return;
-      settingsCollection.update(settings.id, (draft) => {
+      pageReviewSettingsCollection.update(settings.id, (draft) => {
         draft.model = model;
       });
     },
-    [settings, settingsCollection],
+    [settings],
   );
 
   // Update default prompt
   const updateDefaultPromptId = useCallback(
     (promptId: string | null) => {
       if (!settings) return;
-      settingsCollection.update(settings.id, (draft) => {
+      pageReviewSettingsCollection.update(settings.id, (draft) => {
         draft.defaultPromptId = promptId;
       });
     },
-    [settings, settingsCollection],
+    [settings],
   );
 
   // Create a new prompt

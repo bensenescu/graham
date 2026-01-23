@@ -1,4 +1,4 @@
-import { useRef, useEffect, useCallback } from "react";
+import { useRef, useEffect, useCallback, useState } from "react";
 import { GripVertical, Trash2, MoreVertical, Sparkles } from "lucide-react";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
@@ -28,6 +28,7 @@ interface QADocumentBlockProps {
 function AutoResizeTextarea({
   value,
   onChange,
+  onBlur,
   placeholder,
   className,
   onKeyDown,
@@ -35,6 +36,7 @@ function AutoResizeTextarea({
 }: {
   value: string;
   onChange: (value: string) => void;
+  onBlur?: () => void;
   placeholder: string;
   className?: string;
   onKeyDown?: (e: React.KeyboardEvent<HTMLTextAreaElement>) => void;
@@ -55,6 +57,7 @@ function AutoResizeTextarea({
       ref={textareaRef}
       value={value}
       onChange={(e) => onChange(e.target.value)}
+      onBlur={onBlur}
       onKeyDown={onKeyDown}
       onFocus={onFocus}
       placeholder={placeholder}
@@ -82,6 +85,19 @@ export function QADocumentBlock({
   onFocus,
   isOnly = false,
 }: QADocumentBlockProps) {
+  // Local state for editing - only sync to parent on blur
+  const [localQuestion, setLocalQuestion] = useState(block.question);
+  const [localAnswer, setLocalAnswer] = useState(block.answer);
+
+  // Sync local state when block changes from parent (e.g., from sync)
+  useEffect(() => {
+    setLocalQuestion(block.question);
+  }, [block.question]);
+
+  useEffect(() => {
+    setLocalAnswer(block.answer);
+  }, [block.answer]);
+
   const {
     attributes,
     listeners,
@@ -121,6 +137,19 @@ export function QADocumentBlock({
     onFocus?.(block.id);
   }, [block.id, onFocus]);
 
+  // Save on blur handlers
+  const handleQuestionBlur = useCallback(() => {
+    if (localQuestion !== block.question) {
+      onQuestionChange(block.id, localQuestion);
+    }
+  }, [block.id, block.question, localQuestion, onQuestionChange]);
+
+  const handleAnswerBlur = useCallback(() => {
+    if (localAnswer !== block.answer) {
+      onAnswerChange(block.id, localAnswer);
+    }
+  }, [block.id, block.answer, localAnswer, onAnswerChange]);
+
   return (
     <div
       ref={setNodeRef}
@@ -146,8 +175,9 @@ export function QADocumentBlock({
           {/* Question */}
           <div className="flex items-start gap-2">
             <AutoResizeTextarea
-              value={block.question}
-              onChange={(value) => onQuestionChange(block.id, value)}
+              value={localQuestion}
+              onChange={setLocalQuestion}
+              onBlur={handleQuestionBlur}
               onKeyDown={handleQuestionKeyDown}
               onFocus={handleFocus}
               placeholder="What question are you exploring?"
@@ -158,8 +188,9 @@ export function QADocumentBlock({
           {/* Answer */}
           <div className="mt-2">
             <AutoResizeTextarea
-              value={block.answer}
-              onChange={(value) => onAnswerChange(block.id, value)}
+              value={localAnswer}
+              onChange={setLocalAnswer}
+              onBlur={handleAnswerBlur}
               onKeyDown={handleAnswerKeyDown}
               onFocus={handleFocus}
               placeholder="Write your answer here..."
