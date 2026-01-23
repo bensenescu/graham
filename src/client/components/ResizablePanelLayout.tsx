@@ -6,7 +6,6 @@ import {
   forwardRef,
   type ReactNode,
 } from "react";
-import { Sparkles } from "lucide-react";
 
 interface ResizablePanelLayoutProps {
   /** Main content (left side) */
@@ -236,28 +235,6 @@ export const ResizablePanelLayout = forwardRef<
           </div>
         </div>
       </div>
-
-      {/* Edge trigger tab to open panel - only shows when closed */}
-      {onPanelOpen && (
-        <button
-          onClick={onPanelOpen}
-          className={`
-            fixed right-0 top-20 z-20
-            w-6 h-24 
-            bg-base-300 hover:bg-primary hover:w-8
-            border-l border-t border-b border-base-content/10
-            rounded-l-lg
-            flex items-center justify-center
-            transition-all duration-300 ease-out
-            group
-            shadow-lg
-            ${isPanelOpen ? "opacity-0 pointer-events-none translate-x-full" : "opacity-100 translate-x-0"}
-          `}
-          aria-label="Open review panel"
-        >
-          <Sparkles className="h-4 w-4 text-base-content/60 group-hover:text-primary-content transition-colors" />
-        </button>
-      )}
     </div>
   );
 });
