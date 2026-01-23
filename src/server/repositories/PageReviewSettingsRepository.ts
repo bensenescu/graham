@@ -7,13 +7,11 @@ type CreatePageReviewSettings = {
   pageId: string;
   model: string;
   defaultPromptId: string | null;
-  customPromptIds: string[];
 };
 
 type UpdatePageReviewSettings = {
   model?: string;
   defaultPromptId?: string | null;
-  customPromptIds?: string[];
   updatedAt?: string;
 };
 
@@ -38,7 +36,6 @@ async function create(data: CreatePageReviewSettings) {
     pageId: data.pageId,
     model: data.model,
     defaultPromptId: data.defaultPromptId,
-    customPromptIds: JSON.stringify(data.customPromptIds),
   });
 }
 
@@ -56,9 +53,6 @@ async function update(pageId: string, data: UpdatePageReviewSettings) {
   if (data.defaultPromptId !== undefined) {
     updateData.defaultPromptId = data.defaultPromptId;
   }
-  if (data.customPromptIds !== undefined) {
-    updateData.customPromptIds = JSON.stringify(data.customPromptIds);
-  }
 
   await db
     .update(pageReviewSettings)
@@ -75,7 +69,6 @@ async function upsert(data: CreatePageReviewSettings) {
     await update(data.pageId, {
       model: data.model,
       defaultPromptId: data.defaultPromptId,
-      customPromptIds: data.customPromptIds,
     });
   } else {
     await create(data);

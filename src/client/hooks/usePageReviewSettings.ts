@@ -35,24 +35,6 @@ export function usePageReviewSettings(pageId: string) {
     return prompts.find((p) => p.id === settings.defaultPromptId) ?? null;
   }, [settings?.defaultPromptId, prompts]);
 
-  // Get custom prompts
-  const customPrompts = useMemo(() => {
-    if (!settings?.customPromptIds || !prompts) return [];
-    const customIds = settings.customPromptIds;
-    return prompts.filter((p) => customIds.includes(p.id));
-  }, [settings?.customPromptIds, prompts]);
-
-  // Get available prompts (not already selected as default or custom)
-  const availablePrompts = useMemo(() => {
-    if (!prompts) return [];
-    const usedIds = new Set(
-      [settings?.defaultPromptId, ...(settings?.customPromptIds ?? [])].filter(
-        Boolean,
-      ),
-    );
-    return prompts.filter((p) => !usedIds.has(p.id));
-  }, [prompts, settings?.defaultPromptId, settings?.customPromptIds]);
-
   // Update model
   const updateModel = useCallback(
     (model: string) => {
@@ -70,32 +52,6 @@ export function usePageReviewSettings(pageId: string) {
       if (!settings) return;
       settingsCollection.update(settings.id, (draft) => {
         draft.defaultPromptId = promptId;
-      });
-    },
-    [settings, settingsCollection],
-  );
-
-  // Add custom prompt
-  const addCustomPrompt = useCallback(
-    (promptId: string) => {
-      if (!settings) return;
-      settingsCollection.update(settings.id, (draft) => {
-        if (!draft.customPromptIds.includes(promptId)) {
-          draft.customPromptIds = [...draft.customPromptIds, promptId];
-        }
-      });
-    },
-    [settings, settingsCollection],
-  );
-
-  // Remove custom prompt
-  const removeCustomPrompt = useCallback(
-    (promptId: string) => {
-      if (!settings) return;
-      settingsCollection.update(settings.id, (draft) => {
-        draft.customPromptIds = draft.customPromptIds.filter(
-          (id) => id !== promptId,
-        );
       });
     },
     [settings, settingsCollection],
@@ -137,16 +93,12 @@ export function usePageReviewSettings(pageId: string) {
     settings,
     prompts: prompts ?? [],
     defaultPrompt,
-    customPrompts,
-    availablePrompts,
     aiModels,
     isLoading,
 
     // Actions
     updateModel,
     updateDefaultPromptId,
-    addCustomPrompt,
-    removeCustomPrompt,
     createPrompt,
     updatePrompt,
     deletePrompt,

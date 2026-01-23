@@ -51,8 +51,7 @@ export type ReviewAPIResponse = z.infer<typeof reviewAPIResponseSchema>;
 export const pageOverallReviewSchema = z.object({
   id: z.string(),
   pageId: z.string(),
-  promptId: z.string().nullable(), // which prompt was used (null for custom)
-  customPrompt: z.string().nullable(), // if custom prompt was used
+  promptId: z.string().nullable(), // which prompt was used
   summary: z.string(), // the narrative summary from LLM
   createdAt: z.string().optional(),
   updatedAt: z.string().optional(),
@@ -65,7 +64,6 @@ export const upsertPageOverallReviewSchema = z.object({
   id: z.string(),
   pageId: z.string(),
   promptId: z.string().nullable().optional(),
-  customPrompt: z.string().nullable().optional(),
   summary: z.string(),
 });
 

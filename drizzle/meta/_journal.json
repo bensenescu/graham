@@ -50,6 +50,13 @@
       "when": 1769138447995,
       "tag": "0006_living_rattler",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "6",
+      "when": 1769142105535,
+      "tag": "0007_amused_katie_power",
+      "breakpoints": true
     }
   ]
 }

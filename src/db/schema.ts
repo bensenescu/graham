@@ -36,7 +36,6 @@ export const pageReviewSettings = sqliteTable(
     defaultPromptId: text("default_prompt_id").references(() => prompts.id, {
       onDelete: "set null",
     }),
-    customPromptIds: text("custom_prompt_ids").notNull().default("[]"), // JSON array of prompt IDs
     createdAt: text("created_at")
       .notNull()
       .default(sql`(current_timestamp)`),
@@ -106,7 +105,6 @@ export const pageOverallReviewSettings = sqliteTable(
       .unique()
       .references(() => pages.id, { onDelete: "cascade" }),
     mode: text("mode").notNull().default("all_prompts"), // "all_prompts" | "select_prompts" | "custom"
-    customPrompt: text("custom_prompt"), // used when mode is "custom"
     createdAt: text("created_at")
       .notNull()
       .default(sql`(current_timestamp)`),
@@ -148,8 +146,7 @@ export const pageOverallReviews = sqliteTable(
       .references(() => pages.id, { onDelete: "cascade" }),
     promptId: text("prompt_id").references(() => prompts.id, {
       onDelete: "set null",
-    }), // which prompt was used (null for custom)
-    customPrompt: text("custom_prompt"), // if custom prompt was used
+    }), // which prompt was used
     summary: text("summary").notNull(), // the narrative summary from LLM
     createdAt: text("created_at")
       .notNull()

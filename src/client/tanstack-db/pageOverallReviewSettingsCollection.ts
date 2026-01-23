@@ -24,7 +24,6 @@ export function createPageOverallReviewSettingsCollection(pageId: string) {
           data: {
             pageId: modified.pageId,
             mode: modified.mode,
-            customPrompt: modified.customPrompt,
             selectedPromptIds: modified.selectedPrompts?.map(
               (p: { id: string }) => p.id,
             ),

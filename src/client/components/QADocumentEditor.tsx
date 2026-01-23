@@ -233,8 +233,8 @@ export function QADocumentEditor({
   );
 
   return (
-    <div ref={containerRef} className="py-6 px-4 min-h-full">
-      <div className="max-w-3xl mx-auto bg-base-100 rounded-lg px-4 py-2 border border-base-300">
+    <div ref={containerRef} className="py-6 px-4 min-h-screen">
+      <div className="max-w-3xl mx-auto bg-base-100 rounded-lg px-4 py-2 border border-base-300 min-h-[calc(100vh-6rem)]">
         {/* Page title - editable */}
         <input
           type="text"
@@ -245,11 +245,12 @@ export function QADocumentEditor({
         />
 
         {sortedBlocks.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-16 text-center">
-            <p className="text-base-content/60 mb-4">
-              Start by adding your first question.
-            </p>
-            <button onClick={handleAddBlock} className="btn btn-primary gap-2">
+          <div className="py-8">
+            <p className="text-base-content/50 mb-4">No questions yet</p>
+            <button
+              onClick={handleAddBlock}
+              className="btn btn-primary btn-sm gap-2"
+            >
               <Plus className="h-4 w-4" />
               Add Question
             </button>

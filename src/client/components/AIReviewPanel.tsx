@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from "react";
+import { useState, useCallback } from "react";
 import { toast } from "sonner";
 import {
   X,
@@ -6,13 +6,10 @@ import {
   Sparkles,
   Settings2,
   FileText,
-  Plus,
   Trash2,
-  Edit2,
 } from "lucide-react";
 import type { BlockReview } from "@/types/schemas/reviews";
 import type { PageBlock } from "@/types/schemas/pages";
-import type { Prompt } from "@/types/schemas/prompts";
 import { usePageReviewSettings } from "@/client/hooks/usePageReviewSettings";
 import { useOverallReview } from "@/client/hooks/useOverallReview";
 
@@ -36,66 +33,6 @@ interface AIReviewPanelProps {
 }
 
 /**
- * Prompt card component
- */
-function PromptCard({
-  prompt,
-  isDefault,
-  onEdit,
-  onDelete,
-  onSetDefault,
-}: {
-  prompt: Prompt;
-  isDefault?: boolean;
-  onEdit: () => void;
-  onDelete: () => void;
-  onSetDefault?: () => void;
-}) {
-  return (
-    <div className="p-3 rounded-lg border border-base-300 bg-base-200/30">
-      <div className="flex items-start justify-between gap-2">
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2">
-            <span className="text-sm font-medium truncate">{prompt.name}</span>
-            {isDefault && (
-              <span className="badge badge-primary badge-xs">Default</span>
-            )}
-          </div>
-          <p className="text-xs text-base-content/50 mt-1 line-clamp-2">
-            {prompt.prompt}
-          </p>
-        </div>
-        <div className="flex items-center gap-1 flex-shrink-0">
-          {!isDefault && onSetDefault && (
-            <button
-              onClick={onSetDefault}
-              className="btn btn-ghost btn-xs text-base-content/50"
-              title="Set as default"
-            >
-              <Sparkles className="h-3 w-3" />
-            </button>
-          )}
-          <button
-            onClick={onEdit}
-            className="btn btn-ghost btn-xs text-base-content/50"
-            title="Edit prompt"
-          >
-            <Edit2 className="h-3 w-3" />
-          </button>
-          <button
-            onClick={onDelete}
-            className="btn btn-ghost btn-xs text-error/50 hover:text-error"
-            title="Delete prompt"
-          >
-            <Trash2 className="h-3 w-3" />
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/**
  * Configure tab - Review settings, prompts, and model selection
  */
 function ConfigureTab({
@@ -108,72 +45,13 @@ function ConfigureTab({
   const {
     settings,
     defaultPrompt,
-    customPrompts,
-    availablePrompts,
-    prompts,
     aiModels,
     isLoading,
     updateModel,
-    updateDefaultPromptId,
-    addCustomPrompt,
-    removeCustomPrompt,
-    createPrompt,
     updatePrompt,
-    deletePrompt,
   } = usePageReviewSettings(pageId);
-
-  const [isCreating, setIsCreating] = useState(false);
-  const [editingPrompt, setEditingPrompt] = useState<Prompt | null>(null);
-  const [newPromptName, setNewPromptName] = useState("");
-  const [newPromptText, setNewPromptText] = useState("");
-  const [isCreatingDefault, setIsCreatingDefault] = useState(false);
-  const [defaultPromptText, setDefaultPromptText] = useState("");
   const [isEditingDefaultPrompt, setIsEditingDefaultPrompt] = useState(false);
   const [editedDefaultPromptText, setEditedDefaultPromptText] = useState("");
-
-  const handleCreatePrompt = () => {
-    if (!newPromptName.trim() || !newPromptText.trim()) return;
-    createPrompt(newPromptName.trim(), newPromptText.trim());
-    setNewPromptName("");
-    setNewPromptText("");
-    setIsCreating(false);
-  };
-
-  const handleCreateDefaultPrompt = () => {
-    if (!defaultPromptText.trim()) return;
-    const id = createPrompt("Default Prompt", defaultPromptText.trim());
-    updateDefaultPromptId(id);
-    setDefaultPromptText("");
-    setIsCreatingDefault(false);
-  };
-
-  const handleUpdatePrompt = () => {
-    if (!editingPrompt || !newPromptName.trim() || !newPromptText.trim())
-      return;
-    updatePrompt(editingPrompt.id, {
-      name: newPromptName.trim(),
-      prompt: newPromptText.trim(),
-    });
-    setEditingPrompt(null);
-    setNewPromptName("");
-    setNewPromptText("");
-  };
-
-  const startEditing = (prompt: Prompt) => {
-    setEditingPrompt(prompt);
-    setNewPromptName(prompt.name);
-    setNewPromptText(prompt.prompt);
-    setIsCreating(false);
-  };
-
-  const cancelEditing = () => {
-    setEditingPrompt(null);
-    setIsCreating(false);
-    setIsCreatingDefault(false);
-    setNewPromptName("");
-    setNewPromptText("");
-    setDefaultPromptText("");
-  };
 
   if (isLoading) {
     return (
@@ -215,7 +93,7 @@ function ConfigureTab({
           value={
             isEditingDefaultPrompt
               ? editedDefaultPromptText
-              : (defaultPrompt?.prompt ?? defaultPromptText)
+              : (defaultPrompt?.prompt ?? "")
           }
           onChange={(e) => {
             if (defaultPrompt) {
@@ -225,9 +103,6 @@ function ConfigureTab({
               } else {
                 setEditedDefaultPromptText(e.target.value);
               }
-            } else {
-              setDefaultPromptText(e.target.value);
-              if (!isCreatingDefault) setIsCreatingDefault(true);
             }
           }}
           placeholder="Type default review prompt here..."
@@ -260,135 +135,7 @@ function ConfigureTab({
             </button>
           </div>
         )}
-        {!defaultPrompt && isCreatingDefault && (
-          <div className="flex justify-end gap-2 mt-2">
-            <button onClick={cancelEditing} className="btn btn-ghost btn-xs">
-              Cancel
-            </button>
-            <button
-              onClick={handleCreateDefaultPrompt}
-              className="btn btn-neutral btn-xs"
-              disabled={!defaultPromptText.trim()}
-            >
-              Save
-            </button>
-          </div>
-        )}
       </div>
-
-      {/* Custom Prompts */}
-      <div>
-        <div className="flex items-center justify-between mb-2">
-          <label className="text-sm font-medium text-base-content">
-            Custom Prompts
-          </label>
-          <button
-            onClick={() => {
-              setIsCreating(true);
-              setEditingPrompt(null);
-              setNewPromptName("");
-              setNewPromptText("");
-            }}
-            className="btn btn-ghost btn-xs gap-1"
-          >
-            <Plus className="h-3 w-3" />
-            Add
-          </button>
-        </div>
-
-        <div className="space-y-2">
-          {customPrompts.map((prompt) => (
-            <PromptCard
-              key={prompt.id}
-              prompt={prompt}
-              onEdit={() => startEditing(prompt)}
-              onDelete={() => {
-                removeCustomPrompt(prompt.id);
-                deletePrompt(prompt.id);
-              }}
-              onSetDefault={() => {
-                if (defaultPrompt) {
-                  addCustomPrompt(defaultPrompt.id);
-                }
-                removeCustomPrompt(prompt.id);
-                updateDefaultPromptId(prompt.id);
-              }}
-            />
-          ))}
-
-          {customPrompts.length === 0 && !isCreating && (
-            <p className="text-xs text-base-content/50 text-center py-2">
-              No custom prompts yet
-            </p>
-          )}
-        </div>
-      </div>
-
-      {/* Create/Edit Prompt Form */}
-      {(isCreating || editingPrompt) && (
-        <div className="space-y-3">
-          {/* Select existing prompt - only shown when creating (not editing) */}
-          {isCreating && !editingPrompt && availablePrompts.length > 0 && (
-            <>
-              <select
-                className="select select-bordered select-sm w-full"
-                onChange={(e) => {
-                  if (e.target.value) {
-                    addCustomPrompt(e.target.value);
-                    setIsCreating(false);
-                  }
-                }}
-                value=""
-              >
-                <option value="" disabled>
-                  Select an existing prompt...
-                </option>
-                {availablePrompts.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.name}
-                  </option>
-                ))}
-              </select>
-              <div className="flex items-center gap-3">
-                <div className="flex-1 h-px bg-base-300" />
-                <span className="text-xs text-base-content/40">or</span>
-                <div className="flex-1 h-px bg-base-300" />
-              </div>
-            </>
-          )}
-
-          <div className="space-y-2">
-            <input
-              type="text"
-              value={newPromptName}
-              onChange={(e) => setNewPromptName(e.target.value)}
-              placeholder="Prompt name..."
-              className="input input-bordered input-sm w-full"
-              autoFocus
-            />
-            <textarea
-              value={newPromptText}
-              onChange={(e) => setNewPromptText(e.target.value)}
-              placeholder="Enter your prompt..."
-              className="textarea textarea-bordered textarea-sm w-full h-20 text-sm"
-            />
-            <div className="flex justify-end gap-2">
-              <button onClick={cancelEditing} className="btn btn-ghost btn-xs">
-                Cancel
-              </button>
-              <button
-                onClick={
-                  editingPrompt ? handleUpdatePrompt : handleCreatePrompt
-                }
-                className="btn btn-neutral btn-xs"
-                disabled={!newPromptName.trim() || !newPromptText.trim()}
-              >
-                {editingPrompt ? "Save" : "Create"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Delete Page */}
       <div className="pt-4 border-t border-base-300">
@@ -414,7 +161,7 @@ function OverallTab({
   pageId: string;
   blocks: PageBlock[];
 }) {
-  const { customPrompts, defaultPrompt } = usePageReviewSettings(pageId);
+  const { defaultPrompt } = usePageReviewSettings(pageId);
 
   const {
     overallReview,
@@ -431,37 +178,13 @@ function OverallTab({
     customInstructions: defaultPrompt?.prompt,
   });
 
-  // Check if page has custom prompts (beyond just the default)
-  const hasCustomPrompts = customPrompts.length > 0;
-
-  // State for selected prompt (only used when hasCustomPrompts is true)
-  const [selectedPromptId, setSelectedPromptId] = useState<string | null>(null);
-
-  // All available prompts for selection
-  const allPrompts = useMemo(() => {
-    const prompts: Array<{ id: string; name: string; prompt: string }> = [];
-    if (defaultPrompt) {
-      prompts.push(defaultPrompt);
-    }
-    prompts.push(...customPrompts);
-    return prompts;
-  }, [defaultPrompt, customPrompts]);
-
-  // Get the currently selected prompt (or default if none selected)
-  const currentPrompt = useMemo(() => {
-    if (selectedPromptId) {
-      return allPrompts.find((p) => p.id === selectedPromptId) ?? defaultPrompt;
-    }
-    return defaultPrompt;
-  }, [selectedPromptId, allPrompts, defaultPrompt]);
-
   // Handle generate button click
   const handleGenerate = useCallback(() => {
     generateOverallReview(
-      currentPrompt?.id ?? null,
-      currentPrompt?.prompt ?? null,
+      defaultPrompt?.id ?? null,
+      defaultPrompt?.prompt ?? null,
     );
-  }, [generateOverallReview, currentPrompt]);
+  }, [generateOverallReview, defaultPrompt]);
 
   // Format the date for display
   const formatDate = (dateString: string | undefined) => {
@@ -496,27 +219,6 @@ function OverallTab({
             Get holistic feedback on your entire application.
           </p>
         </div>
-
-        {/* Prompt selector - only show if page has custom prompts */}
-        {hasCustomPrompts && (
-          <div className="space-y-2">
-            <label className="text-sm font-medium text-base-content">
-              Review Prompt
-            </label>
-            <select
-              value={selectedPromptId ?? defaultPrompt?.id ?? ""}
-              onChange={(e) => setSelectedPromptId(e.target.value || null)}
-              className="select select-bordered select-sm w-full"
-            >
-              {allPrompts.map((prompt) => (
-                <option key={prompt.id} value={prompt.id}>
-                  {prompt.name}
-                  {prompt.id === defaultPrompt?.id ? " (Default)" : ""}
-                </option>
-              ))}
-            </select>
-          </div>
-        )}
 
         {/* Error message */}
         {error && (
@@ -579,32 +281,6 @@ function OverallTab({
           </button>
         )}
       </div>
-
-      {/* Prompt selector - only show if page has custom prompts and not generating */}
-      {hasCustomPrompts && !isGenerating && (
-        <div className="space-y-2">
-          <label className="text-sm font-medium text-base-content">
-            Review Prompt
-          </label>
-          <select
-            value={
-              selectedPromptId ??
-              overallReview?.promptId ??
-              defaultPrompt?.id ??
-              ""
-            }
-            onChange={(e) => setSelectedPromptId(e.target.value || null)}
-            className="select select-bordered select-sm w-full"
-          >
-            {allPrompts.map((prompt) => (
-              <option key={prompt.id} value={prompt.id}>
-                {prompt.name}
-                {prompt.id === defaultPrompt?.id ? " (Default)" : ""}
-              </option>
-            ))}
-          </select>
-        </div>
-      )}
 
       {/* Error message */}
       {error && (
