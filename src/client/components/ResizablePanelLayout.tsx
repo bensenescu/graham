@@ -126,33 +126,23 @@ export function ResizablePanelLayout({
 
   return (
     <div ref={containerRef} className="h-full flex flex-col overflow-hidden">
-      {/* Header row - renders main header and/or side panel header */}
-      {(mainHeader || (sidePanelHeader && isPanelOpen)) && (
+      {/* Header row - only renders when main header is provided */}
+      {mainHeader && (
         <div className="flex-shrink-0 flex">
-          {/* Main header - animates width (only if provided) */}
-          {mainHeader && (
-            <div
-              className="flex-shrink-0 transition-[width] duration-300 ease-out overflow-hidden"
-              style={{ width: isPanelOpen ? `${mainWidthPercent}%` : "100%" }}
-            >
-              {mainHeader}
-            </div>
-          )}
-
-          {/* Spacer to push side panel header to the right when no main header */}
-          {!mainHeader && isPanelOpen && (
-            <div
-              className="flex-shrink-0 transition-[width] duration-300 ease-out"
-              style={{ width: `${mainWidthPercent}%` }}
-            />
-          )}
+          {/* Main header - animates width */}
+          <div
+            className="flex-shrink-0 transition-[width] duration-300 ease-out overflow-hidden"
+            style={{ width: isPanelOpen ? `${mainWidthPercent}%` : "100%" }}
+          >
+            {mainHeader}
+          </div>
 
           {/* Spacer for resize handle */}
           {isPanelOpen && (
             <div className="w-1 flex-shrink-0 bg-base-300 border-b border-base-300" />
           )}
 
-          {/* Side panel header - fixed at top */}
+          {/* Side panel header in header row when main header exists */}
           {sidePanelHeader && isPanelOpen && (
             <div
               className="flex-shrink-0 bg-base-100 border-b border-base-300"
@@ -202,7 +192,7 @@ export function ResizablePanelLayout({
         {/* Side panel - scrolls independently */}
         <div
           className={`
-            flex-shrink-0 overflow-y-auto bg-base-100
+            flex-shrink-0 bg-base-100 flex flex-col
             transition-all duration-300 ease-out
             ${isPanelOpen ? "opacity-100" : "opacity-0"}
           `}
@@ -210,8 +200,16 @@ export function ResizablePanelLayout({
             width: isPanelOpen ? `calc(${panelWidthPercent}% - 4px)` : "0px",
           }}
         >
+          {/* Side panel header when no main header - stays fixed at top of panel */}
+          {sidePanelHeader && !mainHeader && isPanelOpen && (
+            <div className="flex-shrink-0 border-b border-base-300">
+              {sidePanelHeader}
+            </div>
+          )}
+          {/* Side panel content - scrolls independently */}
           <div
             className={`
+              flex-1 overflow-y-auto
               transition-transform duration-300 ease-out
               ${isPanelOpen ? "translate-x-0" : "translate-x-8"}
             `}
