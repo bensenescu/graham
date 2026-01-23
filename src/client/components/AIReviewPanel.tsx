@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { toast } from "sonner";
 import {
   X,
@@ -7,25 +7,22 @@ import {
   Settings2,
   FileText,
   Trash2,
+  Brain,
 } from "lucide-react";
-import type { BlockReview } from "@/types/schemas/reviews";
 import type { PageBlock } from "@/types/schemas/pages";
 import { usePageReviewSettings } from "@/client/hooks/usePageReviewSettings";
 import { useOverallReview } from "@/client/hooks/useOverallReview";
 
 export type ReviewTab = "settings" | "overall";
 
-interface AIReviewPanelProps {
+interface BlockReviewPanelProps {
   pageId: string;
   blocks: PageBlock[];
-  reviews: Map<string, BlockReview>;
-  isReviewingAll: boolean;
   /** Current active tab - controlled from parent */
   activeTab: ReviewTab;
   /** Called when tab changes */
   onTabChange?: (tab: ReviewTab) => void;
   onClose: () => void;
-  onReviewAll: () => void;
   /** Called when delete page is requested */
   onDeletePage: () => void;
   /** If true, header is rendered externally and not inside the panel */
@@ -154,6 +151,17 @@ function ConfigureTab({
 /**
  * Overall tab - Holistic feedback on the entire application
  */
+const THINKING_PHRASES = [
+  "Analyzing your responses...",
+  "Evaluating coherence...",
+  "Identifying patterns...",
+  "Considering strengths...",
+  "Looking for improvements...",
+  "Assessing overall quality...",
+  "Reviewing key themes...",
+  "Synthesizing feedback...",
+];
+
 function OverallTab({
   pageId,
   blocks,
@@ -162,6 +170,7 @@ function OverallTab({
   blocks: PageBlock[];
 }) {
   const { defaultPrompt } = usePageReviewSettings(pageId);
+  const [thinkingPhraseIndex, setThinkingPhraseIndex] = useState(0);
 
   const {
     overallReview,
@@ -177,6 +186,17 @@ function OverallTab({
     blocks,
     customInstructions: defaultPrompt?.prompt,
   });
+
+  // Rotate through thinking phrases while generating
+  useEffect(() => {
+    if (!isGenerating || displayText) return;
+
+    const interval = setInterval(() => {
+      setThinkingPhraseIndex((i) => (i + 1) % THINKING_PHRASES.length);
+    }, 2000);
+
+    return () => clearInterval(interval);
+  }, [isGenerating, displayText]);
 
   // Handle generate button click
   const handleGenerate = useCallback(() => {
@@ -300,32 +320,16 @@ function OverallTab({
                   {paragraph}
                 </p>
               ))
+          ) : isGenerating ? (
+            <p className="text-base-content/50 italic flex items-center gap-2">
+              <Brain className="h-4 w-4 animate-pulse" />
+              {THINKING_PHRASES[thinkingPhraseIndex]}
+            </p>
           ) : (
-            <p className="text-base-content/50 italic">Generating review...</p>
+            <p className="text-base-content/50 italic">No review yet.</p>
           )}
         </div>
       </div>
-    </div>
-  );
-}
-
-/**
- * Grade badge component with appropriate styling
- */
-function GradeBadge({ grade, score }: { grade: string; score: number }) {
-  const badgeClass =
-    {
-      A: "badge-success",
-      B: "badge-info",
-      C: "badge-warning",
-      D: "badge-error",
-      F: "badge-error",
-    }[grade] || "badge-ghost";
-
-  return (
-    <div className={`badge ${badgeClass} badge-sm gap-1`}>
-      <span className="font-bold">{grade}</span>
-      <span className="opacity-80">{score}</span>
     </div>
   );
 }
@@ -392,15 +396,12 @@ export function BlockReviewPanelHeader({
 export function BlockReviewPanel({
   pageId,
   blocks,
-  reviews,
-  isReviewingAll,
   activeTab,
   onTabChange,
   onClose,
-  onReviewAll,
   onDeletePage,
   externalHeader,
-}: AIReviewPanelProps) {
+}: BlockReviewPanelProps) {
   return (
     <div className="h-full flex flex-col bg-base-100">
       {/* Header - only render inline if not external */}
@@ -411,16 +412,6 @@ export function BlockReviewPanel({
             onTabChange={onTabChange}
             onClose={onClose}
           />
-        </div>
-      )}
-
-      {/* Loading indicator for review all */}
-      {isReviewingAll && (
-        <div className="flex-shrink-0 px-4 py-2 bg-primary/10 border-b border-primary/20">
-          <div className="flex items-center gap-2 text-sm text-primary">
-            <span className="loading loading-spinner loading-xs" />
-            <span>Reviewing all answers...</span>
-          </div>
         </div>
       )}
 
@@ -436,6 +427,3 @@ export function BlockReviewPanel({
     </div>
   );
 }
-
-// Keep the old name as an alias for backwards compatibility
-export const AIReviewPanel = BlockReviewPanel;

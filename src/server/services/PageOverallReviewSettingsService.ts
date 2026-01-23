@@ -4,6 +4,15 @@ import { PageRepository } from "../repositories/PageRepository";
 import type { UpdatePageOverallReviewSettingsInput } from "@/types/schemas/prompts";
 
 /**
+ * Get all overall review settings for the user's pages.
+ */
+async function getAll(userId: string) {
+  const settings =
+    await PageOverallReviewSettingsRepository.findAllByUserId(userId);
+  return { settings };
+}
+
+/**
  * Get overall review settings for a page.
  * Returns settings with expanded selected prompts.
  */
@@ -58,6 +67,7 @@ async function update(
 }
 
 export const PageOverallReviewSettingsService = {
+  getAll,
   getByPageId,
   update,
 } as const;

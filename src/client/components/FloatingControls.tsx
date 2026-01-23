@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Eye, EyeOff, Sparkles, Settings2, FileText } from "lucide-react";
 
 interface FloatingControlsProps {
@@ -38,8 +38,24 @@ export function FloatingControls({
   onOpenOverallTab,
 }: FloatingControlsProps) {
   const [showConfirmModal, setShowConfirmModal] = useState(false);
+  // Track visibility state with delay for entrance animation
+  // This waits for the AIReviewPanel close animation (300ms) to finish before showing
+  const [isVisible, setIsVisible] = useState(!isPanelOpen);
 
-  // Hide when side panel is open
+  useEffect(() => {
+    if (isPanelOpen) {
+      // Hide immediately when panel opens
+      setIsVisible(false);
+    } else {
+      // Wait for panel close animation (300ms) to complete before showing
+      const timer = setTimeout(() => {
+        setIsVisible(true);
+      }, 300);
+      return () => clearTimeout(timer);
+    }
+  }, [isPanelOpen]);
+
+  // Don't render when panel is open
   if (isPanelOpen) {
     return null;
   }
@@ -61,7 +77,13 @@ export function FloatingControls({
 
   return (
     <>
-      <div className="fixed top-20 right-6 z-30">
+      <div
+        className={`
+          fixed top-20 right-6 z-30
+          transition-all duration-200 ease-out
+          ${isVisible ? "opacity-100 translate-x-0" : "opacity-0 translate-x-4"}
+        `}
+      >
         <div className="flex flex-col gap-1 p-1.5 rounded-xl bg-base-100 border border-base-300 shadow-lg min-w-[150px]">
           {/* Toggle inline reviews */}
           <button

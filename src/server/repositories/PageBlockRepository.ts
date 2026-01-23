@@ -1,6 +1,6 @@
 import { db } from "@/db";
-import { pageBlocks } from "@/db/schema";
-import { eq, and } from "drizzle-orm";
+import { pageBlocks, pages } from "@/db/schema";
+import { eq, inArray } from "drizzle-orm";
 
 // Types for repository operations
 type CreatePageBlock = {
@@ -17,6 +17,36 @@ type UpdatePageBlock = {
   sortKey?: string;
   updatedAt?: string;
 };
+
+/**
+ * Find all blocks for all pages owned by a user.
+ */
+async function findAllByUserId(userId: string) {
+  // Get all page IDs for the user
+  const userPages = await db.query.pages.findMany({
+    where: eq(pages.userId, userId),
+    columns: { id: true },
+  });
+
+  if (userPages.length === 0) {
+    return [];
+  }
+
+  const pageIds = userPages.map((p) => p.id);
+
+  return db.query.pageBlocks.findMany({
+    where: inArray(pageBlocks.pageId, pageIds),
+    columns: {
+      id: true,
+      pageId: true,
+      question: true,
+      answer: true,
+      sortKey: true,
+      createdAt: true,
+      updatedAt: true,
+    },
+  });
+}
 
 /**
  * Find all blocks for a page.
@@ -111,6 +141,7 @@ async function deleteAllByPageId(pageId: string) {
 }
 
 export const PageBlockRepository = {
+  findAllByUserId,
   findAllByPageId,
   findById,
   create,

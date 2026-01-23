@@ -1,9 +1,9 @@
 import { useState, useCallback, useMemo, useRef } from "react";
-import { useLiveQuery } from "@tanstack/react-db";
+import { useLiveQuery, eq } from "@tanstack/react-db";
 import type { PageOverallReview } from "@/types/schemas/reviews";
 import type { PageBlock } from "@/types/schemas/pages";
 import { authenticatedFetch } from "@every-app/sdk/core";
-import { createPageOverallReviewCollection } from "@/client/tanstack-db";
+import { pageOverallReviewCollection } from "@/client/tanstack-db";
 
 interface UseOverallReviewOptions {
   pageId: string;
@@ -20,15 +20,11 @@ export function useOverallReview({
   blocks,
   customInstructions,
 }: UseOverallReviewOptions) {
-  // Create the collection for this page
-  const reviewCollection = useMemo(
-    () => createPageOverallReviewCollection(pageId),
-    [pageId],
-  );
-
-  // Get the overall review from the collection
+  // Get the overall review from the collection (filtered by pageId)
   const { data: reviewsArray, isLoading: isLoadingReview } = useLiveQuery((q) =>
-    q.from({ review: reviewCollection }),
+    q
+      .from({ review: pageOverallReviewCollection })
+      .where(({ review }) => eq(review.pageId, pageId)),
   );
 
   // Get the single overall review (or null if none exists)
@@ -95,7 +91,7 @@ export function useOverallReview({
           );
         }
 
-        // Read the streaming response
+        // Read the streaming response with reasoning and text parts
         const reader = response.body?.getReader();
         if (!reader) {
           throw new Error("No response body");
@@ -103,6 +99,7 @@ export function useOverallReview({
 
         const decoder = new TextDecoder();
         let fullText = "";
+        let buffer = "";
 
         while (true) {
           const { done, value } = await reader.read();
@@ -111,10 +108,33 @@ export function useOverallReview({
             break;
           }
 
-          // Decode the chunk and append to full text
-          const chunk = decoder.decode(value, { stream: true });
-          fullText += chunk;
-          setStreamingText(fullText);
+          // Decode the chunk
+          buffer += decoder.decode(value, { stream: true });
+
+          // Process complete JSON lines
+          const lines = buffer.split("\n");
+          buffer = lines.pop() || ""; // Keep incomplete line in buffer
+
+          for (const line of lines) {
+            if (!line.trim()) continue;
+
+            try {
+              const data = JSON.parse(line) as {
+                type: "reasoning" | "text";
+                content: string;
+              };
+
+              // Only accumulate text content (ignore reasoning)
+              if (data.type === "text") {
+                fullText += data.content;
+                setStreamingText(fullText);
+              }
+            } catch {
+              // If JSON parsing fails, treat as plain text (fallback for older format)
+              fullText += line;
+              setStreamingText(fullText);
+            }
+          }
         }
 
         // Streaming complete - save to database
@@ -123,7 +143,7 @@ export function useOverallReview({
 
         if (currentReview) {
           // Update existing review
-          reviewCollection.update(currentReview.id, (draft) => {
+          pageOverallReviewCollection.update(currentReview.id, (draft) => {
             draft.promptId = promptId;
             draft.summary = fullText;
             draft.updatedAt = now;
@@ -131,7 +151,7 @@ export function useOverallReview({
         } else {
           // Insert new review
           const reviewId = crypto.randomUUID();
-          reviewCollection.insert({
+          pageOverallReviewCollection.insert({
             id: reviewId,
             pageId,
             promptId,
@@ -157,7 +177,7 @@ export function useOverallReview({
         setIsGenerating(false);
       }
     },
-    [pageId, blocks, customInstructions, reviewCollection],
+    [pageId, blocks, customInstructions],
   );
 
   // Stop the current generation

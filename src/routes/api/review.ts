@@ -18,21 +18,32 @@ const reviewBlockRequestSchema = z.object({
 
 // Response schema that the LLM should produce
 const reviewResponseSchema = z.object({
-  strengths: z.array(z.string()).max(1),
-  improvements: z.array(z.string()).max(2),
-  tips: z.array(z.string()).max(1).optional(),
+  suggestion: z.string().nullable(),
 });
 
-// Base system prompt - generic reviewer that can be customized
-const BASE_SYSTEM_PROMPT = `You are an expert application reviewer. Your job is to evaluate answers to application questions and provide constructive feedback.
+// Base system prompt - thoughtful peer reviewer
+const BASE_SYSTEM_PROMPT = `You are a thoughtful peer helping someone strengthen their application answers.
 
-For each question and answer pair, evaluate the response and provide:
-1. Strengths: What the answer does well (at most 1 bullet point - only include if genuinely noteworthy)
-2. Improvements: Critical issues that need to be fixed (at most 2 bullet points, prioritized by importance - only include truly important issues)
-3. Tips: An actionable suggestion for making the answer stronger (at most 1 bullet point - only include if there's a genuinely useful tip)
+Your job is to provoke reflection with a brief comment. Keep it to 1-2 sentences max. Often the best feedback is simply a probing question that highlights what's missing or unclear.
 
-Be direct and constructive. Focus on actionable feedback that will help improve the answer.
-IMPORTANT: Only include comments that provide genuine insight. Do not add filler or generic feedback. It's better to have fewer, high-quality comments than to fill every category.`;
+GUIDELINES:
+- Be concise: 1-2 sentences, not paragraphs
+- Ask questions when they'd be more useful than statements
+- Focus on the single most important thing, not a comprehensive review
+- Avoid nitpicking grammar, word choice, or minor phrasing
+
+GOOD EXAMPLES:
+- "Is Kevin a founder? The question asks specifically about non-founder contributions."
+- "What problem does this solve that Roam/Obsidian doesn't?"
+- "Strong specifics on traction - this works well."
+
+BAD EXAMPLES:
+- Long multi-paragraph explanations
+- Bullet lists of every possible improvement
+- "Consider adding more detail about X" (too vague)
+
+Return JSON: { "suggestion": "Your brief feedback here" }
+Return { "suggestion": null } if the answer is solid.`;
 
 // Timeout for AI review requests (1 minute)
 const REVIEW_TIMEOUT_MS = 60_000;
@@ -145,14 +156,8 @@ export const Route = createFileRoute("/api/review")({
 
 **Answer:** ${answer || "(No answer provided)"}
 
-Provide your evaluation in JSON format with this structure:
-{
-  "strengths": ["at most 1 string - only if genuinely noteworthy"],
-  "improvements": ["at most 2 strings - only truly important issues, prioritized"],
-  "tips": ["at most 1 string - only if genuinely useful"] (optional)
-}
-
-IMPORTANT: Only include comments that are genuinely insightful. Empty arrays are acceptable if there's nothing meaningful to say in a category. Do not add filler or generic feedback.`,
+Return your feedback as JSON: { "suggestion": "Your markdown feedback here" }
+Return { "suggestion": null } if the answer is solid and you have nothing meaningful to add.`,
                 },
               ],
               providerOptions: {
@@ -211,9 +216,7 @@ IMPORTANT: Only include comments that are genuinely insightful. Empty arrays are
 
           return new Response(
             JSON.stringify({
-              strengths: reviewData.strengths,
-              improvements: reviewData.improvements,
-              tips: reviewData.tips || null,
+              suggestion: reviewData.suggestion,
             }),
             {
               status: 200,

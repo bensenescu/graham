@@ -42,7 +42,6 @@ export function SidebarNav({ onNavigate }: SidebarNavProps) {
       {/* Header */}
       <div className="px-4 py-4 border-b border-base-300">
         <div className="flex items-center gap-2">
-          <FileText className="h-5 w-5 text-primary" />
           <span className="font-semibold text-base-content">Graham</span>
           <span className="text-base-content/40">-</span>
           <a

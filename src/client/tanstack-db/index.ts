@@ -1,9 +1,9 @@
 export { queryClient } from "./queryClient";
 export { persister } from "./persister";
 export { pageCollection } from "./pageCollection";
-export { createPageBlockCollection } from "./pageBlockCollection";
+export { pageBlockCollection } from "./pageBlockCollection";
 export { promptCollection } from "./promptCollection";
-export { createPageReviewSettingsCollection } from "./pageReviewSettingsCollection";
-export { createPageOverallReviewSettingsCollection } from "./pageOverallReviewSettingsCollection";
-export { createBlockReviewCollection } from "./blockReviewCollection";
-export { createPageOverallReviewCollection } from "./pageOverallReviewCollection";
+export { pageReviewSettingsCollection } from "./pageReviewSettingsCollection";
+export { pageOverallReviewSettingsCollection } from "./pageOverallReviewSettingsCollection";
+export { blockReviewCollection } from "./blockReviewCollection";
+export { pageOverallReviewCollection } from "./pageOverallReviewCollection";

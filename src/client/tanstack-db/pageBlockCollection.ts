@@ -1,25 +1,24 @@
 import { queryCollectionOptions } from "@tanstack/query-db-collection";
 import { queryClient } from "./queryClient";
 import {
-  getPageBlocks,
+  getAllPageBlocks,
   createPageBlock,
   updatePageBlock,
   deletePageBlock,
 } from "@/serverFunctions/pages";
 import { createCollection } from "@tanstack/react-db";
+import { lazyInitForWorkers } from "@every-app/sdk/cloudflare";
 
-// Factory function to create a block collection for a specific page
-export function createPageBlockCollection(pageId: string) {
-  return createCollection(
+export const pageBlockCollection = lazyInitForWorkers(() =>
+  createCollection(
     queryCollectionOptions({
-      queryKey: ["pageBlocks", pageId],
+      queryKey: ["pageBlocks"],
       queryFn: async () => {
-        const result = await getPageBlocks({ data: { pageId } });
+        const result = await getAllPageBlocks();
         return result.blocks;
       },
       queryClient,
       getKey: (item) => item.id,
-      // Handle all CRUD operations
       onInsert: async ({ transaction }) => {
         const { modified: newBlock } = transaction.mutations[0];
         await createPageBlock({
@@ -48,5 +47,5 @@ export function createPageBlockCollection(pageId: string) {
         await deletePageBlock({ data: { id: original.id } });
       },
     }),
-  );
-}
+  ),
+);

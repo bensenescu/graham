@@ -1,8 +1,8 @@
 import { useMemo, useCallback } from "react";
-import { useLiveQuery } from "@tanstack/react-db";
+import { useLiveQuery, eq } from "@tanstack/react-db";
 import {
   promptCollection,
-  createPageOverallReviewSettingsCollection,
+  pageOverallReviewSettingsCollection,
 } from "@/client/tanstack-db";
 import type { OverallReviewMode, Prompt } from "@/types/schemas/prompts";
 
@@ -10,20 +10,17 @@ import type { OverallReviewMode, Prompt } from "@/types/schemas/prompts";
  * Hook for managing page overall review settings.
  */
 export function usePageOverallReviewSettings(pageId: string) {
-  // Create the settings collection for this page
-  const settingsCollection = useMemo(
-    () => createPageOverallReviewSettingsCollection(pageId),
-    [pageId],
-  );
-
   // Get all prompts for the user
   const { data: prompts, isLoading: isLoadingPrompts } = useLiveQuery((q) =>
     q.from({ prompt: promptCollection }),
   );
 
-  // Get overall review settings for this page
+  // Get overall review settings for this page (filtered from the singleton collection)
   const { data: settingsArray, isLoading: isLoadingSettings } = useLiveQuery(
-    (q) => q.from({ settings: settingsCollection }),
+    (q) =>
+      q
+        .from({ settings: pageOverallReviewSettingsCollection })
+        .where(({ settings }) => eq(settings.pageId, pageId)),
   );
 
   const settings = settingsArray?.[0] ?? null;
@@ -45,11 +42,11 @@ export function usePageOverallReviewSettings(pageId: string) {
   const updateMode = useCallback(
     (mode: OverallReviewMode) => {
       if (!settings) return;
-      settingsCollection.update(settings.id, (draft) => {
+      pageOverallReviewSettingsCollection.update(settings.id, (draft) => {
         draft.mode = mode;
       });
     },
-    [settings, settingsCollection],
+    [settings],
   );
 
   // Add a prompt to selected prompts
@@ -59,27 +56,27 @@ export function usePageOverallReviewSettings(pageId: string) {
       const promptToAdd = prompts.find((p) => p.id === promptId);
       if (!promptToAdd) return;
 
-      settingsCollection.update(settings.id, (draft) => {
+      pageOverallReviewSettingsCollection.update(settings.id, (draft) => {
         const existing = draft.selectedPrompts ?? [];
         if (!existing.some((p: Prompt) => p.id === promptId)) {
           draft.selectedPrompts = [...existing, promptToAdd];
         }
       });
     },
-    [settings, settingsCollection, prompts],
+    [settings, prompts],
   );
 
   // Remove a prompt from selected prompts
   const removeSelectedPrompt = useCallback(
     (promptId: string) => {
       if (!settings) return;
-      settingsCollection.update(settings.id, (draft) => {
+      pageOverallReviewSettingsCollection.update(settings.id, (draft) => {
         draft.selectedPrompts = (draft.selectedPrompts ?? []).filter(
           (p: Prompt) => p.id !== promptId,
         );
       });
     },
-    [settings, settingsCollection],
+    [settings],
   );
 
   return {

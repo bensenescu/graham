@@ -8,6 +8,14 @@ import type {
 } from "@/types/schemas/pages";
 
 /**
+ * Get all blocks for all the user's pages.
+ */
+async function getAll(userId: string) {
+  const blocks = await PageBlockRepository.findAllByUserId(userId);
+  return { blocks };
+}
+
+/**
  * Get all blocks for a page.
  * Validates page ownership before returning blocks.
  */
@@ -127,6 +135,7 @@ async function deleteBlock(userId: string, data: DeletePageBlockInput) {
 }
 
 export const PageBlockService = {
+  getAll,
   getAllByPageId,
   create,
   batchCreate,

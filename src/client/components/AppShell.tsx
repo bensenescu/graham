@@ -1,24 +1,9 @@
 import { useRef, useEffect } from "react";
 import { Outlet, useNavigate, useLocation } from "@tanstack/react-router";
-import { Plus, Menu, FileText } from "lucide-react";
+import { Plus, Menu } from "lucide-react";
 import { SidebarNav } from "./Sidebar";
 import { pageCollection } from "@/client/tanstack-db";
 import { DrawerProvider, useDrawer } from "@/client/contexts/DrawerContext";
-
-/**
- * Hook to determine the page title based on current route
- */
-function usePageTitle() {
-  const location = useLocation();
-
-  if (location.pathname === "/") {
-    return "Pages";
-  }
-  if (location.pathname.startsWith("/page/")) {
-    return "Editor";
-  }
-  return "Graham";
-}
 
 /**
  * Mobile navbar right-side actions (route-specific)
@@ -69,7 +54,6 @@ function AppShellContent() {
     open: openDrawer,
     close: closeDrawer,
   } = useDrawer();
-  const pageTitle = usePageTitle();
   const hoverZoneRef = useRef<HTMLDivElement>(null);
   const sidebarRef = useRef<HTMLDivElement>(null);
   const closeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -138,8 +122,8 @@ function AppShellContent() {
 
       {/* Main content area */}
       <div className="flex flex-col h-screen overflow-hidden">
-        {/* Mobile navbar */}
-        <div className="navbar bg-base-100 border-b border-base-300 px-4 min-h-14 flex-shrink-0 md:hidden">
+        {/* Navbar */}
+        <div className="navbar bg-base-100 border-b border-base-300 px-4 min-h-14 flex-shrink-0">
           <div className="flex-none">
             <button
               onClick={openDrawer}
@@ -150,10 +134,7 @@ function AppShellContent() {
             </button>
           </div>
           <div className="flex-1 pl-2">
-            <div className="flex items-center gap-2">
-              <FileText className="h-5 w-5 text-primary" />
-              <span className="font-semibold">{pageTitle}</span>
-            </div>
+            <span className="font-semibold">Graham</span>
           </div>
           <div className="flex-none">
             <MobileNavbarRight />
