@@ -1,4 +1,5 @@
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
+import { useHotkeys } from "react-hotkeys-hook";
 import { toast } from "sonner";
 import {
   X,
@@ -12,6 +13,43 @@ import {
 import type { PageBlock } from "@/types/schemas/pages";
 import { usePageReviewSettings } from "@/client/hooks/usePageReviewSettings";
 import { useOverallReview } from "@/client/hooks/useOverallReview";
+import { SHORTCUT_CLOSE_PANEL_HOTKEY } from "@/client/lib/keyboard-shortcuts";
+
+/**
+ * Auto-resizing textarea that matches Q&A answer styling
+ */
+function AutoResizeTextarea({
+  value,
+  onChange,
+  placeholder,
+  className = "",
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  placeholder?: string;
+  className?: string;
+}) {
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    const textarea = textareaRef.current;
+    if (textarea) {
+      textarea.style.height = "auto";
+      textarea.style.height = `${textarea.scrollHeight}px`;
+    }
+  }, [value]);
+
+  return (
+    <textarea
+      ref={textareaRef}
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      placeholder={placeholder}
+      className={`textarea textarea-bordered w-full resize-none overflow-hidden ${className}`}
+      rows={1}
+    />
+  );
+}
 
 export type ReviewTab = "settings" | "overall";
 
@@ -86,24 +124,24 @@ function ConfigureTab({
         <label className="text-sm font-medium text-base-content mb-2 block">
           Default Prompt
         </label>
-        <textarea
+        <AutoResizeTextarea
           value={
             isEditingDefaultPrompt
               ? editedDefaultPromptText
               : (defaultPrompt?.prompt ?? "")
           }
-          onChange={(e) => {
+          onChange={(value) => {
             if (defaultPrompt) {
               if (!isEditingDefaultPrompt) {
                 setIsEditingDefaultPrompt(true);
-                setEditedDefaultPromptText(e.target.value);
+                setEditedDefaultPromptText(value);
               } else {
-                setEditedDefaultPromptText(e.target.value);
+                setEditedDefaultPromptText(value);
               }
             }
           }}
           placeholder="Type default review prompt here..."
-          className="textarea textarea-bordered textarea-sm w-full h-20 text-sm"
+          className="textarea-sm text-sm"
         />
         {defaultPrompt && isEditingDefaultPrompt && (
           <div className="flex justify-end gap-2 mt-2">
@@ -346,6 +384,11 @@ export function BlockReviewPanelHeader({
   onTabChange: (tab: ReviewTab) => void;
   onClose: () => void;
 }) {
+  // Close panel on Escape key
+  useHotkeys(SHORTCUT_CLOSE_PANEL_HOTKEY, onClose, { enableOnFormTags: true }, [
+    onClose,
+  ]);
+
   const tabs: { id: ReviewTab; label: string; icon: React.ReactNode }[] = [
     {
       id: "settings",
