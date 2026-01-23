@@ -161,13 +161,16 @@ export function QADocumentBlock({
       `}
     >
       <div className="flex">
-        {/* Drag handle - appears on hover */}
-        <div
-          {...attributes}
-          {...listeners}
-          className="flex-shrink-0 w-6 flex items-start justify-center pt-1 cursor-grab active:cursor-grabbing opacity-0 group-hover:opacity-100 transition-opacity text-base-content/30 hover:text-base-content/50"
-        >
-          <GripVertical className="h-4 w-4" />
+        {/* Drag handle - appears on hover or focus-within */}
+        <div className="flex-shrink-0 w-6 flex items-start justify-center pt-1 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity">
+          <button
+            type="button"
+            {...attributes}
+            {...listeners}
+            className="cursor-grab active:cursor-grabbing text-base-content/30 hover:text-base-content/50 rounded focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
+          >
+            <GripVertical className="h-4 w-4" />
+          </button>
         </div>
 
         {/* Content */}
@@ -204,8 +207,8 @@ export function QADocumentBlock({
           )}
         </div>
 
-        {/* Actions dropdown - appears on hover */}
-        <div className="flex-shrink-0 ml-2 opacity-0 group-hover:opacity-100 transition-opacity dropdown dropdown-end">
+        {/* Actions dropdown - appears on hover or focus-within */}
+        <div className="flex-shrink-0 ml-2 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity dropdown dropdown-end">
           <button
             tabIndex={0}
             className="btn btn-ghost btn-xs btn-square text-base-content/50 hover:text-base-content"
