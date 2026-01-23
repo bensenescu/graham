@@ -43,7 +43,6 @@ async function create(userId: string, data: CreatePageInput) {
     pageId: data.id,
     model: "openai-gpt-5.2-high",
     defaultPromptId: promptId,
-    customPromptIds: [],
   });
 
   // Create default overall review settings
@@ -51,7 +50,6 @@ async function create(userId: string, data: CreatePageInput) {
     id: crypto.randomUUID(),
     pageId: data.id,
     mode: "all_prompts",
-    customPrompt: null,
     selectedPromptIds: [],
   });
 

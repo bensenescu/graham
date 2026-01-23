@@ -27,7 +27,6 @@ export function createPageOverallReviewCollection(pageId: string) {
             id: review.id,
             pageId: review.pageId,
             promptId: review.promptId,
-            customPrompt: review.customPrompt,
             summary: review.summary,
           },
         });
@@ -39,7 +38,6 @@ export function createPageOverallReviewCollection(pageId: string) {
             id: review.id,
             pageId: review.pageId,
             promptId: review.promptId,
-            customPrompt: review.customPrompt,
             summary: review.summary,
           },
         });

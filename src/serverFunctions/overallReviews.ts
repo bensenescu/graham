@@ -29,7 +29,6 @@ export const upsertPageOverallReview = createServerFn()
       id: data.id,
       pageId: data.pageId,
       promptId: data.promptId ?? null,
-      customPrompt: data.customPrompt ?? null,
       summary: data.summary,
     });
     return { review: result };

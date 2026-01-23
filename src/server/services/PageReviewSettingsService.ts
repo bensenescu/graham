@@ -8,7 +8,6 @@ import type {
 
 /**
  * Get review settings for a page.
- * Returns settings with expanded customPromptIds.
  */
 async function getByPageId(userId: string, pageId: string) {
   // Verify user owns the page
@@ -23,22 +22,7 @@ async function getByPageId(userId: string, pageId: string) {
     return { settings: null };
   }
 
-  // Parse customPromptIds from JSON
-  const customPromptIds = JSON.parse(settings.customPromptIds) as string[];
-
-  // Get all prompts for this user to resolve custom prompts
-  const allPrompts = await PromptRepository.findAllByUserId(userId);
-  const customPrompts = allPrompts.filter((p) =>
-    customPromptIds.includes(p.id),
-  );
-
-  return {
-    settings: {
-      ...settings,
-      customPromptIds,
-      customPrompts,
-    },
-  };
+  return { settings };
 }
 
 /**
@@ -67,7 +51,6 @@ async function upsert(userId: string, data: CreatePageReviewSettingsInput) {
     pageId: data.pageId,
     model: data.model ?? "openai-gpt-5.2-high",
     defaultPromptId: data.defaultPromptId ?? null,
-    customPromptIds: data.customPromptIds ?? [],
   });
 
   return { success: true };
@@ -97,7 +80,6 @@ async function update(userId: string, data: UpdatePageReviewSettingsInput) {
   await PageReviewSettingsRepository.update(data.pageId, {
     model: data.model,
     defaultPromptId: data.defaultPromptId,
-    customPromptIds: data.customPromptIds,
   });
 
   return { success: true };
@@ -129,7 +111,6 @@ async function initializeForPage(
     pageId,
     model: "openai-gpt-5.2-high",
     defaultPromptId: promptId,
-    customPromptIds: [],
   });
 
   return { promptId, settingsId };

@@ -52,17 +52,6 @@ export function usePageOverallReviewSettings(pageId: string) {
     [settings, settingsCollection],
   );
 
-  // Update custom prompt
-  const updateCustomPrompt = useCallback(
-    (customPrompt: string | null) => {
-      if (!settings) return;
-      settingsCollection.update(settings.id, (draft) => {
-        draft.customPrompt = customPrompt;
-      });
-    },
-    [settings, settingsCollection],
-  );
-
   // Add a prompt to selected prompts
   const addSelectedPrompt = useCallback(
     (promptId: string) => {
@@ -103,7 +92,6 @@ export function usePageOverallReviewSettings(pageId: string) {
 
     // Actions
     updateMode,
-    updateCustomPrompt,
     addSelectedPrompt,
     removeSelectedPrompt,
   };

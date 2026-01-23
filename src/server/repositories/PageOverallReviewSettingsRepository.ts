@@ -10,13 +10,11 @@ type CreatePageOverallReviewSettings = {
   id: string;
   pageId: string;
   mode: OverallReviewMode;
-  customPrompt: string | null;
   selectedPromptIds: string[];
 };
 
 type UpdatePageOverallReviewSettings = {
   mode?: OverallReviewMode;
-  customPrompt?: string | null;
   selectedPromptIds?: string[];
 };
 
@@ -57,7 +55,6 @@ async function create(data: CreatePageOverallReviewSettings) {
     id: settingsId,
     pageId: data.pageId,
     mode: data.mode,
-    customPrompt: data.customPrompt,
   });
 
   // Insert selected prompts if any
@@ -94,9 +91,6 @@ async function update(pageId: string, data: UpdatePageOverallReviewSettings) {
 
   if (data.mode !== undefined) {
     updateData.mode = data.mode;
-  }
-  if (data.customPrompt !== undefined) {
-    updateData.customPrompt = data.customPrompt;
   }
 
   await db
@@ -140,7 +134,6 @@ async function upsert(data: CreatePageOverallReviewSettings) {
   if (existing) {
     await update(data.pageId, {
       mode: data.mode,
-      customPrompt: data.customPrompt,
       selectedPromptIds: data.selectedPromptIds,
     });
     return existing.id;

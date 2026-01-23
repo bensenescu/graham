@@ -43,7 +43,6 @@ export const pageReviewSettingsSchema = z.object({
   pageId: z.string(),
   model: z.string(),
   defaultPromptId: z.string().nullable(),
-  customPromptIds: z.array(z.string()),
   createdAt: z.string().optional(),
   updatedAt: z.string().optional(),
 });
@@ -56,7 +55,6 @@ export const createPageReviewSettingsSchema = z.object({
   pageId: z.string().uuid("Invalid page ID"),
   model: z.string().default("openai-gpt-5.2-high"),
   defaultPromptId: z.string().uuid().nullable().optional(),
-  customPromptIds: z.array(z.string().uuid()).default([]),
 });
 
 export type CreatePageReviewSettingsInput = z.infer<
@@ -68,7 +66,6 @@ export const updatePageReviewSettingsSchema = z.object({
   pageId: z.string().uuid("Invalid page ID"),
   model: z.string().optional(),
   defaultPromptId: z.string().uuid().nullable().optional(),
-  customPromptIds: z.array(z.string().uuid()).optional(),
 });
 
 export type UpdatePageReviewSettingsInput = z.infer<
@@ -110,7 +107,6 @@ export const pageOverallReviewSettingsSchema = z.object({
   id: z.string(),
   pageId: z.string(),
   mode: overallReviewModeSchema,
-  customPrompt: z.string().nullable(),
   createdAt: z.string().optional(),
   updatedAt: z.string().optional(),
 });
@@ -133,7 +129,6 @@ export type PageOverallReviewSettingsWithPrompts = z.infer<
 export const updatePageOverallReviewSettingsSchema = z.object({
   pageId: z.string().uuid("Invalid page ID"),
   mode: overallReviewModeSchema.optional(),
-  customPrompt: z.string().nullable().optional(),
   selectedPromptIds: z.array(z.string().uuid()).optional(),
 });
 

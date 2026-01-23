@@ -52,7 +52,7 @@ export function useOverallReview({
   const generateOverallReview = useCallback(
     async (
       promptId: string | null = null,
-      customPrompt: string | null = null,
+      promptText: string | null = null,
     ) => {
       // Cancel any existing stream
       if (abortControllerRef.current) {
@@ -68,7 +68,7 @@ export function useOverallReview({
 
       try {
         // Build custom instructions from the prompt if provided
-        const instructions = customPrompt || customInstructions;
+        const instructions = promptText || customInstructions;
 
         const response = await authenticatedFetch("/api/overall-review", {
           method: "POST",
@@ -125,7 +125,6 @@ export function useOverallReview({
           // Update existing review
           reviewCollection.update(currentReview.id, (draft) => {
             draft.promptId = promptId;
-            draft.customPrompt = customPrompt;
             draft.summary = fullText;
             draft.updatedAt = now;
           });
@@ -136,7 +135,6 @@ export function useOverallReview({
             id: reviewId,
             pageId,
             promptId,
-            customPrompt,
             summary: fullText,
             createdAt: now,
             updatedAt: now,

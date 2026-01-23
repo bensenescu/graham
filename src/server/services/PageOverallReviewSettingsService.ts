@@ -51,7 +51,6 @@ async function update(
 
   await PageOverallReviewSettingsRepository.update(data.pageId, {
     mode: data.mode,
-    customPrompt: data.customPrompt,
     selectedPromptIds: data.selectedPromptIds,
   });
 

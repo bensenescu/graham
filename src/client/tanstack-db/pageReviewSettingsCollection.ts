@@ -27,7 +27,6 @@ export function createPageReviewSettingsCollection(pageId: string) {
             pageId: newSettings.pageId,
             model: newSettings.model,
             defaultPromptId: newSettings.defaultPromptId,
-            customPromptIds: newSettings.customPromptIds,
           },
         });
       },
@@ -38,7 +37,6 @@ export function createPageReviewSettingsCollection(pageId: string) {
             pageId: modified.pageId,
             model: modified.model,
             defaultPromptId: modified.defaultPromptId,
-            customPromptIds: modified.customPromptIds,
           },
         });
       },

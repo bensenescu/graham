@@ -6,7 +6,6 @@ type UpsertPageOverallReview = {
   id: string;
   pageId: string;
   promptId: string | null;
-  customPrompt: string | null;
   summary: string;
 };
 
@@ -40,7 +39,6 @@ async function upsert(data: UpsertPageOverallReview) {
       .update(pageOverallReviews)
       .set({
         promptId: data.promptId,
-        customPrompt: data.customPrompt,
         summary: data.summary,
         updatedAt: new Date().toISOString(),
       })
@@ -54,7 +52,6 @@ async function upsert(data: UpsertPageOverallReview) {
       id: data.id,
       pageId: data.pageId,
       promptId: data.promptId,
-      customPrompt: data.customPrompt,
       summary: data.summary,
       createdAt: now,
       updatedAt: now,
