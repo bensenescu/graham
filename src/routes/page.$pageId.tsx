@@ -2,10 +2,8 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useLiveQuery, eq } from "@tanstack/react-db";
 import { useCallback, useMemo, useRef, useState } from "react";
 import { pageCollection, pageBlockCollection } from "@/client/tanstack-db";
-import { QADocumentEditor } from "@/client/components/QADocumentEditor";
 import { CollaborativeQADocumentEditor } from "@/client/components/CollaborativeQADocumentEditor";
 import { PageCollaborationProvider } from "@/client/components/PageCollaborationProvider";
-import { ConnectionStatusBanner } from "@/client/components/ConnectionStatusBanner";
 import { ResizablePanelLayout } from "@/client/components/ResizablePanelLayout";
 import { FloatingControls } from "@/client/components/FloatingControls";
 import {
@@ -17,7 +15,6 @@ import { useAIReview } from "@/client/hooks/useAIReview";
 import { usePageReviewSettings } from "@/client/hooks/usePageReviewSettings";
 import { useCollaborationUser } from "@/client/hooks/useCollaborationUser";
 import type { PageBlock } from "@/types/schemas/pages";
-import type { ConnectionState } from "@/client/hooks/useYjsWebSocket";
 
 export const Route = createFileRoute("/page/$pageId")({
   component: PageEditor,
@@ -28,13 +25,9 @@ export const Route = createFileRoute("/page/$pageId")({
 function PageEditor() {
   const { pageId } = Route.useParams();
   const navigate = useNavigate();
-  const titleDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Collaboration state
+  // Collaboration user info
   const { userInfo, isLoading: isLoadingUser } = useCollaborationUser();
-  const [collaborationEnabled, setCollaborationEnabled] = useState(true);
-  const [connectionState, setConnectionState] =
-    useState<ConnectionState>("disconnected");
 
   // Panel state
   const [isPanelOpen, setIsPanelOpen] = useState(false);
@@ -91,22 +84,6 @@ function PageEditor() {
       customInstructions,
     });
 
-  const handleTitleChange = useCallback(
-    (title: string) => {
-      // Debounce the title update
-      if (titleDebounceRef.current) {
-        clearTimeout(titleDebounceRef.current);
-      }
-      titleDebounceRef.current = setTimeout(() => {
-        pageCollection.update(pageId, (draft) => {
-          draft.title = title;
-          draft.updatedAt = new Date().toISOString();
-        });
-      }, 500);
-    },
-    [pageId],
-  );
-
   const handleBlockCreate = useCallback((block: PageBlock) => {
     pageBlockCollection.insert({
       id: block.id,
@@ -140,7 +117,7 @@ function PageEditor() {
     navigate({ to: "/" });
   }, [pageId, navigate]);
 
-  // Panel handlers - must be before early returns to maintain consistent hook order
+  // Panel handlers
   const handlePanelOpen = useCallback(() => {
     setIsPanelOpen(true);
   }, []);
@@ -185,37 +162,33 @@ function PageEditor() {
     );
   }
 
-  // Side panel header
-  const sidePanelHeader = (
-    <BlockReviewPanelHeader
-      activeTab={activeTab}
-      onTabChange={handleTabChange}
-      onClose={handlePanelClose}
-    />
-  );
-
-  // Side panel content
-  const sidePanel = (
-    <BlockReviewPanel
-      pageId={pageId}
-      blocks={sortedBlocks}
-      activeTab={activeTab}
-      onTabChange={handleTabChange}
-      onClose={handlePanelClose}
-      onDeletePage={handleDelete}
-      externalHeader
-    />
-  );
-
-  // Render the editor - use collaborative version if enabled
-  const renderEditor = () => {
-    if (collaborationEnabled) {
-      return (
-        <PageCollaborationProvider
-          pageId={pageId}
-          userInfo={userInfo}
-          enabled={collaborationEnabled}
-        >
+  return (
+    <div className="h-full bg-base-200">
+      <ResizablePanelLayout
+        isPanelOpen={isPanelOpen}
+        onPanelOpen={handlePanelOpen}
+        onPanelClose={handlePanelClose}
+        sidePanelHeader={
+          <BlockReviewPanelHeader
+            activeTab={activeTab}
+            onTabChange={handleTabChange}
+            onClose={handlePanelClose}
+          />
+        }
+        sidePanel={
+          <BlockReviewPanel
+            pageId={pageId}
+            blocks={sortedBlocks}
+            activeTab={activeTab}
+            onTabChange={handleTabChange}
+            onClose={handlePanelClose}
+            onDeletePage={handleDelete}
+            externalHeader
+          />
+        }
+        storageKey="page-review-panel-width"
+      >
+        <PageCollaborationProvider pageId={pageId} userInfo={userInfo}>
           <CollaborativeQADocumentEditor
             pageId={pageId}
             blocks={sortedBlocks}
@@ -228,53 +201,8 @@ function PageEditor() {
             onReviewRequest={reviewBlock}
           />
         </PageCollaborationProvider>
-      );
-    }
-
-    // Fallback to non-collaborative editor
-    return (
-      <QADocumentEditor
-        pageId={pageId}
-        pageTitle={page.title}
-        blocks={sortedBlocks}
-        reviews={reviews}
-        loadingBlockIds={loadingBlockIds}
-        showInlineReviews={showInlineReviews}
-        onBlockCreate={handleBlockCreate}
-        onBlockUpdate={handleBlockUpdate}
-        onBlockDelete={handleBlockDelete}
-        onReviewRequest={reviewBlock}
-        onTitleChange={handleTitleChange}
-      />
-    );
-  };
-
-  return (
-    <div className="h-full bg-base-200">
-      {/* Connection status banner for collaborative mode */}
-      {collaborationEnabled && (
-        <ConnectionStatusBanner
-          connectionState={connectionState}
-          onReconnect={() => {
-            // Toggle collaboration off and on to force reconnect
-            setCollaborationEnabled(false);
-            setTimeout(() => setCollaborationEnabled(true), 100);
-          }}
-        />
-      )}
-
-      <ResizablePanelLayout
-        isPanelOpen={isPanelOpen}
-        onPanelOpen={handlePanelOpen}
-        onPanelClose={handlePanelClose}
-        sidePanelHeader={sidePanelHeader}
-        sidePanel={sidePanel}
-        storageKey="page-review-panel-width"
-      >
-        {renderEditor()}
       </ResizablePanelLayout>
 
-      {/* Floating controls */}
       <FloatingControls
         showInlineReviews={showInlineReviews}
         onToggleInlineReviews={handleToggleInlineReviews}
