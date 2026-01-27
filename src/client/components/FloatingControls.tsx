@@ -83,6 +83,9 @@ export function FloatingControls({
           transition-all duration-200 ease-out
           ${isVisible ? "opacity-100 translate-x-0" : "opacity-0 translate-x-4"}
         `}
+        // Remove from tab order and accessibility tree during animation
+        inert={!isVisible ? true : undefined}
+        aria-hidden={!isVisible}
       >
         <div className="flex flex-col gap-1 p-1.5 rounded-xl bg-base-100 border border-base-300 shadow-lg min-w-[150px]">
           {/* Toggle inline reviews */}

@@ -128,7 +128,7 @@ function AppShellContent() {
             <button
               onClick={openDrawer}
               aria-label="open sidebar"
-              className="btn btn-square btn-ghost btn-sm"
+              className="btn btn-square btn-ghost btn-sm focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-base-100"
             >
               <Menu className="h-5 w-5" />
             </button>
@@ -161,6 +161,9 @@ function AppShellContent() {
         className={`fixed top-0 left-0 h-full z-50 transform transition-transform duration-200 ease-out ${
           isDrawerOpen ? "translate-x-0" : "-translate-x-full"
         }`}
+        // Remove from tab order and accessibility tree when closed
+        inert={!isDrawerOpen ? true : undefined}
+        aria-hidden={!isDrawerOpen}
       >
         <div className="flex h-full">
           {/* Actual sidebar */}

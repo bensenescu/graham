@@ -67,6 +67,7 @@ export function QADocumentEditor({
   // Local state for editing
   const [localBlocks, setLocalBlocks] = useState<PageBlock[]>(blocks);
   const [localTitle, setLocalTitle] = useState(pageTitle || "");
+  const [focusBlockId, setFocusBlockId] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const sensors = useDraggableSensors();
 
@@ -149,6 +150,7 @@ export function QADocumentEditor({
     };
 
     setLocalBlocks((prev) => [...prev, newBlock]);
+    setFocusBlockId(newBlock.id);
     onBlockCreate(newBlock);
   }, [localBlocks, pageId, onBlockCreate]);
 
@@ -177,6 +179,7 @@ export function QADocumentEditor({
       };
 
       setLocalBlocks((prev) => [...prev, newBlock]);
+      setFocusBlockId(newBlock.id);
       onBlockCreate(newBlock);
     },
     [localBlocks, pageId, onBlockCreate],
@@ -270,6 +273,8 @@ export function QADocumentEditor({
                     onReviewRequest={onReviewRequest}
                     onFocus={onBlockFocus}
                     isOnly={sortedBlocks.length === 1}
+                    autoFocusQuestion={block.id === focusBlockId}
+                    onAutoFocusDone={() => setFocusBlockId(null)}
                   />
                 ))}
               </div>

@@ -80,8 +80,10 @@ export function QABlock({
   const handleQuestionKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
       // Cmd/Ctrl + Enter to add new block after this one
+      if (e.nativeEvent.isComposing) return;
       if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
         e.preventDefault();
+        e.stopPropagation();
         onAddAfter?.(block.id);
       }
     },
@@ -91,8 +93,10 @@ export function QABlock({
   const handleAnswerKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
       // Cmd/Ctrl + Enter to add new block after this one
+      if (e.nativeEvent.isComposing) return;
       if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
         e.preventDefault();
+        e.stopPropagation();
         onAddAfter?.(block.id);
       }
     },
