@@ -11,5 +11,4 @@ export function getBlockQuestionId(blockId: string): string {
   return `block-question-${blockId}`;
 }
 
-export const PAGE_TITLE_CONTAINER_ID = "page-title-container";
 export const ADD_QUESTION_BUTTON_ID = "add-question-button";

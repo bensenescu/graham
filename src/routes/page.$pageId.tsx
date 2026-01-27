@@ -10,6 +10,7 @@ import {
   BlockReviewPanelHeader,
   type ReviewTab,
 } from "@/client/components/AIReviewPanel";
+import { PracticeModeModal } from "@/client/components/PracticeMode";
 import { useAIReview } from "@/client/hooks/useAIReview";
 import { usePageReviewSettings } from "@/client/hooks/usePageReviewSettings";
 import type { PageBlock } from "@/types/schemas/pages";
@@ -28,6 +29,9 @@ function PageEditor() {
   // Panel state
   const [isPanelOpen, setIsPanelOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<ReviewTab>("settings");
+
+  // Practice mode state
+  const [isPracticeModeOpen, setIsPracticeModeOpen] = useState(false);
 
   // Inline reviews visibility (persisted to localStorage)
   const [showInlineReviews, setShowInlineReviews] = useState(() => {
@@ -147,6 +151,14 @@ function PageEditor() {
     setIsPanelOpen(true);
   }, []);
 
+  const handleOpenPracticeMode = useCallback(() => {
+    setIsPracticeModeOpen(true);
+  }, []);
+
+  const handleClosePracticeMode = useCallback(() => {
+    setIsPracticeModeOpen(false);
+  }, []);
+
   if (isLoadingPages || isLoadingBlocks) {
     return (
       <div className="h-full flex items-center justify-center">
@@ -232,6 +244,15 @@ function PageEditor() {
         isPanelOpen={isPanelOpen}
         onOpenPanel={handlePanelOpen}
         onOpenOverallTab={handleOpenOverallTab}
+        onOpenPracticeMode={handleOpenPracticeMode}
+      />
+
+      {/* Practice Mode Modal */}
+      <PracticeModeModal
+        pageId={pageId}
+        blocks={sortedBlocks}
+        isOpen={isPracticeModeOpen}
+        onClose={handleClosePracticeMode}
       />
     </div>
   );
