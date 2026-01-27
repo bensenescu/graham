@@ -1,10 +1,11 @@
 import { Link, useLocation } from "@tanstack/react-router";
-import { FileText, Plus, ChevronRight } from "lucide-react";
+import { FileText, Plus, ChevronRight, Keyboard } from "lucide-react";
 import { useLiveQuery } from "@tanstack/react-db";
 import { pageCollection } from "@/client/tanstack-db";
 
 interface SidebarNavProps {
   onNavigate?: () => void;
+  onShowKeyboardShortcuts?: () => void;
 }
 
 /**
@@ -12,7 +13,10 @@ interface SidebarNavProps {
  * - App header with logo
  * - Pages section with recent pages
  */
-export function SidebarNav({ onNavigate }: SidebarNavProps) {
+export function SidebarNav({
+  onNavigate,
+  onShowKeyboardShortcuts,
+}: SidebarNavProps) {
   const location = useLocation();
   const currentPath = location.pathname;
 
@@ -120,6 +124,23 @@ export function SidebarNav({ onNavigate }: SidebarNavProps) {
           </div>
         )}
       </nav>
+
+      {/* Footer */}
+      <div className="px-4 py-3 border-t border-base-300">
+        <button
+          onClick={() => {
+            onShowKeyboardShortcuts?.();
+            onNavigate?.();
+          }}
+          className="flex items-center gap-2 w-full px-2 py-2 text-sm text-base-content/60 hover:text-base-content hover:bg-base-200 rounded-lg transition-colors"
+        >
+          <Keyboard className="h-4 w-4" />
+          <span>Keyboard shortcuts</span>
+          <kbd className="ml-auto px-1.5 py-0.5 text-xs font-mono bg-base-300 border border-base-content/20 rounded">
+            ?
+          </kbd>
+        </button>
+      </div>
     </div>
   );
 }

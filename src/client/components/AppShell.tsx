@@ -1,9 +1,12 @@
-import { useRef, useEffect } from "react";
+import { useRef, useEffect, useState } from "react";
 import { Outlet, useNavigate, useLocation } from "@tanstack/react-router";
 import { Plus, Menu } from "lucide-react";
+import { useHotkeys } from "react-hotkeys-hook";
 import { SidebarNav } from "./Sidebar";
+import { KeyboardShortcutsModal } from "./KeyboardShortcutsModal";
 import { pageCollection } from "@/client/tanstack-db";
 import { DrawerProvider, useDrawer } from "@/client/contexts/DrawerContext";
+import { SHORTCUT_SHOW_SHORTCUTS_HOTKEY } from "@/client/lib/keyboard-shortcuts";
 
 /**
  * Mobile navbar right-side actions (route-specific)
@@ -57,6 +60,14 @@ function AppShellContent() {
   const hoverZoneRef = useRef<HTMLDivElement>(null);
   const sidebarRef = useRef<HTMLDivElement>(null);
   const closeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const [isShortcutsModalOpen, setIsShortcutsModalOpen] = useState(false);
+
+  // Global keyboard shortcut to show shortcuts modal
+  useHotkeys(
+    SHORTCUT_SHOW_SHORTCUTS_HOTKEY,
+    () => setIsShortcutsModalOpen(true),
+    { preventDefault: true },
+  );
 
   // Handle hover behavior for desktop
   useEffect(() => {
@@ -171,7 +182,10 @@ function AppShellContent() {
           <div className="flex h-full">
             {/* Actual sidebar */}
             <div className="w-72 h-full bg-base-100 border-r border-base-300">
-              <SidebarNav onNavigate={closeDrawer} />
+              <SidebarNav
+                onNavigate={closeDrawer}
+                onShowKeyboardShortcuts={() => setIsShortcutsModalOpen(true)}
+              />
             </div>
             {/* Invisible extended hover area (desktop only) */}
             <div className="hidden md:block w-8 h-full" />
@@ -191,6 +205,12 @@ function AppShellContent() {
           <Outlet />
         </div>
       </div>
+
+      {/* Keyboard shortcuts modal */}
+      <KeyboardShortcutsModal
+        isOpen={isShortcutsModalOpen}
+        onClose={() => setIsShortcutsModalOpen(false)}
+      />
     </div>
   );
 }

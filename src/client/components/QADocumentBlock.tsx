@@ -5,6 +5,7 @@ import { CSS } from "@dnd-kit/utilities";
 import type { PageBlock } from "@/types/schemas/pages";
 import type { BlockReview } from "@/types/schemas/reviews";
 import { InlineBlockReview } from "./InlineBlockReview";
+import { getBlockItemId } from "@/client/lib/element-ids";
 
 interface QADocumentBlockProps {
   block: PageBlock;
@@ -146,20 +147,54 @@ export function QADocumentBlock({
     onAutoFocusDone?.(block.id);
   }, [autoFocusQuestion, block.id, onAutoFocusDone]);
 
+  // Handle container focus (for keyboard navigation)
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  // Combine dnd-kit's setNodeRef with our containerRef
+  const setCombinedRef = useCallback(
+    (node: HTMLDivElement | null) => {
+      setNodeRef(node);
+      (containerRef as React.MutableRefObject<HTMLDivElement | null>).current =
+        node;
+    },
+    [setNodeRef],
+  );
+
   return (
     <div
-      ref={setNodeRef}
+      ref={setCombinedRef}
+      id={getBlockItemId(block.id)}
+      tabIndex={0}
       style={style}
       data-block-id={block.id}
       className={`
-        group relative py-4 transition-colors
+        group relative py-4 transition-colors outline-none
+        focus:bg-primary/5 focus:-mx-4 focus:px-4 focus:rounded-lg
         ${isActive ? "bg-primary/5 -mx-4 px-4 rounded-lg" : ""}
       `}
-      onFocus={() => setHasFocusWithin(true)}
+      onFocus={(e) => {
+        setHasFocusWithin(true);
+        // Only call onFocus if we're focusing the container itself (for keyboard nav)
+        if (e.target === containerRef.current) {
+          onFocus?.(block.id);
+        }
+      }}
       onBlur={(e) => {
         // Only set false if focus moved outside this block
         if (!e.currentTarget.contains(e.relatedTarget as Node)) {
           setHasFocusWithin(false);
+        }
+      }}
+      onKeyDown={(e) => {
+        // Enter to start editing the question
+        if (e.key === "Enter" && e.target === containerRef.current) {
+          e.preventDefault();
+          questionInputRef.current?.focus();
+        }
+        // Escape to return focus to container from textarea
+        if (e.key === "Escape" && e.target !== containerRef.current) {
+          e.preventDefault();
+          containerRef.current?.focus();
         }
       }}
     >
