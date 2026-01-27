@@ -25,3 +25,6 @@ dist/
 /blob-report/
 /playwright/.cache/
 .tanstack
+
+# Localflare generated files
+.localflare/

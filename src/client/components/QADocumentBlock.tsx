@@ -20,6 +20,8 @@ interface QADocumentBlockProps {
   onReviewRequest?: (id: string) => void;
   onFocus?: (id: string) => void;
   isOnly?: boolean;
+  autoFocusQuestion?: boolean;
+  onAutoFocusDone?: (id: string) => void;
 }
 
 /**
@@ -33,6 +35,7 @@ function AutoResizeTextarea({
   className,
   onKeyDown,
   onFocus,
+  inputRef,
 }: {
   value: string;
   onChange: (value: string) => void;
@@ -41,20 +44,22 @@ function AutoResizeTextarea({
   className?: string;
   onKeyDown?: (e: React.KeyboardEvent<HTMLTextAreaElement>) => void;
   onFocus?: () => void;
+  inputRef?: React.RefObject<HTMLTextAreaElement | null>;
 }) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const resolvedRef = inputRef ?? textareaRef;
 
   useEffect(() => {
-    const textarea = textareaRef.current;
+    const textarea = resolvedRef.current;
     if (textarea) {
       textarea.style.height = "auto";
       textarea.style.height = `${textarea.scrollHeight}px`;
     }
-  }, [value]);
+  }, [value, resolvedRef]);
 
   return (
     <textarea
-      ref={textareaRef}
+      ref={resolvedRef}
       value={value}
       onChange={(e) => onChange(e.target.value)}
       onBlur={onBlur}
@@ -84,10 +89,15 @@ export function QADocumentBlock({
   onReviewRequest,
   onFocus,
   isOnly = false,
+  autoFocusQuestion = false,
+  onAutoFocusDone,
 }: QADocumentBlockProps) {
   // Local state for editing - only sync to parent on blur
   const [localQuestion, setLocalQuestion] = useState(block.question);
   const [localAnswer, setLocalAnswer] = useState(block.answer);
+  const questionInputRef = useRef<HTMLTextAreaElement>(null);
+  // Track if block has focus within for accessibility (controls should only be tabbable when block is focused)
+  const [hasFocusWithin, setHasFocusWithin] = useState(false);
 
   // Sync local state when block changes from parent (e.g., from sync)
   useEffect(() => {
@@ -115,8 +125,10 @@ export function QADocumentBlock({
 
   const handleQuestionKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+      if (e.nativeEvent.isComposing) return;
       if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
         e.preventDefault();
+        e.stopPropagation();
         onAddAfter?.(block.id);
       }
     },
@@ -125,8 +137,10 @@ export function QADocumentBlock({
 
   const handleAnswerKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+      if (e.nativeEvent.isComposing) return;
       if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
         e.preventDefault();
+        e.stopPropagation();
         onAddAfter?.(block.id);
       }
     },
@@ -150,6 +164,12 @@ export function QADocumentBlock({
     }
   }, [block.id, block.answer, localAnswer, onAnswerChange]);
 
+  useEffect(() => {
+    if (!autoFocusQuestion) return;
+    questionInputRef.current?.focus();
+    onAutoFocusDone?.(block.id);
+  }, [autoFocusQuestion, block.id, onAutoFocusDone]);
+
   return (
     <div
       ref={setNodeRef}
@@ -159,14 +179,22 @@ export function QADocumentBlock({
         group relative py-4 transition-colors
         ${isActive ? "bg-primary/5 -mx-4 px-4 rounded-lg" : ""}
       `}
+      onFocus={() => setHasFocusWithin(true)}
+      onBlur={(e) => {
+        // Only set false if focus moved outside this block
+        if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+          setHasFocusWithin(false);
+        }
+      }}
     >
       <div className="flex">
-        {/* Drag handle - appears on hover or focus-within */}
+        {/* Drag handle - appears on hover or focus-within, only tabbable when block has focus */}
         <div className="flex-shrink-0 w-6 flex items-start justify-center pt-1 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity">
           <button
             type="button"
             {...attributes}
             {...listeners}
+            tabIndex={hasFocusWithin ? 0 : -1}
             className="cursor-grab active:cursor-grabbing text-base-content/30 hover:text-base-content/50 rounded focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
           >
             <GripVertical className="h-4 w-4" />
@@ -183,6 +211,7 @@ export function QADocumentBlock({
               onBlur={handleQuestionBlur}
               onKeyDown={handleQuestionKeyDown}
               onFocus={handleFocus}
+              inputRef={questionInputRef}
               placeholder="What question are you exploring?"
               className="text-base font-semibold text-base-content placeholder:text-base-content/40 leading-relaxed"
             />
@@ -207,17 +236,17 @@ export function QADocumentBlock({
           )}
         </div>
 
-        {/* Actions dropdown - appears on hover or focus-within */}
+        {/* Actions dropdown - appears on hover or focus-within, only tabbable when block has focus */}
         <div className="flex-shrink-0 ml-2 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity dropdown dropdown-end">
           <button
-            tabIndex={0}
+            tabIndex={hasFocusWithin ? 0 : -1}
             className="btn btn-ghost btn-xs btn-square text-base-content/50 hover:text-base-content"
             aria-label="Question actions"
           >
             <MoreVertical className="h-4 w-4" />
           </button>
           <ul
-            tabIndex={0}
+            tabIndex={hasFocusWithin ? 0 : -1}
             className="dropdown-content z-20 menu p-1 shadow-lg bg-base-100 rounded-lg border border-base-300 w-44"
           >
             {onReviewRequest && (

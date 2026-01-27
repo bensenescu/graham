@@ -177,6 +177,8 @@ export function ResizablePanelLayout({
           role="separator"
           aria-orientation="vertical"
           aria-label="Resize panel"
+          tabIndex={isPanelOpen ? 0 : -1}
+          aria-hidden={!isPanelOpen}
         >
           {/* Visual grip indicator */}
           <div className="h-full w-full flex items-center justify-center">
@@ -199,6 +201,9 @@ export function ResizablePanelLayout({
           style={{
             width: isPanelOpen ? `calc(${panelWidthPercent}% - 4px)` : "0px",
           }}
+          // Remove from tab order and accessibility tree when closed
+          inert={!isPanelOpen ? true : undefined}
+          aria-hidden={!isPanelOpen}
         >
           {/* Side panel header when no main header - stays fixed at top of panel */}
           {sidePanelHeader && !mainHeader && isPanelOpen && (
