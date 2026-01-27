@@ -1,7 +1,8 @@
 import { Link, useLocation } from "@tanstack/react-router";
+import { useMemo } from "react";
 import { FileText, Plus, ChevronRight, Keyboard } from "lucide-react";
 import { useLiveQuery } from "@tanstack/react-db";
-import { pageCollection } from "@/client/tanstack-db";
+import { pageCollection, sharedPageCollection } from "@/client/tanstack-db";
 
 interface SidebarNavProps {
   onNavigate?: () => void;
@@ -20,19 +21,34 @@ export function SidebarNav({
   const location = useLocation();
   const currentPath = location.pathname;
 
-  // Get recent pages (sorted by updatedAt desc, limited to 10)
-  const { data: recentPages } = useLiveQuery((q) =>
-    q
-      .from({ page: pageCollection })
-      .orderBy(({ page }) => page.updatedAt, "desc")
-      .limit(10),
-  );
-
-  // Get total page count to show "See all" link
-  const { data: allPages } = useLiveQuery((q) =>
+  // Get all owned pages
+  const { data: ownedPages } = useLiveQuery((q) =>
     q.from({ page: pageCollection }),
   );
-  const totalPageCount = allPages?.length ?? 0;
+
+  // Get all shared pages
+  const { data: sharedPages } = useLiveQuery((q) =>
+    q.from({ page: sharedPageCollection }),
+  );
+
+  // Combine and sort by updatedAt, take top 10
+  const recentPages = useMemo(() => {
+    const owned = (ownedPages ?? []).map((p) => ({ ...p, isShared: false }));
+    const shared = (sharedPages ?? []).map((p) => ({ ...p, isShared: true }));
+    const combined = [...owned, ...shared];
+
+    // Sort by updatedAt descending
+    combined.sort((a, b) => {
+      const dateA = new Date(a.updatedAt).getTime();
+      const dateB = new Date(b.updatedAt).getTime();
+      return dateB - dateA;
+    });
+
+    return combined.slice(0, 10);
+  }, [ownedPages, sharedPages]);
+
+  // Get total page count to show "See all" link
+  const totalPageCount = (ownedPages?.length ?? 0) + (sharedPages?.length ?? 0);
 
   // Extract page ID from URL if on a page
   const pageMatch = currentPath.match(/^\/page\/([^/]+)/);

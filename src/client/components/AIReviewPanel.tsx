@@ -13,7 +13,9 @@ import {
 import type { PageBlock } from "@/types/schemas/pages";
 import { usePageReviewSettings } from "@/client/hooks/usePageReviewSettings";
 import { useOverallReview } from "@/client/hooks/useOverallReview";
+import { usePageSharing } from "@/client/hooks/usePageSharing";
 import { SHORTCUT_CLOSE_PANEL_HOTKEY } from "@/client/lib/keyboard-shortcuts";
+import { ShareSettings } from "./ShareSettings";
 
 /**
  * Auto-resizing textarea that matches Q&A answer styling
@@ -85,6 +87,7 @@ function ConfigureTab({
     updateModel,
     updatePrompt,
   } = usePageReviewSettings(pageId);
+  const { isOwner } = usePageSharing(pageId);
   const [isEditingDefaultPrompt, setIsEditingDefaultPrompt] = useState(false);
   const [editedDefaultPromptText, setEditedDefaultPromptText] = useState("");
 
@@ -172,16 +175,23 @@ function ConfigureTab({
         )}
       </div>
 
-      {/* Delete Page */}
+      {/* Sharing - only visible to page owner */}
       <div className="pt-4 border-t border-base-300">
-        <button
-          onClick={onDeletePage}
-          className="btn btn-ghost btn-sm gap-2 text-base-content/60 hover:text-error"
-        >
-          <Trash2 className="h-4 w-4" />
-          Delete Page
-        </button>
+        <ShareSettings pageId={pageId} />
       </div>
+
+      {/* Delete Page - only visible to page owner */}
+      {isOwner && (
+        <div className="pt-4 border-t border-base-300">
+          <button
+            onClick={onDeletePage}
+            className="btn btn-ghost btn-sm gap-2 text-base-content/60 hover:text-error"
+          >
+            <Trash2 className="h-4 w-4" />
+            Delete Page
+          </button>
+        </div>
+      )}
     </div>
   );
 }
