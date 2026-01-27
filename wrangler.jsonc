@@ -27,4 +27,22 @@
       "migrations_dir": "drizzle",
     },
   ],
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "PAGE_BLOCK_DO",
+        "class_name": "PageBlockDO",
+      },
+      {
+        "name": "PAGE_META_DO",
+        "class_name": "PageMetaDO",
+      },
+    ],
+  },
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_classes": ["PageBlockDO", "PageMetaDO"],
+    },
+  ],
 }

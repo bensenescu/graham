@@ -3,6 +3,9 @@ import { useLiveQuery, eq } from "@tanstack/react-db";
 import { useCallback, useMemo, useRef, useState } from "react";
 import { pageCollection, pageBlockCollection } from "@/client/tanstack-db";
 import { QADocumentEditor } from "@/client/components/QADocumentEditor";
+import { CollaborativeQADocumentEditor } from "@/client/components/CollaborativeQADocumentEditor";
+import { PageCollaborationProvider } from "@/client/components/PageCollaborationProvider";
+import { ConnectionStatusBanner } from "@/client/components/ConnectionStatusBanner";
 import { ResizablePanelLayout } from "@/client/components/ResizablePanelLayout";
 import { FloatingControls } from "@/client/components/FloatingControls";
 import {
@@ -12,7 +15,9 @@ import {
 } from "@/client/components/AIReviewPanel";
 import { useAIReview } from "@/client/hooks/useAIReview";
 import { usePageReviewSettings } from "@/client/hooks/usePageReviewSettings";
+import { useCollaborationUser } from "@/client/hooks/useCollaborationUser";
 import type { PageBlock } from "@/types/schemas/pages";
+import type { ConnectionState } from "@/client/hooks/useYjsWebSocket";
 
 export const Route = createFileRoute("/page/$pageId")({
   component: PageEditor,
@@ -24,6 +29,12 @@ function PageEditor() {
   const { pageId } = Route.useParams();
   const navigate = useNavigate();
   const titleDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Collaboration state
+  const { userInfo, isLoading: isLoadingUser } = useCollaborationUser();
+  const [collaborationEnabled, setCollaborationEnabled] = useState(true);
+  const [connectionState, setConnectionState] =
+    useState<ConnectionState>("disconnected");
 
   // Panel state
   const [isPanelOpen, setIsPanelOpen] = useState(false);
@@ -147,7 +158,7 @@ function PageEditor() {
     setIsPanelOpen(true);
   }, []);
 
-  if (isLoadingPages || isLoadingBlocks) {
+  if (isLoadingPages || isLoadingBlocks || isLoadingUser) {
     return (
       <div className="h-full flex items-center justify-center">
         <span className="loading loading-spinner loading-md"></span>
@@ -196,8 +207,62 @@ function PageEditor() {
     />
   );
 
+  // Render the editor - use collaborative version if enabled
+  const renderEditor = () => {
+    if (collaborationEnabled) {
+      return (
+        <PageCollaborationProvider
+          pageId={pageId}
+          userInfo={userInfo}
+          enabled={collaborationEnabled}
+        >
+          <CollaborativeQADocumentEditor
+            pageId={pageId}
+            blocks={sortedBlocks}
+            reviews={reviews}
+            loadingBlockIds={loadingBlockIds}
+            showInlineReviews={showInlineReviews}
+            onBlockCreate={handleBlockCreate}
+            onBlockUpdate={handleBlockUpdate}
+            onBlockDelete={handleBlockDelete}
+            onReviewRequest={reviewBlock}
+          />
+        </PageCollaborationProvider>
+      );
+    }
+
+    // Fallback to non-collaborative editor
+    return (
+      <QADocumentEditor
+        pageId={pageId}
+        pageTitle={page.title}
+        blocks={sortedBlocks}
+        reviews={reviews}
+        loadingBlockIds={loadingBlockIds}
+        showInlineReviews={showInlineReviews}
+        onBlockCreate={handleBlockCreate}
+        onBlockUpdate={handleBlockUpdate}
+        onBlockDelete={handleBlockDelete}
+        onReviewRequest={reviewBlock}
+        onTitleChange={handleTitleChange}
+      />
+    );
+  };
+
   return (
     <div className="h-full bg-base-200">
+      {/* Connection status banner for collaborative mode */}
+      {collaborationEnabled && (
+        <ConnectionStatusBanner
+          connectionState={connectionState}
+          onReconnect={() => {
+            // Toggle collaboration off and on to force reconnect
+            setCollaborationEnabled(false);
+            setTimeout(() => setCollaborationEnabled(true), 100);
+          }}
+        />
+      )}
+
       <ResizablePanelLayout
         isPanelOpen={isPanelOpen}
         onPanelOpen={handlePanelOpen}
@@ -206,19 +271,7 @@ function PageEditor() {
         sidePanel={sidePanel}
         storageKey="page-review-panel-width"
       >
-        <QADocumentEditor
-          pageId={pageId}
-          pageTitle={page.title}
-          blocks={sortedBlocks}
-          reviews={reviews}
-          loadingBlockIds={loadingBlockIds}
-          showInlineReviews={showInlineReviews}
-          onBlockCreate={handleBlockCreate}
-          onBlockUpdate={handleBlockUpdate}
-          onBlockDelete={handleBlockDelete}
-          onReviewRequest={reviewBlock}
-          onTitleChange={handleTitleChange}
-        />
+        {renderEditor()}
       </ResizablePanelLayout>
 
       {/* Floating controls */}
