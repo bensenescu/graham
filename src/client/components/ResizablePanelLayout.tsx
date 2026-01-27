@@ -203,7 +203,6 @@ export function ResizablePanelLayout({
           }}
           // Remove from tab order and accessibility tree when closed
           inert={!isPanelOpen ? true : undefined}
-          aria-hidden={!isPanelOpen}
         >
           {/* Side panel header when no main header - stays fixed at top of panel */}
           {sidePanelHeader && !mainHeader && isPanelOpen && (

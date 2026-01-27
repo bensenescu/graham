@@ -269,7 +269,6 @@ export function QADocumentEditor({
                     onQuestionChange={handleQuestionChange}
                     onAnswerChange={handleAnswerChange}
                     onDelete={handleDelete}
-                    onAddAfter={handleAddAfter}
                     onReviewRequest={onReviewRequest}
                     onFocus={onBlockFocus}
                     isOnly={sortedBlocks.length === 1}

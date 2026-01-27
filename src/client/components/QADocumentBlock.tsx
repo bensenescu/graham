@@ -123,30 +123,6 @@ export function QADocumentBlock({
     opacity: isDragging ? 0.5 : 1,
   };
 
-  const handleQuestionKeyDown = useCallback(
-    (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-      if (e.nativeEvent.isComposing) return;
-      if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
-        e.preventDefault();
-        e.stopPropagation();
-        onAddAfter?.(block.id);
-      }
-    },
-    [block.id, onAddAfter],
-  );
-
-  const handleAnswerKeyDown = useCallback(
-    (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-      if (e.nativeEvent.isComposing) return;
-      if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
-        e.preventDefault();
-        e.stopPropagation();
-        onAddAfter?.(block.id);
-      }
-    },
-    [block.id, onAddAfter],
-  );
-
   const handleFocus = useCallback(() => {
     onFocus?.(block.id);
   }, [block.id, onFocus]);
@@ -209,7 +185,6 @@ export function QADocumentBlock({
               value={localQuestion}
               onChange={setLocalQuestion}
               onBlur={handleQuestionBlur}
-              onKeyDown={handleQuestionKeyDown}
               onFocus={handleFocus}
               inputRef={questionInputRef}
               placeholder="What question are you exploring?"
@@ -223,7 +198,6 @@ export function QADocumentBlock({
               value={localAnswer}
               onChange={setLocalAnswer}
               onBlur={handleAnswerBlur}
-              onKeyDown={handleAnswerKeyDown}
               onFocus={handleFocus}
               placeholder="Write your answer here..."
               className="text-base text-base-content/80 placeholder:text-base-content/40 leading-relaxed"
