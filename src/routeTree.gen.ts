@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as NewRouteImport } from './routes/new'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as PagePageIdRouteImport } from './routes/page.$pageId'
+import { Route as ApiTranscribeRouteImport } from './routes/api/transcribe'
 import { Route as ApiReviewRouteImport } from './routes/api/review'
 import { Route as ApiOverallReviewRouteImport } from './routes/api/overall-review'
 
@@ -30,6 +31,11 @@ const PagePageIdRoute = PagePageIdRouteImport.update({
   path: '/page/$pageId',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiTranscribeRoute = ApiTranscribeRouteImport.update({
+  id: '/api/transcribe',
+  path: '/api/transcribe',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiReviewRoute = ApiReviewRouteImport.update({
   id: '/api/review',
   path: '/api/review',
@@ -46,6 +52,7 @@ export interface FileRoutesByFullPath {
   '/new': typeof NewRoute
   '/api/overall-review': typeof ApiOverallReviewRoute
   '/api/review': typeof ApiReviewRoute
+  '/api/transcribe': typeof ApiTranscribeRoute
   '/page/$pageId': typeof PagePageIdRoute
 }
 export interface FileRoutesByTo {
@@ -53,6 +60,7 @@ export interface FileRoutesByTo {
   '/new': typeof NewRoute
   '/api/overall-review': typeof ApiOverallReviewRoute
   '/api/review': typeof ApiReviewRoute
+  '/api/transcribe': typeof ApiTranscribeRoute
   '/page/$pageId': typeof PagePageIdRoute
 }
 export interface FileRoutesById {
@@ -61,6 +69,7 @@ export interface FileRoutesById {
   '/new': typeof NewRoute
   '/api/overall-review': typeof ApiOverallReviewRoute
   '/api/review': typeof ApiReviewRoute
+  '/api/transcribe': typeof ApiTranscribeRoute
   '/page/$pageId': typeof PagePageIdRoute
 }
 export interface FileRouteTypes {
@@ -70,15 +79,23 @@ export interface FileRouteTypes {
     | '/new'
     | '/api/overall-review'
     | '/api/review'
+    | '/api/transcribe'
     | '/page/$pageId'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/new' | '/api/overall-review' | '/api/review' | '/page/$pageId'
+  to:
+    | '/'
+    | '/new'
+    | '/api/overall-review'
+    | '/api/review'
+    | '/api/transcribe'
+    | '/page/$pageId'
   id:
     | '__root__'
     | '/'
     | '/new'
     | '/api/overall-review'
     | '/api/review'
+    | '/api/transcribe'
     | '/page/$pageId'
   fileRoutesById: FileRoutesById
 }
@@ -87,6 +104,7 @@ export interface RootRouteChildren {
   NewRoute: typeof NewRoute
   ApiOverallReviewRoute: typeof ApiOverallReviewRoute
   ApiReviewRoute: typeof ApiReviewRoute
+  ApiTranscribeRoute: typeof ApiTranscribeRoute
   PagePageIdRoute: typeof PagePageIdRoute
 }
 
@@ -113,6 +131,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PagePageIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/transcribe': {
+      id: '/api/transcribe'
+      path: '/api/transcribe'
+      fullPath: '/api/transcribe'
+      preLoaderRoute: typeof ApiTranscribeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/review': {
       id: '/api/review'
       path: '/api/review'
@@ -135,6 +160,7 @@ const rootRouteChildren: RootRouteChildren = {
   NewRoute: NewRoute,
   ApiOverallReviewRoute: ApiOverallReviewRoute,
   ApiReviewRoute: ApiReviewRoute,
+  ApiTranscribeRoute: ApiTranscribeRoute,
   PagePageIdRoute: PagePageIdRoute,
 }
 export const routeTree = rootRouteImport
