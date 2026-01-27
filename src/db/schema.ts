@@ -331,6 +331,33 @@ export const practiceAnswerRatings = sqliteTable(
   ],
 );
 
+// === Page Sharing ===
+
+// Page Shares table (collaborators who have access to a page)
+export const pageShares = sqliteTable(
+  "page_shares",
+  {
+    id: text("id").primaryKey(),
+    pageId: text("page_id")
+      .notNull()
+      .references(() => pages.id, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    sharedBy: text("shared_by")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    createdAt: text("created_at")
+      .notNull()
+      .default(sql`(current_timestamp)`),
+  },
+  (table) => [
+    index("page_shares_page_id_idx").on(table.pageId),
+    index("page_shares_user_id_idx").on(table.userId),
+    uniqueIndex("page_shares_page_user_idx").on(table.pageId, table.userId),
+  ],
+);
+
 // === Relations ===
 
 export const usersRelations = relations(users, ({ many }) => ({
@@ -500,6 +527,23 @@ export const practiceAnswerRatingsRelations = relations(
   }),
 );
 
+// === Page Sharing Relations ===
+
+export const pageSharesRelations = relations(pageShares, ({ one }) => ({
+  page: one(pages, {
+    fields: [pageShares.pageId],
+    references: [pages.id],
+  }),
+  user: one(users, {
+    fields: [pageShares.userId],
+    references: [users.id],
+  }),
+  sharedByUser: one(users, {
+    fields: [pageShares.sharedBy],
+    references: [users.id],
+  }),
+}));
+
 // === Type Exports ===
 
 export type User = typeof users.$inferSelect;
@@ -551,3 +595,7 @@ export type NewPracticeAnswer = typeof practiceAnswers.$inferInsert;
 
 export type PracticeAnswerRating = typeof practiceAnswerRatings.$inferSelect;
 export type NewPracticeAnswerRating = typeof practiceAnswerRatings.$inferInsert;
+
+// Page Sharing Types
+export type PageShare = typeof pageShares.$inferSelect;
+export type NewPageShare = typeof pageShares.$inferInsert;

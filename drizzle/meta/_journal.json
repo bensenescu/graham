@@ -71,6 +71,13 @@
       "when": 1769544847509,
       "tag": "0009_glossy_ikaris",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "6",
+      "when": 1769548312010,
+      "tag": "0010_even_enchantress",
+      "breakpoints": true
     }
   ]
 }

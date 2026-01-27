@@ -7,3 +7,4 @@ export { pageReviewSettingsCollection } from "./pageReviewSettingsCollection";
 export { pageOverallReviewSettingsCollection } from "./pageOverallReviewSettingsCollection";
 export { blockReviewCollection } from "./blockReviewCollection";
 export { pageOverallReviewCollection } from "./pageOverallReviewCollection";
+export { sharedPageCollection } from "./sharedPageCollection";
