@@ -23,7 +23,6 @@ import { generateSortKeyBetween } from "@/client/lib/fractional-indexing";
 import { useKeyboardNavigation } from "@/client/hooks/useKeyboardNavigation";
 import {
   getBlockItemId,
-  PAGE_TITLE_CONTAINER_ID,
   ADD_QUESTION_BUTTON_ID,
 } from "@/client/lib/element-ids";
 import {
@@ -225,29 +224,23 @@ export function CollaborativeQADocumentEditor({
     [addBlockCollab, pageId, onBlockCreate],
   );
 
-  // Keyboard navigation
+  // Keyboard navigation for blocks (include add button at the end)
   const navItemIds = useMemo(
-    () => [
-      PAGE_TITLE_CONTAINER_ID,
-      ...sortedBlocks.map((block) => block.id),
-      ADD_QUESTION_BUTTON_ID,
-    ],
+    () => [...sortedBlocks.map((block) => block.id), ADD_QUESTION_BUTTON_ID],
     [sortedBlocks],
   );
 
+  // Get element ID - handles both blocks and the add button
   const getNavElementId = useCallback((id: string) => {
-    if (id === PAGE_TITLE_CONTAINER_ID) return PAGE_TITLE_CONTAINER_ID;
-    if (id === ADD_QUESTION_BUTTON_ID) return ADD_QUESTION_BUTTON_ID;
+    if (id === ADD_QUESTION_BUTTON_ID) {
+      return ADD_QUESTION_BUTTON_ID;
+    }
     return getBlockItemId(id);
   }, []);
 
   const handleKeyboardAdd = useCallback(
     (afterId: string | null) => {
-      if (
-        afterId &&
-        afterId !== ADD_QUESTION_BUTTON_ID &&
-        afterId !== PAGE_TITLE_CONTAINER_ID
-      ) {
+      if (afterId && afterId !== ADD_QUESTION_BUTTON_ID) {
         handleAddAfter(afterId);
       } else {
         handleAddBlock();
@@ -256,10 +249,10 @@ export function CollaborativeQADocumentEditor({
     [handleAddAfter, handleAddBlock],
   );
 
+  // Handle keyboard delete (only if not the only block, and not the add button)
   const handleKeyboardDelete = useCallback(
     (id: string) => {
-      if (id === ADD_QUESTION_BUTTON_ID || id === PAGE_TITLE_CONTAINER_ID)
-        return;
+      if (id === ADD_QUESTION_BUTTON_ID) return;
       if (sortedBlocks.length > 1) {
         handleDelete(id);
       }
@@ -267,14 +260,9 @@ export function CollaborativeQADocumentEditor({
     [sortedBlocks.length, handleDelete],
   );
 
+  // Handle keyboard edit (focus the question textarea)
   const handleKeyboardEdit = useCallback((id: string) => {
     if (id === ADD_QUESTION_BUTTON_ID) return;
-    if (id === PAGE_TITLE_CONTAINER_ID) {
-      const titleContainer = document.getElementById(PAGE_TITLE_CONTAINER_ID);
-      const input = titleContainer?.querySelector("input");
-      input?.focus();
-      return;
-    }
     const blockElement = document.getElementById(getBlockItemId(id));
     const questionTextarea = blockElement?.querySelector("textarea");
     questionTextarea?.focus();
@@ -325,36 +313,18 @@ export function CollaborativeQADocumentEditor({
   );
 
   return (
-    <div ref={containerRef} className="pt-14 pb-6 px-6 min-h-screen">
+    <div ref={containerRef} className="pt-6 pb-6 px-6 min-h-screen">
       <div className="max-w-3xl mx-auto bg-base-100 rounded-lg px-4 py-2 border border-base-300 min-h-[calc(100vh-6rem)]">
-        {/* Header with presence and connection status */}
-        <div className="flex items-center justify-between py-2 border-b border-base-200 mb-2">
-          <PagePresenceIndicator users={users} compact />
-          <ConnectionIndicator
-            connectionState={connectionState}
-            onClick={reconnect}
-          />
-        </div>
-
-        {/* Page title - collaborative */}
-        <div
-          id={PAGE_TITLE_CONTAINER_ID}
-          tabIndex={0}
-          className="outline-none rounded-lg focus:bg-primary/5 focus:-mx-4 focus:px-4"
-          onKeyDown={(e) => {
-            if (e.key === "Escape" && e.target !== e.currentTarget) {
-              e.preventDefault();
-              e.currentTarget.focus();
-            }
-            if (e.key === "Enter" && e.target === e.currentTarget) {
-              e.preventDefault();
-              const input = e.currentTarget.querySelector("input");
-              input?.focus();
-            }
-          }}
-        >
-          <CollaborativeTitle collaboration={collaboration} />
-        </div>
+        {/* Page title - editable */}
+        <input
+          type="text"
+          value={localTitle}
+          onChange={handleTitleChange}
+          onBlur={handleTitleBlur}
+          placeholder="Untitled"
+          style={{ fontSize: "1.5rem", lineHeight: "2rem" }}
+          className="w-full font-bold text-base-content bg-transparent border-none outline-none pt-4 pb-2 placeholder:text-base-content/40"
+        />
 
         {sortedBlocks.length === 0 ? (
           <div className="py-8">

@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Eye, EyeOff, Sparkles, Settings2, FileText } from "lucide-react";
+import { Eye, EyeOff, Sparkles, Settings2, FileText, Mic } from "lucide-react";
 
 interface FloatingControlsProps {
   /** Whether inline AI reviews are visible */
@@ -20,6 +20,8 @@ interface FloatingControlsProps {
   onOpenPanel: () => void;
   /** Open the panel to the Overall tab */
   onOpenOverallTab: () => void;
+  /** Open practice mode */
+  onOpenPracticeMode: () => void;
 }
 
 /**
@@ -36,6 +38,7 @@ export function FloatingControls({
   isPanelOpen,
   onOpenPanel,
   onOpenOverallTab,
+  onOpenPracticeMode,
 }: FloatingControlsProps) {
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   // Track visibility state with delay for entrance animation
@@ -116,6 +119,16 @@ export function FloatingControls({
           >
             <FileText className="h-4 w-4" />
             <span className="text-xs">Overall Review</span>
+          </button>
+
+          {/* Practice Mode button */}
+          <button
+            onClick={onOpenPracticeMode}
+            disabled={!hasBlocks}
+            className="btn btn-sm btn-ghost justify-start gap-2 text-left"
+          >
+            <Mic className="h-4 w-4 text-secondary" />
+            <span className="text-xs">Practice Mode</span>
           </button>
 
           {/* Review All / Re-review All button */}

@@ -8,7 +8,7 @@ import type {
 } from "@/types/schemas/pages";
 
 /**
- * Get all blocks for all the user's pages.
+ * Get all blocks for all the user's accessible pages (owned + shared).
  */
 async function getAll(userId: string) {
   const blocks = await PageBlockRepository.findAllByUserId(userId);
@@ -17,11 +17,11 @@ async function getAll(userId: string) {
 
 /**
  * Get all blocks for a page.
- * Validates page ownership before returning blocks.
+ * Validates page access (owner or collaborator) before returning blocks.
  */
 async function getAllByPageId(userId: string, pageId: string) {
-  // Verify user owns the page
-  const page = await PageRepository.findByIdAndUserId(pageId, userId);
+  // Verify user has access to the page
+  const { page } = await PageRepository.findByIdWithAccess(pageId, userId);
   if (!page) {
     throw new Error("Page not found");
   }
@@ -32,11 +32,11 @@ async function getAllByPageId(userId: string, pageId: string) {
 
 /**
  * Create a page block.
- * Validates page ownership before creating.
+ * Validates page access (owner or collaborator) before creating.
  */
 async function create(userId: string, data: CreatePageBlockInput) {
-  // Verify user owns the page
-  const page = await PageRepository.findByIdAndUserId(data.pageId, userId);
+  // Verify user has access to the page
+  const { page } = await PageRepository.findByIdWithAccess(data.pageId, userId);
   if (!page) {
     throw new Error("Page not found");
   }
@@ -50,7 +50,7 @@ async function create(userId: string, data: CreatePageBlockInput) {
   });
 
   // Update page's updatedAt
-  await PageRepository.update(data.pageId, userId, {});
+  await PageRepository.updateWithAccess(data.pageId, userId, {});
 
   return { success: true };
 }
@@ -60,8 +60,8 @@ async function create(userId: string, data: CreatePageBlockInput) {
  * Used when creating a page from a template.
  */
 async function batchCreate(userId: string, data: BatchCreatePageBlocksInput) {
-  // Verify user owns the page
-  const page = await PageRepository.findByIdAndUserId(data.pageId, userId);
+  // Verify user has access to the page
+  const { page } = await PageRepository.findByIdWithAccess(data.pageId, userId);
   if (!page) {
     throw new Error("Page not found");
   }
@@ -77,14 +77,14 @@ async function batchCreate(userId: string, data: BatchCreatePageBlocksInput) {
   await PageBlockRepository.batchCreate(blocksToCreate);
 
   // Update page's updatedAt
-  await PageRepository.update(data.pageId, userId, {});
+  await PageRepository.updateWithAccess(data.pageId, userId, {});
 
   return { success: true };
 }
 
 /**
  * Update a page block.
- * Validates block exists and user owns the parent page.
+ * Validates block exists and user has access to the parent page (owner or collaborator).
  */
 async function update(userId: string, data: UpdatePageBlockInput) {
   const block = await PageBlockRepository.findById(data.id);
@@ -92,8 +92,11 @@ async function update(userId: string, data: UpdatePageBlockInput) {
     throw new Error("Block not found");
   }
 
-  // Verify user owns the page
-  const page = await PageRepository.findByIdAndUserId(block.pageId, userId);
+  // Verify user has access to the page
+  const { page } = await PageRepository.findByIdWithAccess(
+    block.pageId,
+    userId,
+  );
   if (!page) {
     throw new Error("Page not found");
   }
@@ -105,14 +108,14 @@ async function update(userId: string, data: UpdatePageBlockInput) {
   });
 
   // Update page's updatedAt
-  await PageRepository.update(block.pageId, userId, {});
+  await PageRepository.updateWithAccess(block.pageId, userId, {});
 
   return { success: true };
 }
 
 /**
  * Delete a page block.
- * Validates block exists and user owns the parent page.
+ * Validates block exists and user has access to the parent page (owner or collaborator).
  */
 async function deleteBlock(userId: string, data: DeletePageBlockInput) {
   const block = await PageBlockRepository.findById(data.id);
@@ -120,8 +123,11 @@ async function deleteBlock(userId: string, data: DeletePageBlockInput) {
     throw new Error("Block not found");
   }
 
-  // Verify user owns the page
-  const page = await PageRepository.findByIdAndUserId(block.pageId, userId);
+  // Verify user has access to the page
+  const { page } = await PageRepository.findByIdWithAccess(
+    block.pageId,
+    userId,
+  );
   if (!page) {
     throw new Error("Page not found");
   }
@@ -129,7 +135,7 @@ async function deleteBlock(userId: string, data: DeletePageBlockInput) {
   await PageBlockRepository.delete(data.id);
 
   // Update page's updatedAt
-  await PageRepository.update(block.pageId, userId, {});
+  await PageRepository.updateWithAccess(block.pageId, userId, {});
 
   return { success: true };
 }
