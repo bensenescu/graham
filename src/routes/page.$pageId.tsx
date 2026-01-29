@@ -2,7 +2,8 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useLiveQuery, eq } from "@tanstack/react-db";
 import { useCallback, useMemo, useRef, useState } from "react";
 import { pageCollection, pageBlockCollection } from "@/client/tanstack-db";
-import { QADocumentEditor } from "@/client/components/QADocumentEditor";
+import { CollaborativeQADocumentEditor } from "@/client/components/CollaborativeQADocumentEditor";
+import { PageCollaborationProvider } from "@/client/components/PageCollaborationProvider";
 import { ResizablePanelLayout } from "@/client/components/ResizablePanelLayout";
 import { FloatingControls } from "@/client/components/FloatingControls";
 import {
@@ -13,6 +14,7 @@ import {
 import { PracticeModeModal } from "@/client/components/PracticeMode";
 import { useAIReview } from "@/client/hooks/useAIReview";
 import { usePageReviewSettings } from "@/client/hooks/usePageReviewSettings";
+import { useCollaborationUser } from "@/client/hooks/useCollaborationUser";
 import type { PageBlock } from "@/types/schemas/pages";
 
 export const Route = createFileRoute("/page/$pageId")({
@@ -24,7 +26,9 @@ export const Route = createFileRoute("/page/$pageId")({
 function PageEditor() {
   const { pageId } = Route.useParams();
   const navigate = useNavigate();
-  const titleDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Collaboration user info
+  const { userInfo, isLoading: isLoadingUser } = useCollaborationUser();
 
   // Panel state
   const [isPanelOpen, setIsPanelOpen] = useState(false);
@@ -84,22 +88,6 @@ function PageEditor() {
       customInstructions,
     });
 
-  const handleTitleChange = useCallback(
-    (title: string) => {
-      // Debounce the title update
-      if (titleDebounceRef.current) {
-        clearTimeout(titleDebounceRef.current);
-      }
-      titleDebounceRef.current = setTimeout(() => {
-        pageCollection.update(pageId, (draft) => {
-          draft.title = title;
-          draft.updatedAt = new Date().toISOString();
-        });
-      }, 500);
-    },
-    [pageId],
-  );
-
   const handleBlockCreate = useCallback((block: PageBlock) => {
     pageBlockCollection.insert({
       id: block.id,
@@ -133,7 +121,7 @@ function PageEditor() {
     navigate({ to: "/" });
   }, [pageId, navigate]);
 
-  // Panel handlers - must be before early returns to maintain consistent hook order
+  // Panel handlers
   const handlePanelOpen = useCallback(() => {
     setIsPanelOpen(true);
   }, []);
@@ -186,54 +174,47 @@ function PageEditor() {
     );
   }
 
-  // Side panel header
-  const sidePanelHeader = (
-    <BlockReviewPanelHeader
-      activeTab={activeTab}
-      onTabChange={handleTabChange}
-      onClose={handlePanelClose}
-    />
-  );
-
-  // Side panel content
-  const sidePanel = (
-    <BlockReviewPanel
-      pageId={pageId}
-      blocks={sortedBlocks}
-      activeTab={activeTab}
-      onTabChange={handleTabChange}
-      onClose={handlePanelClose}
-      onDeletePage={handleDelete}
-      externalHeader
-    />
-  );
-
   return (
     <div className="h-full bg-base-200">
       <ResizablePanelLayout
         isPanelOpen={isPanelOpen}
         onPanelOpen={handlePanelOpen}
         onPanelClose={handlePanelClose}
-        sidePanelHeader={sidePanelHeader}
-        sidePanel={sidePanel}
+        sidePanelHeader={
+          <BlockReviewPanelHeader
+            activeTab={activeTab}
+            onTabChange={handleTabChange}
+            onClose={handlePanelClose}
+          />
+        }
+        sidePanel={
+          <BlockReviewPanel
+            pageId={pageId}
+            blocks={sortedBlocks}
+            activeTab={activeTab}
+            onTabChange={handleTabChange}
+            onClose={handlePanelClose}
+            onDeletePage={handleDelete}
+            externalHeader
+          />
+        }
         storageKey="page-review-panel-width"
       >
-        <QADocumentEditor
-          pageId={pageId}
-          pageTitle={page.title}
-          blocks={sortedBlocks}
-          reviews={reviews}
-          loadingBlockIds={loadingBlockIds}
-          showInlineReviews={showInlineReviews}
-          onBlockCreate={handleBlockCreate}
-          onBlockUpdate={handleBlockUpdate}
-          onBlockDelete={handleBlockDelete}
-          onReviewRequest={reviewBlock}
-          onTitleChange={handleTitleChange}
-        />
+        <PageCollaborationProvider pageId={pageId} userInfo={userInfo}>
+          <CollaborativeQADocumentEditor
+            pageId={pageId}
+            blocks={sortedBlocks}
+            reviews={reviews}
+            loadingBlockIds={loadingBlockIds}
+            showInlineReviews={showInlineReviews}
+            onBlockCreate={handleBlockCreate}
+            onBlockUpdate={handleBlockUpdate}
+            onBlockDelete={handleBlockDelete}
+            onReviewRequest={reviewBlock}
+          />
+        </PageCollaborationProvider>
       </ResizablePanelLayout>
 
-      {/* Floating controls */}
       <FloatingControls
         showInlineReviews={showInlineReviews}
         onToggleInlineReviews={handleToggleInlineReviews}

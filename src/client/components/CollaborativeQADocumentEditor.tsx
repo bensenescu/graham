@@ -16,47 +16,104 @@ import {
   sortableKeyboardCoordinates,
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
-import { QADocumentBlock } from "./QADocumentBlock";
+import { CollaborativeQADocumentBlock } from "./CollaborativeQADocumentBlock";
 import type { PageBlock } from "@/types/schemas/pages";
 import type { BlockReview } from "@/types/schemas/reviews";
-import {
-  generateDefaultSortKey,
-  generateSortKeyBetween,
-} from "@/client/lib/fractional-indexing";
+import { generateSortKeyBetween } from "@/client/lib/fractional-indexing";
 import { useKeyboardNavigation } from "@/client/hooks/useKeyboardNavigation";
 import {
   getBlockItemId,
   ADD_QUESTION_BUTTON_ID,
 } from "@/client/lib/element-ids";
+import {
+  usePageCollaborationContext,
+  type PageCollaborationContextValue,
+} from "./PageCollaborationProvider";
+import { PagePresenceIndicator } from "./PagePresenceIndicator";
+import { ConnectionIndicator } from "./ConnectionStatusBanner";
 
-interface QADocumentEditorProps {
+interface CollaborativeQADocumentEditorProps {
   pageId: string;
-  pageTitle?: string;
   blocks: PageBlock[];
   reviews?: Map<string, BlockReview>;
-  /** Set of block IDs currently being reviewed */
   loadingBlockIds?: Set<string>;
   activeBlockId?: string | null;
-  /** Whether to show inline AI reviews */
   showInlineReviews?: boolean;
   onBlockCreate: (block: PageBlock) => void;
   onBlockUpdate: (id: string, updates: Partial<PageBlock>) => void;
   onBlockDelete: (id: string) => void;
   onBlockFocus?: (id: string) => void;
   onReviewRequest?: (id: string) => void;
-  onTitleChange?: (title: string) => void;
 }
 
 /**
- * Document-style Q&A editor with clean, minimal design.
- * Supports AI review integration with bi-directional sync.
- *
- * Note: This component does NOT have its own scroll container.
- * The parent component (ResizablePanelLayout) handles scrolling.
+ * Collaborative auto-resizing title input that syncs with Yjs Y.Text
  */
-export function QADocumentEditor({
+function CollaborativeTitle({
+  collaboration,
+  onTitleChange,
+}: {
+  collaboration: PageCollaborationContextValue;
+  onTitleChange?: (title: string) => void;
+}) {
+  const { titleText, connectionState } = collaboration;
+  const [value, setValue] = useState(titleText.toString());
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  // Subscribe to Y.Text changes
+  useEffect(() => {
+    const observer = () => {
+      const newValue = titleText.toString();
+      setValue(newValue);
+      onTitleChange?.(newValue);
+    };
+
+    titleText.observe(observer);
+    return () => titleText.unobserve(observer);
+  }, [titleText, onTitleChange]);
+
+  // Handle local changes
+  const handleChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const newValue = e.target.value;
+      const oldValue = titleText.toString();
+
+      if (newValue !== oldValue) {
+        titleText.delete(0, oldValue.length);
+        titleText.insert(0, newValue);
+      }
+    },
+    [titleText],
+  );
+
+  // Show connection state in border
+  const borderClass =
+    connectionState === "connected"
+      ? ""
+      : connectionState === "connecting"
+        ? "border-b-2 border-blue-300"
+        : "border-b-2 border-yellow-400";
+
+  return (
+    <input
+      ref={inputRef}
+      type="text"
+      value={value}
+      onChange={handleChange}
+      placeholder="Untitled"
+      style={{ fontSize: "1.5rem", lineHeight: "2rem" }}
+      className={`w-full font-bold text-base-content bg-transparent border-none outline-none pt-4 pb-2 placeholder:text-base-content/40 ${borderClass}`}
+    />
+  );
+}
+
+/**
+ * Collaborative Document-style Q&A editor
+ *
+ * Uses the PageCollaborationProvider context for real-time collaboration.
+ */
+export function CollaborativeQADocumentEditor({
   pageId,
-  pageTitle,
   blocks,
   reviews,
   loadingBlockIds,
@@ -67,52 +124,45 @@ export function QADocumentEditor({
   onBlockDelete,
   onBlockFocus,
   onReviewRequest,
-  onTitleChange,
-}: QADocumentEditorProps) {
-  // Local state for editing
-  const [localBlocks, setLocalBlocks] = useState<PageBlock[]>(blocks);
-  const [localTitle, setLocalTitle] = useState(pageTitle || "");
+}: CollaborativeQADocumentEditorProps) {
+  // Get collaboration context
+  const collaboration = usePageCollaborationContext();
+  const {
+    userInfo,
+    blockOrder,
+    connectionState,
+    users,
+    addBlock: addBlockCollab,
+    removeBlock: removeBlockCollab,
+    reorderBlock: reorderBlockCollab,
+    updatePresence,
+    reconnect,
+  } = collaboration;
+
   const [focusBlockId, setFocusBlockId] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const sensors = useDraggableSensors();
 
-  // Sync local state when blocks change from parent
-  useEffect(() => {
-    const localJson = JSON.stringify(localBlocks);
-    const blocksJson = JSON.stringify(blocks);
-    if (localJson !== blocksJson) {
-      setLocalBlocks(blocks);
-    }
-  }, [blocks]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Sync local title when pageTitle changes from parent
-  useEffect(() => {
-    if (pageTitle !== undefined && pageTitle !== localTitle) {
-      setLocalTitle(pageTitle);
-    }
-  }, [pageTitle]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Handle title change - only update local state while typing
-  const handleTitleChange = useCallback(
-    (e: React.ChangeEvent<HTMLInputElement>) => {
-      setLocalTitle(e.target.value);
-    },
-    [],
-  );
-
-  // Save title on blur
-  const handleTitleBlur = useCallback(() => {
-    if (localTitle !== pageTitle) {
-      onTitleChange?.(localTitle);
-    }
-  }, [localTitle, pageTitle, onTitleChange]);
-
-  // Sort blocks by sortKey
+  // Merge D1 blocks with collaborative block order
+  // Use the collaborative block order if available, otherwise fall back to D1 blocks
   const sortedBlocks = useMemo(() => {
-    return [...localBlocks].sort((a, b) =>
+    if (blockOrder.length > 0) {
+      // Map collaborative block order to actual block data
+      return blockOrder
+        .map((item) => blocks.find((b) => b.id === item.id))
+        .filter((b): b is PageBlock => b !== undefined);
+    }
+
+    // Fallback to D1 block ordering
+    return [...blocks].sort((a, b) =>
       b.sortKey > a.sortKey ? 1 : b.sortKey < a.sortKey ? -1 : 0,
     );
-  }, [localBlocks]);
+  }, [blocks, blockOrder]);
+
+  // Update presence when active block changes
+  useEffect(() => {
+    updatePresence(activeBlockId || null);
+  }, [activeBlockId, updatePresence]);
 
   // Direct update to parent (called on blur from block component)
   const handleQuestionChange = useCallback(
@@ -131,63 +181,47 @@ export function QADocumentEditor({
 
   const handleDelete = useCallback(
     (id: string) => {
-      setLocalBlocks((prev) => prev.filter((block) => block.id !== id));
+      // Remove from collaborative state
+      removeBlockCollab(id);
+      // Also remove from D1
       onBlockDelete(id);
     },
-    [onBlockDelete],
+    [removeBlockCollab, onBlockDelete],
   );
 
   const handleAddBlock = useCallback(() => {
-    const sorted = [...localBlocks].sort((a, b) =>
-      b.sortKey > a.sortKey ? 1 : b.sortKey < a.sortKey ? -1 : 0,
-    );
-    const lowestSortKey = sorted[sorted.length - 1]?.sortKey;
-    const newSortKey = lowestSortKey
-      ? "!" + lowestSortKey
-      : generateDefaultSortKey();
+    // Add via collaborative state
+    const { id: newBlockId, sortKey } = addBlockCollab();
 
     const newBlock: PageBlock = {
-      id: crypto.randomUUID(),
+      id: newBlockId,
       pageId,
       question: "",
       answer: "",
-      sortKey: newSortKey,
+      sortKey,
     };
 
-    setLocalBlocks((prev) => [...prev, newBlock]);
     setFocusBlockId(newBlock.id);
     onBlockCreate(newBlock);
-  }, [localBlocks, pageId, onBlockCreate]);
+  }, [addBlockCollab, pageId, onBlockCreate]);
 
   const handleAddAfter = useCallback(
     (afterId: string) => {
-      const sorted = [...localBlocks].sort((a, b) =>
-        b.sortKey > a.sortKey ? 1 : b.sortKey < a.sortKey ? -1 : 0,
-      );
-      const blockIndex = sorted.findIndex((b) => b.id === afterId);
-      if (blockIndex === -1) return;
-
-      const afterBlock = sorted[blockIndex];
-      const belowBlock = sorted[blockIndex + 1];
-
-      const newSortKey = generateSortKeyBetween(
-        belowBlock?.sortKey,
-        afterBlock.sortKey,
-      );
+      // Add via collaborative state
+      const { id: newBlockId, sortKey } = addBlockCollab(afterId);
 
       const newBlock: PageBlock = {
-        id: crypto.randomUUID(),
+        id: newBlockId,
         pageId,
         question: "",
         answer: "",
-        sortKey: newSortKey,
+        sortKey,
       };
 
-      setLocalBlocks((prev) => [...prev, newBlock]);
       setFocusBlockId(newBlock.id);
       onBlockCreate(newBlock);
     },
-    [localBlocks, pageId, onBlockCreate],
+    [addBlockCollab, pageId, onBlockCreate],
   );
 
   // Keyboard navigation for blocks (include add button at the end)
@@ -204,7 +238,6 @@ export function QADocumentEditor({
     return getBlockItemId(id);
   }, []);
 
-  // Handle keyboard add (after current block, or at end if none focused)
   const handleKeyboardAdd = useCallback(
     (afterId: string | null) => {
       if (afterId && afterId !== ADD_QUESTION_BUTTON_ID) {
@@ -250,17 +283,21 @@ export function QADocumentEditor({
 
       if (!over || active.id === over.id) return;
 
-      const sorted = [...localBlocks].sort((a, b) =>
-        b.sortKey > a.sortKey ? 1 : b.sortKey < a.sortKey ? -1 : 0,
+      const draggedIndex = sortedBlocks.findIndex(
+        (block) => block.id === active.id,
       );
-
-      const draggedIndex = sorted.findIndex((block) => block.id === active.id);
-      const targetIndex = sorted.findIndex((block) => block.id === over.id);
+      const targetIndex = sortedBlocks.findIndex(
+        (block) => block.id === over.id,
+      );
 
       if (draggedIndex === -1 || targetIndex === -1) return;
 
+      // Use collaborative reorder
+      reorderBlockCollab(active.id as string, targetIndex);
+
+      // Also update D1 sort key
       const { beforeBlock, afterBlock } = calculateNewPosition(
-        sorted,
+        sortedBlocks,
         draggedIndex,
         targetIndex,
       );
@@ -270,14 +307,9 @@ export function QADocumentEditor({
         beforeBlock?.sortKey,
       );
 
-      setLocalBlocks((prev) =>
-        prev.map((block) =>
-          block.id === active.id ? { ...block, sortKey: newSortKey } : block,
-        ),
-      );
       onBlockUpdate(active.id as string, { sortKey: newSortKey });
     },
-    [localBlocks, onBlockUpdate],
+    [sortedBlocks, reorderBlockCollab, onBlockUpdate],
   );
 
   return (
@@ -318,7 +350,7 @@ export function QADocumentEditor({
             >
               <div>
                 {sortedBlocks.map((block) => (
-                  <QADocumentBlock
+                  <CollaborativeQADocumentBlock
                     key={block.id}
                     block={block}
                     review={reviews?.get(block.id)}
@@ -333,6 +365,8 @@ export function QADocumentEditor({
                     isOnly={sortedBlocks.length === 1}
                     autoFocusQuestion={block.id === focusBlockId}
                     onAutoFocusDone={() => setFocusBlockId(null)}
+                    userInfo={userInfo}
+                    collaborationEnabled={connectionState === "connected"}
                   />
                 ))}
               </div>
