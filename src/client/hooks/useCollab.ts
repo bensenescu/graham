@@ -1,17 +1,17 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import * as Y from "yjs";
 import { WebsocketProvider } from "y-websocket";
-import { useCurrentUser } from "@every-app/sdk/tanstack";
-import { getSessionToken } from "@every-app/sdk/core";
 import {
   collabManager,
-  type UserInfo,
   type ConnectionState,
   type CollabConnection,
 } from "@/client/lib/PageCollabManager";
+import { useSessionReadyToken, type UserInfo } from "./useSessionReadyToken";
+import { useCollabAwareness } from "./useCollabAwareness";
 
 // Re-export types for consumers
-export type { UserInfo, ConnectionState } from "@/client/lib/PageCollabManager";
+export type { UserInfo } from "./useSessionReadyToken";
+export type { ConnectionState } from "@/client/lib/PageCollabManager";
 
 export interface UseCollabOptions {
   /** Base URL for WebSocket connection */
@@ -20,7 +20,7 @@ export interface UseCollabOptions {
   roomName: string;
   /** Whether collaboration is enabled */
   enabled?: boolean;
-  /** Session token for authentication */
+  /** Session token for authentication (optional override) */
   sessionToken?: string | null;
 }
 
@@ -32,28 +32,6 @@ export interface UseCollabReturn {
   hasSyncedOnce: boolean;
   reconnect: () => void;
   userInfo: UserInfo;
-}
-
-const CURSOR_COLORS = [
-  "#E57373",
-  "#64B5F6",
-  "#81C784",
-  "#FFD54F",
-  "#BA68C8",
-  "#4DD0E1",
-  "#FF8A65",
-  "#A1887F",
-  "#90A4AE",
-  "#F06292",
-];
-
-function generateUserColor(userId: string): string {
-  let hash = 0;
-  for (let i = 0; i < userId.length; i++) {
-    hash = (hash << 5) - hash + userId.charCodeAt(i);
-    hash = hash & hash;
-  }
-  return CURSOR_COLORS[Math.abs(hash) % CURSOR_COLORS.length];
 }
 
 /**
@@ -74,26 +52,13 @@ export function useCollab({
     useState<ConnectionState>("disconnected");
   const [isSynced, setIsSynced] = useState(false);
   const [hasSyncedOnce, setHasSyncedOnce] = useState(false);
-  const [resolvedToken, setResolvedToken] = useState<string | null>(
-    sessionToken ?? null,
-  );
 
-  // Get user info from current session
-  const currentUser = useCurrentUser();
-  const sessionReady = !!currentUser?.userId;
-  const userInfo = useMemo((): UserInfo => {
-    const userId = currentUser?.userId ?? "anonymous";
-    const userName = currentUser?.email ?? "Anonymous";
-    console.debug("[useCollab] userInfo computed", {
-      userId,
-      userName,
-      hasCurrentUser: !!currentUser,
-      sessionReady,
-    });
-    return { userId, userName, userColor: generateUserColor(userId) };
-  }, [currentUser?.userId, currentUser?.email]);
+  // Centralized session/token/userInfo logic
+  const { sessionReady, token, userInfo } = useSessionReadyToken({
+    sessionToken,
+  });
 
-  // Store userInfo in a ref so we can update awareness without recreating connection
+  // Store userInfo in a ref for use in callbacks
   const userInfoRef = useRef(userInfo);
   userInfoRef.current = userInfo;
 
@@ -129,9 +94,7 @@ export function useCollab({
         const p = collabManager.getProvider(roomName, url);
         if (p) {
           setProvider(p);
-          // Update connection state based on provider status
           setConnectionState(p.wsconnected ? "connected" : "connecting");
-          // Check if already synced
           if (p.synced) {
             setIsSynced(true);
           }
@@ -140,22 +103,7 @@ export function useCollab({
       url,
     );
 
-    // Clear awareness on beforeunload to remove stale cursors
-    const handleBeforeUnload = () => {
-      const p = collabManager.getProvider(roomName, url);
-      if (p) {
-        p.awareness.setLocalState(null);
-      }
-    };
-    window.addEventListener("beforeunload", handleBeforeUnload);
-
     return () => {
-      window.removeEventListener("beforeunload", handleBeforeUnload);
-      // Clear awareness before releasing connection
-      const p = collabManager.getProvider(roomName, url);
-      if (p) {
-        p.awareness.setLocalState(null);
-      }
       unsubProviderReady();
       collabManager.releaseConnection(roomName, url);
       setConnection(null);
@@ -163,94 +111,24 @@ export function useCollab({
       setIsSynced(false);
       setHasSyncedOnce(false);
     };
-  }, [url, roomName, enabled]); // Don't include userInfo - we use ref to avoid recreation
+  }, [url, roomName, enabled]);
 
+  // Connect provider when session is ready and token is available
   useEffect(() => {
-    if (sessionToken !== undefined) {
-      setResolvedToken(sessionToken ?? null);
-      return;
-    }
-
-    let isActive = true;
-
-    if (!sessionReady) {
-      setResolvedToken(null);
-      return () => {
-        isActive = false;
-      };
-    }
-
-    getSessionToken().then((token) => {
-      if (!isActive) return;
-      setResolvedToken(token ?? null);
-    });
-
-    return () => {
-      isActive = false;
-    };
-  }, [sessionReady, sessionToken]);
-
-  useEffect(() => {
-    // Only connect when we have both a token AND valid user info (not Anonymous)
-    if (!enabled || !resolvedToken || !sessionReady) return;
-
-    console.debug("[useCollab] connectWithToken", {
-      roomName,
-      hasToken: !!resolvedToken,
-      sessionReady,
-      userInfo: userInfoRef.current,
-    });
+    if (!enabled || !token || !sessionReady) return;
 
     const nextProvider = collabManager.connectWithToken({
       url,
       roomName,
-      token: resolvedToken,
+      token,
       userInfo: userInfoRef.current,
     });
 
     if (nextProvider) {
       setProvider(nextProvider);
       setConnectionState(nextProvider.wsconnected ? "connected" : "connecting");
-      console.debug("[useCollab] provider created", {
-        roomName,
-        wsconnected: nextProvider.wsconnected,
-        awarenessLocalState: nextProvider.awareness.getLocalState(),
-      });
     }
-  }, [enabled, resolvedToken, sessionReady, url, roomName]);
-
-  // Update awareness when userInfo changes (without recreating connection)
-  // Only set awareness when session is ready (not Anonymous)
-  useEffect(() => {
-    if (!provider) return;
-
-    if (!sessionReady) {
-      // Don't set Anonymous awareness - clear it instead
-      console.debug(
-        "[useCollab] skipping awareness update (session not ready)",
-        {
-          roomName,
-          userId: userInfo.userId,
-        },
-      );
-      return;
-    }
-
-    console.debug("[useCollab] updating awareness", {
-      roomName,
-      userName: userInfo.userName,
-      userId: userInfo.userId,
-    });
-    provider.awareness.setLocalStateField("user", {
-      name: userInfo.userName,
-      color: userInfo.userColor,
-      userId: userInfo.userId,
-    });
-    console.debug("[useCollab] awareness updated", {
-      roomName,
-      localState: provider.awareness.getLocalState(),
-    });
-  }, [provider, userInfo, roomName, sessionReady]);
+  }, [enabled, token, sessionReady, url, roomName]);
 
   // Subscribe to state changes from manager
   useEffect(() => {
@@ -276,7 +154,6 @@ export function useCollab({
     };
 
     provider.on("sync", handleSync);
-    // Check initial state
     if (provider.synced) {
       setIsSynced(true);
       setHasSyncedOnce(true);
@@ -287,77 +164,27 @@ export function useCollab({
     };
   }, [provider]);
 
-  // Store sessionReady in a ref so we can check it in event handlers
-  const sessionReadyRef = useRef(sessionReady);
-  sessionReadyRef.current = sessionReady;
-
-  // Re-apply awareness on reconnect (provider status change) and visibility change
-  useEffect(() => {
-    if (!provider) return;
-
-    const applyAwareness = () => {
-      const currentUserInfo = userInfoRef.current;
-
-      // Don't apply Anonymous awareness
-      if (!sessionReadyRef.current || currentUserInfo.userId === "anonymous") {
-        console.debug(
-          "[useCollab] skipping re-apply awareness (session not ready)",
-          {
-            roomName,
-            userId: currentUserInfo.userId,
-          },
-        );
-        return;
-      }
-
-      console.debug("[useCollab] re-applying awareness", {
-        roomName,
-        userName: currentUserInfo.userName,
-        userId: currentUserInfo.userId,
-      });
-      provider.awareness.setLocalStateField("user", {
-        name: currentUserInfo.userName,
-        color: currentUserInfo.userColor,
-        userId: currentUserInfo.userId,
-      });
-    };
-
-    // Re-apply awareness when provider reconnects
-    const handleStatus = ({ status }: { status: string }) => {
-      if (status === "connected") {
-        applyAwareness();
-      }
-    };
-
-    // Re-apply awareness when tab becomes visible
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === "visible" && provider.wsconnected) {
-        applyAwareness();
-      }
-    };
-
-    provider.on("status", handleStatus);
-    document.addEventListener("visibilitychange", handleVisibilityChange);
-
-    return () => {
-      provider.off("status", handleStatus);
-      document.removeEventListener("visibilitychange", handleVisibilityChange);
-    };
-  }, [provider, roomName]);
+  // Centralized awareness management
+  useCollabAwareness({
+    provider,
+    userInfo,
+    sessionReady,
+    roomName,
+  });
 
   const reconnect = useCallback(() => {
-    if (!resolvedToken) return;
+    if (!token) return;
     const nextProvider = collabManager.connectWithToken({
       url,
       roomName,
-      token: resolvedToken,
+      token,
       userInfo: userInfoRef.current,
     });
     if (nextProvider) {
       setProvider(nextProvider);
       setConnectionState(nextProvider.wsconnected ? "connected" : "connecting");
     }
-  }, [url, roomName, resolvedToken]);
+  }, [url, roomName, token]);
 
   return useMemo(
     () => ({
@@ -367,7 +194,7 @@ export function useCollab({
       isSynced,
       hasSyncedOnce,
       reconnect,
-      userInfo, // Always use current userInfo, not stale connection.userInfo
+      userInfo,
     }),
     [
       connection,

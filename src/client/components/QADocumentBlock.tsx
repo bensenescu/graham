@@ -177,6 +177,7 @@ export function QADocumentBlock({
               <CollabTextEditor
                 fragment={collab.getBlockQuestionFragment(block.id)!}
                 provider={collab.provider}
+                userId={collab.userInfo.userId}
                 userName={collab.userInfo.userName}
                 userColor={collab.userInfo.userColor}
                 placeholder="What question are you exploring?"
@@ -198,6 +199,7 @@ export function QADocumentBlock({
               <CollabTextEditor
                 fragment={collab.getBlockAnswerFragment(block.id)!}
                 provider={collab.provider}
+                userId={collab.userInfo.userId}
                 userName={collab.userInfo.userName}
                 userColor={collab.userInfo.userColor}
                 placeholder="Write your answer here..."

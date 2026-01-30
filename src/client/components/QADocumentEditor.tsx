@@ -385,6 +385,7 @@ export function QADocumentEditor({
                   <CollabTextEditor
                     fragment={getTitleFragment()!}
                     provider={provider}
+                    userId={userInfo.userId}
                     userName={userInfo.userName}
                     userColor={userInfo.userColor}
                     placeholder="Untitled"

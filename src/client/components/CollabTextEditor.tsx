@@ -12,6 +12,8 @@ export interface CollabTextEditorProps {
   fragment: Y.XmlFragment;
   /** WebSocket provider for awareness (cursor positions) */
   provider: WebsocketProvider;
+  /** Current user's ID for filtering own cursor */
+  userId: string;
   /** Current user's name for cursor label */
   userName: string;
   /** Current user's color for cursor */
@@ -39,6 +41,7 @@ export interface CollabTextEditorProps {
 export function CollabTextEditor({
   fragment,
   provider,
+  userId,
   userName,
   userColor,
   placeholder = "",
@@ -120,10 +123,11 @@ export function CollabTextEditor({
         user: {
           name: userName,
           color: userColor,
+          userId: userId,
         },
         render: (user) => {
-          // Don't render cursor for our own user
-          if (user.name === userName) {
+          // Don't render cursor for our own user (filter by userId for reliability)
+          if (user.userId === userId) {
             return document.createElement("span"); // Empty element
           }
 
@@ -140,8 +144,8 @@ export function CollabTextEditor({
           return cursor;
         },
         selectionRender: (user) => {
-          // Don't render selection for our own user
-          if (user.name === userName) {
+          // Don't render selection for our own user (filter by userId for reliability)
+          if (user.userId === userId) {
             return {};
           }
           return {
@@ -150,7 +154,15 @@ export function CollabTextEditor({
         },
       }),
     ];
-  }, [fragment, provider, userName, userColor, placeholder, singleLine]);
+  }, [
+    fragment,
+    provider,
+    userId,
+    userName,
+    userColor,
+    placeholder,
+    singleLine,
+  ]);
 
   const editor = useEditor({
     extensions,

@@ -1,17 +1,17 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import * as Y from "yjs";
 import { WebsocketProvider } from "y-websocket";
-import { useCurrentUser } from "@every-app/sdk/tanstack";
-import { getSessionToken } from "@every-app/sdk/core";
 import {
   collabManager,
-  type UserInfo,
   type ConnectionState,
   type CollabConnection,
 } from "@/client/lib/PageCollabManager";
+import { useSessionReadyToken, type UserInfo } from "./useSessionReadyToken";
+import { useCollabAwareness } from "./useCollabAwareness";
 
 // Re-export types for consumers
-export type { UserInfo, ConnectionState } from "@/client/lib/PageCollabManager";
+export type { UserInfo } from "./useSessionReadyToken";
+export type { ConnectionState } from "@/client/lib/PageCollabManager";
 
 export interface UsePageCollabOptions {
   pageId: string;
@@ -37,28 +37,6 @@ export interface UsePageCollabReturn {
   getBlockAnswerFragment: (blockId: string) => Y.XmlFragment | null;
 }
 
-const CURSOR_COLORS = [
-  "#E57373",
-  "#64B5F6",
-  "#81C784",
-  "#FFD54F",
-  "#BA68C8",
-  "#4DD0E1",
-  "#FF8A65",
-  "#A1887F",
-  "#90A4AE",
-  "#F06292",
-];
-
-function generateUserColor(userId: string): string {
-  let hash = 0;
-  for (let i = 0; i < userId.length; i++) {
-    hash = (hash << 5) - hash + userId.charCodeAt(i);
-    hash = hash & hash;
-  }
-  return CURSOR_COLORS[Math.abs(hash) % CURSOR_COLORS.length];
-}
-
 /**
  * Hook for collaborative page editing using Yjs.
  *
@@ -82,20 +60,13 @@ export function usePageCollab({
     useState<ConnectionState>("disconnected");
   const [isSynced, setIsSynced] = useState(false);
   const [hasSyncedOnce, setHasSyncedOnce] = useState(false);
-  const [resolvedToken, setResolvedToken] = useState<string | null>(
-    sessionToken ?? null,
-  );
 
-  // Get user info from current session
-  const currentUser = useCurrentUser();
-  const sessionReady = !!currentUser?.userId;
-  const userInfo = useMemo((): UserInfo => {
-    const userId = currentUser?.userId ?? "anonymous";
-    const userName = currentUser?.email ?? "Anonymous";
-    return { userId, userName, userColor: generateUserColor(userId) };
-  }, [currentUser?.userId, currentUser?.email]);
+  // Centralized session/token/userInfo logic
+  const { sessionReady, token, userInfo } = useSessionReadyToken({
+    sessionToken,
+  });
 
-  // Store userInfo in a ref so we can update awareness without recreating connection
+  // Store userInfo in a ref for use in callbacks
   const userInfoRef = useRef(userInfo);
   userInfoRef.current = userInfo;
 
@@ -111,11 +82,6 @@ export function usePageCollab({
       userInfo: userInfoRef.current,
     });
 
-    console.debug("[usePageCollab] connection created", {
-      pageId,
-      hasProvider: !!conn.provider,
-    });
-
     setConnection(conn);
     setConnectionState("disconnected");
 
@@ -126,11 +92,6 @@ export function usePageCollab({
         conn.provider.wsconnected ? "connected" : "connecting",
       );
       setIsSynced(conn.provider.synced);
-      console.debug("[usePageCollab] provider already available", {
-        pageId,
-        wsconnected: conn.provider.wsconnected,
-        synced: conn.provider.synced,
-      });
     }
 
     // Subscribe to provider ready event
@@ -138,17 +99,10 @@ export function usePageCollab({
       const p = collabManager.getProvider(pageId);
       if (p) {
         setProvider(p);
-        // Update connection state based on provider status
         setConnectionState(p.wsconnected ? "connected" : "connecting");
-        // Check if already synced
         if (p.synced) {
           setIsSynced(true);
         }
-        console.debug("[usePageCollab] provider ready", {
-          pageId,
-          wsconnected: p.wsconnected,
-          synced: p.synced,
-        });
       }
     });
 
@@ -159,87 +113,30 @@ export function usePageCollab({
       setProvider(null);
       setIsSynced(false);
       setHasSyncedOnce(false);
-      console.debug("[usePageCollab] cleanup", { pageId });
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pageId, enabled]); // Don't include isSessionReady - session refresh shouldn't recreate connection
+  }, [pageId, enabled]);
 
+  // Connect provider when session is ready and token is available
   useEffect(() => {
-    if (sessionToken !== undefined) {
-      setResolvedToken(sessionToken ?? null);
-      return;
-    }
-
-    let isActive = true;
-
-    if (!sessionReady) {
-      setResolvedToken(null);
-      return () => {
-        isActive = false;
-      };
-    }
-
-    getSessionToken().then((token) => {
-      if (!isActive) return;
-      setResolvedToken(token ?? null);
-    });
-
-    return () => {
-      isActive = false;
-    };
-  }, [sessionReady, sessionToken]);
-
-  useEffect(() => {
-    // Only connect when we have both a token AND valid user info (not Anonymous)
-    if (!enabled || !resolvedToken || !sessionReady) return;
-
-    console.debug("[usePageCollab] connectWithToken", {
-      pageId,
-      hasToken: !!resolvedToken,
-      sessionReady,
-      userInfo: userInfoRef.current,
-    });
+    if (!enabled || !token || !sessionReady) return;
 
     const nextProvider = collabManager.connectWithToken({
       roomName: pageId,
-      token: resolvedToken,
+      token,
       userInfo: userInfoRef.current,
     });
 
     if (nextProvider) {
       setProvider(nextProvider);
       setConnectionState(nextProvider.wsconnected ? "connected" : "connecting");
-      console.debug("[usePageCollab] provider created", {
-        pageId,
-        wsconnected: nextProvider.wsconnected,
-        awarenessLocalState: nextProvider.awareness.getLocalState(),
-      });
     }
-  }, [enabled, resolvedToken, sessionReady, pageId]);
-
-  // Update awareness when userInfo changes (without recreating connection)
-  useEffect(() => {
-    if (provider) {
-      provider.awareness.setLocalStateField("user", {
-        name: userInfo.userName,
-        color: userInfo.userColor,
-        userId: userInfo.userId,
-      });
-      console.debug("[usePageCollab] awareness updated", {
-        pageId,
-        userId: userInfo.userId,
-      });
-    }
-  }, [provider, userInfo]);
+  }, [enabled, token, sessionReady, pageId]);
 
   // Subscribe to state changes from manager
   useEffect(() => {
     if (!connection) return;
 
-    const unsubscribe = collabManager.onStateChange(pageId, (state) => {
-      setConnectionState(state);
-      console.debug("[usePageCollab] connection state", { pageId, state });
-    });
+    const unsubscribe = collabManager.onStateChange(pageId, setConnectionState);
     return unsubscribe;
   }, [pageId, connection]);
 
@@ -252,15 +149,12 @@ export function usePageCollab({
       if (synced) {
         setHasSyncedOnce(true);
       }
-      console.debug("[usePageCollab] sync state", { pageId, synced });
     };
 
     provider.on("sync", handleSync);
-    // Check initial state
     if (provider.synced) {
       setIsSynced(true);
       setHasSyncedOnce(true);
-      console.debug("[usePageCollab] initial sync true", { pageId });
     }
 
     return () => {
@@ -268,59 +162,26 @@ export function usePageCollab({
     };
   }, [provider]);
 
-  // Re-apply awareness on reconnect (provider status change) and visibility change
-  useEffect(() => {
-    if (!provider) return;
-
-    const applyAwareness = () => {
-      const currentUserInfo = userInfoRef.current;
-      console.debug("[usePageCollab] re-applying awareness", {
-        pageId,
-        userName: currentUserInfo.userName,
-        userId: currentUserInfo.userId,
-      });
-      provider.awareness.setLocalStateField("user", {
-        name: currentUserInfo.userName,
-        color: currentUserInfo.userColor,
-        userId: currentUserInfo.userId,
-      });
-    };
-
-    // Re-apply awareness when provider reconnects
-    const handleStatus = ({ status }: { status: string }) => {
-      if (status === "connected") {
-        applyAwareness();
-      }
-    };
-
-    // Re-apply awareness when tab becomes visible
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === "visible" && provider.wsconnected) {
-        applyAwareness();
-      }
-    };
-
-    provider.on("status", handleStatus);
-    document.addEventListener("visibilitychange", handleVisibilityChange);
-
-    return () => {
-      provider.off("status", handleStatus);
-      document.removeEventListener("visibilitychange", handleVisibilityChange);
-    };
-  }, [provider, pageId]);
+  // Centralized awareness management
+  useCollabAwareness({
+    provider,
+    userInfo,
+    sessionReady,
+    roomName: pageId,
+  });
 
   const reconnect = useCallback(() => {
-    if (!resolvedToken) return;
+    if (!token) return;
     const nextProvider = collabManager.connectWithToken({
       roomName: pageId,
-      token: resolvedToken,
+      token,
       userInfo: userInfoRef.current,
     });
     if (nextProvider) {
       setProvider(nextProvider);
       setConnectionState(nextProvider.wsconnected ? "connected" : "connecting");
     }
-  }, [pageId, resolvedToken]);
+  }, [pageId, token]);
 
   const getFragment = useCallback(
     (name: string): Y.XmlFragment | null => {

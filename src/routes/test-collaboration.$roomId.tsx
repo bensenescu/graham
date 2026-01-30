@@ -167,6 +167,7 @@ function CollabEditor({
         user: {
           name: userName,
           color: userColor,
+          userId: userId,
         },
         render: (user) => {
           // Don't render cursor for our own user
