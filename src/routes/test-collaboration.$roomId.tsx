@@ -20,7 +20,6 @@ function TestCollaborationPage() {
   const { doc, provider, connectionState, isSynced, reconnect } = useSimpleCollab({
     roomId,
     userInfo,
-    enabled: true,
   });
 
   const connectionLabel = useMemo(() => {

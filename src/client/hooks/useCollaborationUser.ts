@@ -1,4 +1,5 @@
-import { useMemo, useEffect, useState } from "react";
+import { useMemo } from "react";
+import { useCurrentUser } from "@every-app/sdk/tanstack";
 import type { UserInfo } from "./useYjsWebSocket";
 
 /**
@@ -30,85 +31,30 @@ function generateUserColor(userId: string): string {
   return CURSOR_COLORS[Math.abs(hash) % CURSOR_COLORS.length];
 }
 
-/**
- * Get or generate a unique client ID for this browser session
- */
-function getClientId(): string {
-  const STORAGE_KEY = "collab-client-id";
-
-  if (typeof window === "undefined") {
-    return crypto.randomUUID();
-  }
-
-  let clientId = localStorage.getItem(STORAGE_KEY);
-  if (!clientId) {
-    clientId = crypto.randomUUID();
-    localStorage.setItem(STORAGE_KEY, clientId);
-  }
-  return clientId;
-}
-
-/**
- * Get or set the user's display name for collaboration
- */
-function getDisplayName(): string {
-  const STORAGE_KEY = "collab-display-name";
-
-  if (typeof window === "undefined") {
-    return "Anonymous";
-  }
-
-  let name = localStorage.getItem(STORAGE_KEY);
-  if (!name) {
-    // Generate a random name as fallback
-    name = `User ${Math.floor(Math.random() * 1000)}`;
-    localStorage.setItem(STORAGE_KEY, name);
-  }
-  return name;
-}
-
 export interface UseCollaborationUserReturn {
   userInfo: UserInfo;
   isLoading: boolean;
-  setDisplayName: (name: string) => void;
 }
 
 /**
- * Hook to get user information for collaborative editing
- *
- * In a production app, this would fetch user info from the auth system.
- * For now, it uses localStorage to persist a client ID and display name.
+ * Hook to get user information for collaborative editing.
+ * Uses the authenticated user's email and ID.
  */
 export function useCollaborationUser(): UseCollaborationUserReturn {
-  const [isLoading, setIsLoading] = useState(true);
-  const [displayName, setDisplayNameState] = useState("Anonymous");
-
-  useEffect(() => {
-    // Initialize from localStorage on mount
-    setDisplayNameState(getDisplayName());
-    setIsLoading(false);
-  }, []);
-
-  const setDisplayName = (name: string) => {
-    if (typeof window !== "undefined") {
-      localStorage.setItem("collab-display-name", name);
-    }
-    setDisplayNameState(name);
-  };
+  const currentUser = useCurrentUser();
 
   const userInfo = useMemo((): UserInfo => {
-    const userId = getClientId();
-    const userName = displayName;
+    const userId = currentUser?.userId ?? "anonymous";
+    const userName = currentUser?.email ?? "Anonymous";
     return {
       userId,
       userName,
       userColor: generateUserColor(userId),
     };
-  }, [displayName]);
+  }, [currentUser?.userId, currentUser?.email]);
 
   return {
     userInfo,
-    isLoading,
-    setDisplayName,
+    isLoading: currentUser === null,
   };
 }

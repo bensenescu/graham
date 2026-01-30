@@ -23,21 +23,19 @@ export interface UseYjsWebSocketOptions {
   roomName?: string;
   userInfo: UserInfo;
   enabled?: boolean;
-  /** Optional external doc - if not provided, one is created internally */
+  /** Optional external Y.Doc - if not provided, one is created internally */
   doc?: Y.Doc;
-  /** Optional external awareness - if not provided, provider's awareness is used */
+  /** Optional external awareness - if provided, user state will be set on it */
   awareness?: awarenessProtocol.Awareness;
 }
 
 export interface UseYjsWebSocketReturn {
   doc: Y.Doc;
   provider: WebsocketProvider | null;
-  awareness: awarenessProtocol.Awareness | null;
   connectionState: ConnectionState;
   /** Whether the initial document sync is complete */
   isSynced: boolean;
   reconnect: () => void;
-  /** Send a JSON message over the WebSocket (for custom messages) */
   sendJsonMessage: (data: Record<string, unknown>) => void;
 }
 
@@ -53,17 +51,12 @@ export function useYjsWebSocket({
     useState<ConnectionState>("disconnected");
   const [isSynced, setIsSynced] = useState(false);
   const [provider, setProvider] = useState<WebsocketProvider | null>(null);
-  const docRef = useRef<Y.Doc | null>(externalDoc ?? null);
+  const docRef = useRef<Y.Doc>(externalDoc ?? new Y.Doc());
   const cleanupRef = useRef<(() => void) | null>(null);
 
   // Wait for session to be ready
   const currentUser = useCurrentUser();
   const isSessionReady = currentUser !== null;
-
-  // Create doc lazily if not provided externally
-  if (!docRef.current) {
-    docRef.current = new Y.Doc();
-  }
 
   const connect = useCallback(async () => {
     if (!enabled || !docRef.current || !isSessionReady) return;
@@ -104,11 +97,8 @@ export function useYjsWebSocket({
       }
     );
 
-    // If external awareness provided, sync it with provider's awareness
-    // Otherwise use provider's awareness directly
+    // Set user awareness (use external awareness if provided)
     const awareness = externalAwareness ?? newProvider.awareness;
-
-    // Set user awareness
     awareness.setLocalStateField("user", {
       name: userInfo.userName,
       color: userInfo.userColor,
@@ -177,7 +167,6 @@ export function useYjsWebSocket({
   return {
     doc: docRef.current,
     provider,
-    awareness: provider?.awareness ?? externalAwareness ?? null,
     connectionState,
     isSynced,
     reconnect,

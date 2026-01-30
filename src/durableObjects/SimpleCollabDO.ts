@@ -93,13 +93,6 @@ export class SimpleCollabDO implements DurableObject {
     }
 
     this.connections.add(ws);
-
-    this.awareness.setLocalStateField("user", {
-      name: userInfo.userName,
-      color: userInfo.userColor,
-      userId: userInfo.userId,
-    });
-
     this.sendInitialSync(ws);
 
     return new Response(null, {
