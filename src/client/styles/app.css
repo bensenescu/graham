@@ -168,3 +168,52 @@ select {
     @apply border-error/60 bg-error/20;
   }
 }
+
+/* Collaborative cursor styles for TipTap */
+.collab-caret {
+  border-left: 2px solid;
+  margin-left: -1px;
+  margin-right: -1px;
+  pointer-events: none;
+  position: relative;
+  word-break: normal;
+}
+
+.collab-caret-label {
+  border-radius: 4px 4px 4px 0;
+  color: #fff;
+  font-family: system-ui, -apple-system, sans-serif;
+  font-size: 11px;
+  font-weight: 500;
+  left: -2px;
+  line-height: 1;
+  padding: 3px 6px;
+  position: absolute;
+  top: -1.5em;
+  user-select: none;
+  white-space: nowrap;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+
+/* TipTap placeholder styling */
+.tiptap p.is-editor-empty:first-child::before {
+  color: var(--color-base-content);
+  opacity: 0.4;
+  content: attr(data-placeholder);
+  float: left;
+  height: 0;
+  pointer-events: none;
+}
+
+/* TipTap editor prose styling */
+.tiptap {
+  outline: none;
+}
+
+.tiptap:focus {
+  outline: none;
+}
+
+.tiptap p {
+  margin: 0;
+}

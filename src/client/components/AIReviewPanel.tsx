@@ -63,8 +63,8 @@ interface BlockReviewPanelProps {
   /** Called when tab changes */
   onTabChange?: (tab: ReviewTab) => void;
   onClose: () => void;
-  /** Called when delete page is requested */
-  onDeletePage: () => void;
+  /** Called when delete page is requested (only available for owners) */
+  onDeletePage?: () => void;
   /** If true, header is rendered externally and not inside the panel */
   externalHeader?: boolean;
 }
@@ -77,7 +77,7 @@ function ConfigureTab({
   onDeletePage,
 }: {
   pageId: string;
-  onDeletePage: () => void;
+  onDeletePage?: () => void;
 }) {
   const {
     settings,
@@ -181,7 +181,7 @@ function ConfigureTab({
       </div>
 
       {/* Delete Page - only visible to page owner */}
-      {isOwner && (
+      {isOwner && onDeletePage && (
         <div className="pt-4 border-t border-base-300">
           <button
             onClick={onDeletePage}

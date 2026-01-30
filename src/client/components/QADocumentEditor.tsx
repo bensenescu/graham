@@ -1,4 +1,12 @@
-import { useCallback, useMemo, useRef, useState, useEffect } from "react";
+import {
+  useCallback,
+  useMemo,
+  useRef,
+  useState,
+  useEffect,
+  createContext,
+  useContext,
+} from "react";
 import { Plus } from "lucide-react";
 import {
   DndContext,
@@ -17,6 +25,7 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { QADocumentBlock } from "./QADocumentBlock";
+import { CollabTextEditor, getFragmentText } from "./CollabTextEditor";
 import type { PageBlock } from "@/types/schemas/pages";
 import type { BlockReview } from "@/types/schemas/reviews";
 import {
@@ -28,6 +37,25 @@ import {
   getBlockItemId,
   ADD_QUESTION_BUTTON_ID,
 } from "@/client/lib/element-ids";
+import {
+  usePageCollab,
+  type UsePageCollabReturn,
+} from "@/client/hooks/usePageCollab";
+
+// Context for passing collab state to child blocks
+export interface PageCollabContextValue {
+  collab: UsePageCollabReturn | null;
+  isCollabReady: boolean;
+}
+
+export const PageCollabContext = createContext<PageCollabContextValue>({
+  collab: null,
+  isCollabReady: false,
+});
+
+export function usePageCollabContext() {
+  return useContext(PageCollabContext);
+}
 
 interface QADocumentEditorProps {
   pageId: string;
@@ -75,6 +103,51 @@ export function QADocumentEditor({
   const [focusBlockId, setFocusBlockId] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const sensors = useDraggableSensors();
+  // Track if we've seeded initial content to Yjs
+  const hasSeededTitleRef = useRef(false);
+
+  // Collaborative editing via Yjs
+  const collab = usePageCollab({ pageId });
+  const { provider, isSynced, connectionState, getTitleFragment, userInfo } =
+    collab;
+
+  // Whether collab is ready for editing
+  const isCollabReady =
+    provider !== null && connectionState === "connected" && isSynced;
+
+  // Reset seeding flag when pageId changes
+  useEffect(() => {
+    hasSeededTitleRef.current = false;
+  }, [pageId]);
+
+  // Seed title fragment from DB when Yjs syncs (if fragment is empty)
+  useEffect(() => {
+    if (!isCollabReady || hasSeededTitleRef.current) return;
+
+    const titleFragment = getTitleFragment();
+    if (titleFragment.length === 0 && pageTitle) {
+      // Fragment is empty but DB has content - seed from DB
+      // Note: CollabTextEditor handles this via initialContent prop
+    }
+    hasSeededTitleRef.current = true;
+  }, [isCollabReady, getTitleFragment, pageTitle]);
+
+  // Sync title from Yjs to DB on blur
+  const handleTitleBlur = useCallback(() => {
+    if (!isCollabReady) {
+      // Fallback: use local state
+      if (localTitle !== pageTitle) {
+        onTitleChange?.(localTitle);
+      }
+      return;
+    }
+
+    const titleFragment = getTitleFragment();
+    const yjsTitle = getFragmentText(titleFragment);
+    if (yjsTitle !== pageTitle) {
+      onTitleChange?.(yjsTitle);
+    }
+  }, [isCollabReady, getTitleFragment, pageTitle, localTitle, onTitleChange]);
 
   // Sync local state when blocks change from parent
   useEffect(() => {
@@ -85,27 +158,20 @@ export function QADocumentEditor({
     }
   }, [blocks]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Sync local title when pageTitle changes from parent
+  // Sync local title when pageTitle changes from parent (non-collab fallback)
   useEffect(() => {
     if (pageTitle !== undefined && pageTitle !== localTitle) {
       setLocalTitle(pageTitle);
     }
   }, [pageTitle]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Handle title change - only update local state while typing
+  // Handle title change - only update local state while typing (fallback mode)
   const handleTitleChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
       setLocalTitle(e.target.value);
     },
     [],
   );
-
-  // Save title on blur
-  const handleTitleBlur = useCallback(() => {
-    if (localTitle !== pageTitle) {
-      onTitleChange?.(localTitle);
-    }
-  }, [localTitle, pageTitle, onTitleChange]);
 
   // Sort blocks by sortKey
   const sortedBlocks = useMemo(() => {
@@ -280,19 +346,45 @@ export function QADocumentEditor({
     [localBlocks, onBlockUpdate],
   );
 
+  // Collab context value for child blocks
+  const collabContextValue = useMemo<PageCollabContextValue>(
+    () => ({
+      collab: isCollabReady ? collab : null,
+      isCollabReady,
+    }),
+    [collab, isCollabReady],
+  );
+
   return (
-    <div ref={containerRef} className="pt-6 pb-6 px-6 min-h-screen">
-      <div className="max-w-3xl mx-auto bg-base-100 rounded-lg px-4 py-2 border border-base-300 min-h-[calc(100vh-6rem)]">
-        {/* Page title - editable */}
-        <input
-          type="text"
-          value={localTitle}
-          onChange={handleTitleChange}
-          onBlur={handleTitleBlur}
-          placeholder="Untitled"
-          style={{ fontSize: "1.5rem", lineHeight: "2rem" }}
-          className="w-full font-bold text-base-content bg-transparent border-none outline-none pt-4 pb-2 placeholder:text-base-content/40"
-        />
+    <PageCollabContext.Provider value={collabContextValue}>
+      <div ref={containerRef} className="pt-6 pb-6 px-6 min-h-screen">
+        <div className="max-w-3xl mx-auto bg-base-100 rounded-lg px-4 py-2 border border-base-300 min-h-[calc(100vh-6rem)]">
+          {/* Page title - collaborative or fallback */}
+          {isCollabReady && provider ? (
+            <div className="pt-4 pb-2">
+              <CollabTextEditor
+                fragment={getTitleFragment()}
+                provider={provider}
+                userName={userInfo.userName}
+                userColor={userInfo.userColor}
+                placeholder="Untitled"
+                className="text-2xl font-bold text-base-content [&_p]:m-0"
+                onBlur={handleTitleBlur}
+                initialContent={pageTitle || ""}
+                singleLine
+              />
+            </div>
+          ) : (
+            <input
+              type="text"
+              value={localTitle}
+              onChange={handleTitleChange}
+              onBlur={handleTitleBlur}
+              placeholder="Untitled"
+              style={{ fontSize: "1.5rem", lineHeight: "2rem" }}
+              className="w-full font-bold text-base-content bg-transparent border-none outline-none pt-4 pb-2 placeholder:text-base-content/40"
+            />
+          )}
 
         {sortedBlocks.length === 0 ? (
           <div className="py-8">
@@ -340,25 +432,26 @@ export function QADocumentEditor({
           </DndContext>
         )}
 
-        {/* Add button at bottom */}
-        {sortedBlocks.length > 0 && (
-          <div className="pb-2">
-            <button
-              id={ADD_QUESTION_BUTTON_ID}
-              tabIndex={0}
-              onClick={handleAddBlock}
-              className="btn btn-ghost btn-sm gap-2 text-base-content/60 hover:text-base-content focus:bg-primary/10 focus:text-base-content"
-            >
-              <Plus className="h-4 w-4" />
-              Add Question
-              <kbd className="ml-1 px-1.5 py-0.5 text-xs font-mono bg-base-300 border border-base-content/20 rounded">
-                a
-              </kbd>
-            </button>
-          </div>
-        )}
+          {/* Add button at bottom */}
+          {sortedBlocks.length > 0 && (
+            <div className="pb-2">
+              <button
+                id={ADD_QUESTION_BUTTON_ID}
+                tabIndex={0}
+                onClick={handleAddBlock}
+                className="btn btn-ghost btn-sm gap-2 text-base-content/60 hover:text-base-content focus:bg-primary/10 focus:text-base-content"
+              >
+                <Plus className="h-4 w-4" />
+                Add Question
+                <kbd className="ml-1 px-1.5 py-0.5 text-xs font-mono bg-base-300 border border-base-content/20 rounded">
+                  a
+                </kbd>
+              </button>
+            </div>
+          )}
+        </div>
       </div>
-    </div>
+    </PageCollabContext.Provider>
   );
 }
 

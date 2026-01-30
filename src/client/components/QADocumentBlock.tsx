@@ -6,6 +6,8 @@ import type { PageBlock } from "@/types/schemas/pages";
 import type { BlockReview } from "@/types/schemas/reviews";
 import { InlineBlockReview } from "./InlineBlockReview";
 import { getBlockItemId } from "@/client/lib/element-ids";
+import { usePageCollabContext } from "./QADocumentEditor";
+import { CollabTextEditor, getFragmentText } from "./CollabTextEditor";
 
 interface QADocumentBlockProps {
   block: PageBlock;
@@ -93,21 +95,28 @@ export function QADocumentBlock({
   autoFocusQuestion = false,
   onAutoFocusDone,
 }: QADocumentBlockProps) {
-  // Local state for editing - only sync to parent on blur
+  // Get collaboration context from parent
+  const { collab, isCollabReady } = usePageCollabContext();
+
+  // Local state for editing - only sync to parent on blur (fallback mode)
   const [localQuestion, setLocalQuestion] = useState(block.question);
   const [localAnswer, setLocalAnswer] = useState(block.answer);
   const questionInputRef = useRef<HTMLTextAreaElement>(null);
   // Track if block has focus within for accessibility (controls should only be tabbable when block is focused)
   const [hasFocusWithin, setHasFocusWithin] = useState(false);
 
-  // Sync local state when block changes from parent (e.g., from sync)
+  // Sync local state when block changes from parent (e.g., from sync) - fallback mode only
   useEffect(() => {
-    setLocalQuestion(block.question);
-  }, [block.question]);
+    if (!isCollabReady) {
+      setLocalQuestion(block.question);
+    }
+  }, [block.question, isCollabReady]);
 
   useEffect(() => {
-    setLocalAnswer(block.answer);
-  }, [block.answer]);
+    if (!isCollabReady) {
+      setLocalAnswer(block.answer);
+    }
+  }, [block.answer, isCollabReady]);
 
   const {
     attributes,
@@ -128,18 +137,44 @@ export function QADocumentBlock({
     onFocus?.(block.id);
   }, [block.id, onFocus]);
 
-  // Save on blur handlers
+  // Save on blur handlers - sync Yjs to DB if collab is ready, otherwise use local state
   const handleQuestionBlur = useCallback(() => {
-    if (localQuestion !== block.question) {
+    if (isCollabReady && collab) {
+      const fragment = collab.getBlockQuestionFragment(block.id);
+      const yjsContent = getFragmentText(fragment);
+      if (yjsContent !== block.question) {
+        onQuestionChange(block.id, yjsContent);
+      }
+    } else if (localQuestion !== block.question) {
       onQuestionChange(block.id, localQuestion);
     }
-  }, [block.id, block.question, localQuestion, onQuestionChange]);
+  }, [
+    isCollabReady,
+    collab,
+    block.id,
+    block.question,
+    localQuestion,
+    onQuestionChange,
+  ]);
 
   const handleAnswerBlur = useCallback(() => {
-    if (localAnswer !== block.answer) {
+    if (isCollabReady && collab) {
+      const fragment = collab.getBlockAnswerFragment(block.id);
+      const yjsContent = getFragmentText(fragment);
+      if (yjsContent !== block.answer) {
+        onAnswerChange(block.id, yjsContent);
+      }
+    } else if (localAnswer !== block.answer) {
       onAnswerChange(block.id, localAnswer);
     }
-  }, [block.id, block.answer, localAnswer, onAnswerChange]);
+  }, [
+    isCollabReady,
+    collab,
+    block.id,
+    block.answer,
+    localAnswer,
+    onAnswerChange,
+  ]);
 
   useEffect(() => {
     if (!autoFocusQuestion) return;
@@ -215,28 +250,56 @@ export function QADocumentBlock({
         {/* Content */}
         <div className="flex-1 min-w-0">
           {/* Question */}
-          <div className="flex items-start gap-2">
-            <AutoResizeTextarea
-              value={localQuestion}
-              onChange={setLocalQuestion}
-              onBlur={handleQuestionBlur}
-              onFocus={handleFocus}
-              inputRef={questionInputRef}
-              placeholder="What question are you exploring?"
-              className="text-base font-semibold text-base-content placeholder:text-base-content/40 leading-relaxed"
-            />
+          <div className="flex items-start gap-2 w-full">
+            {isCollabReady && collab?.provider ? (
+              <CollabTextEditor
+                fragment={collab.getBlockQuestionFragment(block.id)}
+                provider={collab.provider}
+                userName={collab.userInfo.userName}
+                userColor={collab.userInfo.userColor}
+                placeholder="What question are you exploring?"
+                className="text-base font-semibold text-base-content [&_p]:m-0 leading-relaxed w-full"
+                onBlur={handleQuestionBlur}
+                onFocus={handleFocus}
+                initialContent={block.question}
+              />
+            ) : (
+              <AutoResizeTextarea
+                value={localQuestion}
+                onChange={setLocalQuestion}
+                onBlur={handleQuestionBlur}
+                onFocus={handleFocus}
+                inputRef={questionInputRef}
+                placeholder="What question are you exploring?"
+                className="text-base font-semibold text-base-content placeholder:text-base-content/40 leading-relaxed"
+              />
+            )}
           </div>
 
           {/* Answer */}
           <div className="mt-2">
-            <AutoResizeTextarea
-              value={localAnswer}
-              onChange={setLocalAnswer}
-              onBlur={handleAnswerBlur}
-              onFocus={handleFocus}
-              placeholder="Write your answer here..."
-              className="text-base text-base-content/80 placeholder:text-base-content/40 leading-relaxed"
-            />
+            {isCollabReady && collab?.provider ? (
+              <CollabTextEditor
+                fragment={collab.getBlockAnswerFragment(block.id)}
+                provider={collab.provider}
+                userName={collab.userInfo.userName}
+                userColor={collab.userInfo.userColor}
+                placeholder="Write your answer here..."
+                className="text-base text-base-content/80 [&_p]:m-0 leading-relaxed w-full"
+                onBlur={handleAnswerBlur}
+                onFocus={handleFocus}
+                initialContent={block.answer}
+              />
+            ) : (
+              <AutoResizeTextarea
+                value={localAnswer}
+                onChange={setLocalAnswer}
+                onBlur={handleAnswerBlur}
+                onFocus={handleFocus}
+                placeholder="Write your answer here..."
+                className="text-base text-base-content/80 placeholder:text-base-content/40 leading-relaxed"
+              />
+            )}
           </div>
 
           {/* Inline Review */}

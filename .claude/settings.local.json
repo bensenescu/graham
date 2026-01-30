@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx tsc:*)",
+      "Bash(pnpm wrangler types:*)",
+      "Bash(pnpm build:*)"
+    ]
+  }
+}

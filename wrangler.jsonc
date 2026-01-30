@@ -33,12 +33,20 @@
         "name": "SIMPLE_COLLAB_DO",
         "class_name": "SimpleCollabDO",
       },
+      {
+        "name": "PAGE_COLLAB_DO",
+        "class_name": "PageCollabDO",
+      },
     ],
   },
   "migrations": [
     {
       "tag": "v1",
       "new_classes": ["SimpleCollabDO"],
+    },
+    {
+      "tag": "v2",
+      "new_classes": ["PageCollabDO"],
     },
   ],
 }
