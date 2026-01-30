@@ -23,7 +23,7 @@
     {
       "binding": "DB",
       "database_name": "every-graham",
-      "database_id": "98c1adbf-c0fa-408e-9754-7c22915d2e05",
+      "database_id": "aa916598-6afb-4c1e-a667-368b0fca1846",
       "migrations_dir": "drizzle",
     },
   ],

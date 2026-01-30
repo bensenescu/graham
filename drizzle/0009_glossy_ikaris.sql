@@ -69,8 +69,4 @@ CREATE TABLE `practice_sessions` (
 	FOREIGN KEY (`page_id`) REFERENCES `pages`(`id`) ON UPDATE no action ON DELETE cascade
 );
 --> statement-breakpoint
-CREATE INDEX `practice_sessions_page_id_idx` ON `practice_sessions` (`page_id`);--> statement-breakpoint
-ALTER TABLE `block_reviews` ADD `suggestion` text;--> statement-breakpoint
-ALTER TABLE `block_reviews` DROP COLUMN `strengths`;--> statement-breakpoint
-ALTER TABLE `block_reviews` DROP COLUMN `improvements`;--> statement-breakpoint
-ALTER TABLE `block_reviews` DROP COLUMN `tips`;
+CREATE INDEX `practice_sessions_page_id_idx` ON `practice_sessions` (`page_id`);
