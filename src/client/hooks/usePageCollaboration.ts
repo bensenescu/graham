@@ -24,8 +24,8 @@ export interface PagePresenceUser {
 export interface UsePageCollaborationOptions {
   /** The page ID to collaborate on */
   pageId: string;
-  /** User information for presence */
-  userInfo: UserInfo;
+  /** User information for presence (optional - derived from session if not provided) */
+  userInfo?: UserInfo;
   /** Whether the connection should be active */
   enabled?: boolean;
 }

@@ -7,8 +7,7 @@ import CollaborationCaret from "@tiptap/extension-collaboration-caret";
 import Placeholder from "@tiptap/extension-placeholder";
 import * as Y from "yjs";
 import type { WebsocketProvider } from "y-websocket";
-import { useCollaborationUser } from "@/client/hooks/useCollaborationUser";
-import { useSimpleCollab } from "@/client/hooks/useSimpleCollab";
+import { useYjsWebSocket } from "@/client/hooks/useYjsWebSocket";
 
 export const Route = createFileRoute("/test-collaboration/$roomId")({
   component: TestCollaborationPage,
@@ -16,10 +15,9 @@ export const Route = createFileRoute("/test-collaboration/$roomId")({
 
 function TestCollaborationPage() {
   const { roomId } = Route.useParams();
-  const { userInfo } = useCollaborationUser();
-  const { doc, provider, connectionState, isSynced, reconnect } = useSimpleCollab({
-    roomId,
-    userInfo,
+  const { doc, provider, connectionState, isSynced, reconnect, userInfo } = useYjsWebSocket({
+    url: "/api/test-collaboration",
+    roomName: roomId,
   });
 
   const connectionLabel = useMemo(() => {

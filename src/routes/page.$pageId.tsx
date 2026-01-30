@@ -19,7 +19,6 @@ import {
 import { PracticeModeModal } from "@/client/components/PracticeMode";
 import { useAIReview } from "@/client/hooks/useAIReview";
 import { usePageReviewSettings } from "@/client/hooks/usePageReviewSettings";
-import { useCollaborationUser } from "@/client/hooks/useCollaborationUser";
 import type { PageBlock } from "@/types/schemas/pages";
 
 export const Route = createFileRoute("/page/$pageId")({
@@ -32,8 +31,7 @@ function PageEditor() {
   const { pageId } = Route.useParams();
   const navigate = useNavigate();
 
-  // Collaboration user info
-  const { userInfo, isLoading: isLoadingUser } = useCollaborationUser();
+  // Collaboration
   const currentUser = useCurrentUser();
   const collaborationEnabled = Boolean(currentUser);
 
@@ -217,7 +215,6 @@ function PageEditor() {
       >
         <PageCollaborationProvider
           pageId={pageId}
-          userInfo={userInfo}
           enabled={collaborationEnabled}
         >
           <CollaborativeQADocumentEditor

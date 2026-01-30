@@ -54,6 +54,7 @@
     "react-dom": "^19.0.0",
     "react-hotkeys-hook": "^5.2.3",
     "react-markdown": "^10.1.0",
+    "remeda": "^2.33.4",
     "sonner": "^2.0.7",
     "tailwindcss": "^4.1.16",
     "y-protocols": "^1.0.7",

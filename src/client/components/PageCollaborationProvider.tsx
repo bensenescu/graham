@@ -51,8 +51,8 @@ const PageCollaborationContext =
 export interface PageCollaborationProviderProps {
   /** The page ID to collaborate on */
   pageId: string;
-  /** User information for presence */
-  userInfo: UserInfo;
+  /** User information for presence (optional - derived from session if not provided) */
+  userInfo?: UserInfo;
   /** Whether collaboration should be enabled */
   enabled?: boolean;
   /** Children components */
@@ -100,28 +100,38 @@ export function PageCollaborationProvider({
   enabled = true,
   children,
 }: PageCollaborationProviderProps) {
-  // Ensure user has a color
+  // Ensure user has a color if userInfo provided
   const userInfo = useMemo(
-    (): UserInfo => ({
-      ...providedUserInfo,
-      userColor:
-        providedUserInfo.userColor || generateUserColor(providedUserInfo.userId),
-    }),
+    (): UserInfo | undefined =>
+      providedUserInfo
+        ? {
+            ...providedUserInfo,
+            userColor:
+              providedUserInfo.userColor || generateUserColor(providedUserInfo.userId),
+          }
+        : undefined,
     [providedUserInfo],
   );
 
-  // Use the page collaboration hook
+  // Use the page collaboration hook (userInfo will be derived internally if not provided)
   const collaboration = usePageCollaboration({
     pageId,
     userInfo,
     enabled,
   });
 
+  // Get the actual userInfo from collaboration (may be derived)
+  const actualUserInfo = userInfo ?? {
+    userId: "anonymous",
+    userName: "Anonymous",
+    userColor: "#808080",
+  };
+
   // Memoize the context value
   const contextValue = useMemo(
     (): PageCollaborationContextValue => ({
       pageId,
-      userInfo,
+      userInfo: actualUserInfo,
       titleText: collaboration.titleText,
       blockOrder: collaboration.blockOrder,
       doc: collaboration.doc,
@@ -134,7 +144,7 @@ export function PageCollaborationProvider({
       updatePresence: collaboration.updatePresence,
       reconnect: collaboration.reconnect,
     }),
-    [pageId, userInfo, collaboration],
+    [pageId, actualUserInfo, collaboration],
   );
 
   return (

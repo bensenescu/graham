@@ -1,9 +1,23 @@
-import { useEffect, useState, useRef, useCallback } from "react";
+import { useEffect, useState, useRef, useCallback, useMemo } from "react";
 import * as Y from "yjs";
 import * as awarenessProtocol from "y-protocols/awareness";
 import { WebsocketProvider } from "y-websocket";
 import { getSessionToken } from "@every-app/sdk/core";
 import { useCurrentUser } from "@every-app/sdk/tanstack";
+
+const CURSOR_COLORS = [
+  "#E57373", "#64B5F6", "#81C784", "#FFD54F", "#BA68C8",
+  "#4DD0E1", "#FF8A65", "#A1887F", "#90A4AE", "#F06292",
+];
+
+function generateUserColor(userId: string): string {
+  let hash = 0;
+  for (let i = 0; i < userId.length; i++) {
+    hash = (hash << 5) - hash + userId.charCodeAt(i);
+    hash = hash & hash;
+  }
+  return CURSOR_COLORS[Math.abs(hash) % CURSOR_COLORS.length];
+}
 
 export interface UserInfo {
   userId: string;
@@ -21,11 +35,12 @@ export interface UseYjsWebSocketOptions {
   url: string;
   /** Room name - combined with url to form full WebSocket path */
   roomName?: string;
-  userInfo: UserInfo;
+  /** User info - if not provided, generated from current session */
+  userInfo?: UserInfo;
   enabled?: boolean;
-  /** Optional external Y.Doc - if not provided, one is created internally */
+  /** External Y.Doc - if not provided, one is created internally */
   doc?: Y.Doc;
-  /** Optional external awareness - if provided, user state will be set on it */
+  /** External awareness - if provided, user state will be set on it */
   awareness?: awarenessProtocol.Awareness;
 }
 
@@ -36,13 +51,14 @@ export interface UseYjsWebSocketReturn {
   /** Whether the initial document sync is complete */
   isSynced: boolean;
   reconnect: () => void;
+  userInfo: UserInfo;
   sendJsonMessage: (data: Record<string, unknown>) => void;
 }
 
 export function useYjsWebSocket({
   url,
   roomName = "",
-  userInfo,
+  userInfo: externalUserInfo,
   enabled = true,
   doc: externalDoc,
   awareness: externalAwareness,
@@ -54,8 +70,14 @@ export function useYjsWebSocket({
   const docRef = useRef<Y.Doc>(externalDoc ?? new Y.Doc());
   const cleanupRef = useRef<(() => void) | null>(null);
 
-  // Wait for session to be ready
+  // Get user info from current session (used when externalUserInfo not provided)
   const currentUser = useCurrentUser();
+  const derivedUserInfo = useMemo((): UserInfo => {
+    const userId = currentUser?.userId ?? "anonymous";
+    const userName = currentUser?.email ?? "Anonymous";
+    return { userId, userName, userColor: generateUserColor(userId) };
+  }, [currentUser?.userId, currentUser?.email]);
+  const userInfo = externalUserInfo ?? derivedUserInfo;
   const isSessionReady = currentUser !== null;
 
   const connect = useCallback(async () => {
@@ -170,6 +192,7 @@ export function useYjsWebSocket({
     connectionState,
     isSynced,
     reconnect,
+    userInfo,
     sendJsonMessage,
   };
 }

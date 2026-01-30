@@ -3,9 +3,11 @@ import * as encoding from "lib0/encoding";
 import * as decoding from "lib0/decoding";
 import * as syncProtocol from "y-protocols/sync";
 import * as awarenessProtocol from "y-protocols/awareness";
+import { funnel } from "remeda";
 
 const MESSAGE_SYNC = 0;
 const MESSAGE_AWARENESS = 1;
+const SAVE_DEBOUNCE_MS = 1000;
 
 interface UserInfo {
   userId: string;
@@ -26,6 +28,9 @@ export class SimpleCollabDO implements DurableObject {
   private doc: Y.Doc;
   private awareness: awarenessProtocol.Awareness;
   private connections: Set<WebSocketWithUser> = new Set();
+  private debouncedSave = funnel(() => this.saveToStorage(), {
+    minQuietPeriodMs: SAVE_DEBOUNCE_MS,
+  });
 
   constructor(state: DurableObjectState) {
     this.state = state;
@@ -34,7 +39,7 @@ export class SimpleCollabDO implements DurableObject {
     this.doc.getText("content");
 
     this.doc.on("update", (update, origin) => {
-      this.saveToStorage();
+      this.debouncedSave.call();
       this.broadcastDocUpdate(update, origin as WebSocketWithUser | null);
     });
 
@@ -218,7 +223,7 @@ export class SimpleCollabDO implements DurableObject {
     }
 
     if (this.connections.size === 0) {
-      this.saveToStorage();
+      this.debouncedSave.call();
     }
   }
 
