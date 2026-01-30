@@ -84,6 +84,12 @@ export function useCollab({
   const userInfo = useMemo((): UserInfo => {
     const userId = currentUser?.userId ?? "anonymous";
     const userName = currentUser?.email ?? "Anonymous";
+    console.debug("[useCollab] userInfo computed", {
+      userId,
+      userName,
+      hasCurrentUser: !!currentUser,
+      sessionReady,
+    });
     return { userId, userName, userColor: generateUserColor(userId) };
   }, [currentUser?.userId, currentUser?.email]);
 
@@ -170,7 +176,15 @@ export function useCollab({
   }, [sessionReady, sessionToken]);
 
   useEffect(() => {
-    if (!enabled || !resolvedToken) return;
+    // Only connect when we have both a token AND valid user info (not Anonymous)
+    if (!enabled || !resolvedToken || !sessionReady) return;
+
+    console.debug("[useCollab] connectWithToken", {
+      roomName,
+      hasToken: !!resolvedToken,
+      sessionReady,
+      userInfo: userInfoRef.current,
+    });
 
     const nextProvider = collabManager.connectWithToken({
       url,
@@ -182,19 +196,33 @@ export function useCollab({
     if (nextProvider) {
       setProvider(nextProvider);
       setConnectionState(nextProvider.wsconnected ? "connected" : "connecting");
+      console.debug("[useCollab] provider created", {
+        roomName,
+        wsconnected: nextProvider.wsconnected,
+        awarenessLocalState: nextProvider.awareness.getLocalState(),
+      });
     }
-  }, [enabled, resolvedToken, url, roomName]);
+  }, [enabled, resolvedToken, sessionReady, url, roomName]);
 
   // Update awareness when userInfo changes (without recreating connection)
   useEffect(() => {
     if (provider) {
+      console.debug("[useCollab] updating awareness", {
+        roomName,
+        userName: userInfo.userName,
+        userId: userInfo.userId,
+      });
       provider.awareness.setLocalStateField("user", {
         name: userInfo.userName,
         color: userInfo.userColor,
         userId: userInfo.userId,
       });
+      console.debug("[useCollab] awareness updated", {
+        roomName,
+        localState: provider.awareness.getLocalState(),
+      });
     }
-  }, [provider, userInfo]);
+  }, [provider, userInfo, roomName]);
 
   // Subscribe to state changes from manager
   useEffect(() => {
@@ -253,7 +281,7 @@ export function useCollab({
       isSynced,
       hasSyncedOnce,
       reconnect,
-      userInfo: connection?.userInfo ?? userInfo,
+      userInfo, // Always use current userInfo, not stale connection.userInfo
     }),
     [
       connection,

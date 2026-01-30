@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useMemo } from "react";
+import { useEffect, useMemo } from "react";
 import { useEditor, EditorContent } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Collaboration from "@tiptap/extension-collaboration";
@@ -38,6 +38,31 @@ function TestCollaborationPage() {
 
   // Only render editor after the first successful sync
   const isReady = doc && provider && hasSyncedOnce;
+
+  // Debug: log awareness state changes
+  useEffect(() => {
+    if (!provider) return;
+
+    console.debug("[test-collab] provider ready", {
+      roomId,
+      userName: userInfo.userName,
+      userId: userInfo.userId,
+      localState: provider.awareness.getLocalState(),
+      allStates: Array.from(provider.awareness.getStates().entries()),
+    });
+
+    const handleAwarenessChange = () => {
+      console.debug("[test-collab] awareness change", {
+        roomId,
+        allStates: Array.from(provider.awareness.getStates().entries()),
+      });
+    };
+
+    provider.awareness.on("change", handleAwarenessChange);
+    return () => {
+      provider.awareness.off("change", handleAwarenessChange);
+    };
+  }, [provider, roomId, userInfo]);
 
   return (
     <div className="min-h-screen bg-base-200 px-6 py-10">

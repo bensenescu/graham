@@ -190,7 +190,15 @@ export function usePageCollab({
   }, [sessionReady, sessionToken]);
 
   useEffect(() => {
-    if (!enabled || !resolvedToken) return;
+    // Only connect when we have both a token AND valid user info (not Anonymous)
+    if (!enabled || !resolvedToken || !sessionReady) return;
+
+    console.debug("[usePageCollab] connectWithToken", {
+      pageId,
+      hasToken: !!resolvedToken,
+      sessionReady,
+      userInfo: userInfoRef.current,
+    });
 
     const nextProvider = collabManager.connectWithToken({
       roomName: pageId,
@@ -201,8 +209,13 @@ export function usePageCollab({
     if (nextProvider) {
       setProvider(nextProvider);
       setConnectionState(nextProvider.wsconnected ? "connected" : "connecting");
+      console.debug("[usePageCollab] provider created", {
+        pageId,
+        wsconnected: nextProvider.wsconnected,
+        awarenessLocalState: nextProvider.awareness.getLocalState(),
+      });
     }
-  }, [enabled, resolvedToken, pageId]);
+  }, [enabled, resolvedToken, sessionReady, pageId]);
 
   // Update awareness when userInfo changes (without recreating connection)
   useEffect(() => {
@@ -302,7 +315,7 @@ export function usePageCollab({
       isSynced,
       hasSyncedOnce,
       reconnect,
-      userInfo: connection?.userInfo ?? userInfo,
+      userInfo, // Always use current userInfo, not stale connection.userInfo
       getFragment,
       getTitleFragment,
       getBlockQuestionFragment,
