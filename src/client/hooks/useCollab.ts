@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import * as Y from "yjs";
 import { WebsocketProvider } from "y-websocket";
 import { useCurrentUser } from "@every-app/sdk/tanstack";
+import { getSessionToken } from "@every-app/sdk/core";
 import {
   collabManager,
   type UserInfo,
@@ -19,6 +20,8 @@ export interface UseCollabOptions {
   roomName: string;
   /** Whether collaboration is enabled */
   enabled?: boolean;
+  /** Session token for authentication */
+  sessionToken?: string | null;
 }
 
 export interface UseCollabReturn {
@@ -26,6 +29,7 @@ export interface UseCollabReturn {
   provider: WebsocketProvider | null;
   connectionState: ConnectionState;
   isSynced: boolean;
+  hasSyncedOnce: boolean;
   reconnect: () => void;
   userInfo: UserInfo;
 }
@@ -62,16 +66,21 @@ export function useCollab({
   url,
   roomName,
   enabled = true,
+  sessionToken,
 }: UseCollabOptions): UseCollabReturn {
   const [connection, setConnection] = useState<CollabConnection | null>(null);
   const [provider, setProvider] = useState<WebsocketProvider | null>(null);
   const [connectionState, setConnectionState] =
     useState<ConnectionState>("disconnected");
   const [isSynced, setIsSynced] = useState(false);
+  const [hasSyncedOnce, setHasSyncedOnce] = useState(false);
+  const [resolvedToken, setResolvedToken] = useState<string | null>(
+    sessionToken ?? null,
+  );
 
   // Get user info from current session
   const currentUser = useCurrentUser();
-  const isSessionReady = currentUser !== null;
+  const sessionReady = !!currentUser?.userId;
   const userInfo = useMemo((): UserInfo => {
     const userId = currentUser?.userId ?? "anonymous";
     const userName = currentUser?.email ?? "Anonymous";
@@ -82,13 +91,9 @@ export function useCollab({
   const userInfoRef = useRef(userInfo);
   userInfoRef.current = userInfo;
 
-  // Get connection from manager - wait for session to be ready before connecting
+  // Get connection from manager (doc only; provider connects explicitly)
   useEffect(() => {
-    if (!enabled || !isSessionReady) {
-      setConnection(null);
-      setProvider(null);
-      setConnectionState("disconnected");
-      setIsSynced(false);
+    if (!enabled) {
       return;
     }
 
@@ -100,28 +105,34 @@ export function useCollab({
     });
 
     setConnection(conn);
-    setConnectionState("connecting");
+    setConnectionState("disconnected");
 
     // If provider is already available, use it
     if (conn.provider) {
       setProvider(conn.provider);
-      setConnectionState(conn.provider.wsconnected ? "connected" : "connecting");
+      setConnectionState(
+        conn.provider.wsconnected ? "connected" : "connecting",
+      );
       setIsSynced(conn.provider.synced);
     }
 
     // Subscribe to provider ready event
-    const unsubProviderReady = collabManager.onProviderReady(roomName, () => {
-      const p = collabManager.getProvider(roomName, url);
-      if (p) {
-        setProvider(p);
-        // Update connection state based on provider status
-        setConnectionState(p.wsconnected ? "connected" : "connecting");
-        // Check if already synced
-        if (p.synced) {
-          setIsSynced(true);
+    const unsubProviderReady = collabManager.onProviderReady(
+      roomName,
+      () => {
+        const p = collabManager.getProvider(roomName, url);
+        if (p) {
+          setProvider(p);
+          // Update connection state based on provider status
+          setConnectionState(p.wsconnected ? "connected" : "connecting");
+          // Check if already synced
+          if (p.synced) {
+            setIsSynced(true);
+          }
         }
-      }
-    }, url);
+      },
+      url,
+    );
 
     return () => {
       unsubProviderReady();
@@ -129,8 +140,50 @@ export function useCollab({
       setConnection(null);
       setProvider(null);
       setIsSynced(false);
+      setHasSyncedOnce(false);
     };
-  }, [url, roomName, enabled, isSessionReady]); // Don't include userInfo - we use ref to avoid recreation
+  }, [url, roomName, enabled]); // Don't include userInfo - we use ref to avoid recreation
+
+  useEffect(() => {
+    if (sessionToken !== undefined) {
+      setResolvedToken(sessionToken ?? null);
+      return;
+    }
+
+    let isActive = true;
+
+    if (!sessionReady) {
+      setResolvedToken(null);
+      return () => {
+        isActive = false;
+      };
+    }
+
+    getSessionToken().then((token) => {
+      if (!isActive) return;
+      setResolvedToken(token ?? null);
+    });
+
+    return () => {
+      isActive = false;
+    };
+  }, [sessionReady, sessionToken]);
+
+  useEffect(() => {
+    if (!enabled || !resolvedToken) return;
+
+    const nextProvider = collabManager.connectWithToken({
+      url,
+      roomName,
+      token: resolvedToken,
+      userInfo: userInfoRef.current,
+    });
+
+    if (nextProvider) {
+      setProvider(nextProvider);
+      setConnectionState(nextProvider.wsconnected ? "connected" : "connecting");
+    }
+  }, [enabled, resolvedToken, url, roomName]);
 
   // Update awareness when userInfo changes (without recreating connection)
   useEffect(() => {
@@ -150,7 +203,7 @@ export function useCollab({
     const unsubscribe = collabManager.onStateChange(
       roomName,
       setConnectionState,
-      url
+      url,
     );
     return unsubscribe;
   }, [url, roomName, connection]);
@@ -161,12 +214,16 @@ export function useCollab({
 
     const handleSync = (synced: boolean) => {
       setIsSynced(synced);
+      if (synced) {
+        setHasSyncedOnce(true);
+      }
     };
 
     provider.on("sync", handleSync);
     // Check initial state
     if (provider.synced) {
       setIsSynced(true);
+      setHasSyncedOnce(true);
     }
 
     return () => {
@@ -175,8 +232,18 @@ export function useCollab({
   }, [provider]);
 
   const reconnect = useCallback(() => {
-    collabManager.reconnect(roomName, url);
-  }, [url, roomName]);
+    if (!resolvedToken) return;
+    const nextProvider = collabManager.connectWithToken({
+      url,
+      roomName,
+      token: resolvedToken,
+      userInfo: userInfoRef.current,
+    });
+    if (nextProvider) {
+      setProvider(nextProvider);
+      setConnectionState(nextProvider.wsconnected ? "connected" : "connecting");
+    }
+  }, [url, roomName, resolvedToken]);
 
   return useMemo(
     () => ({
@@ -184,9 +251,18 @@ export function useCollab({
       provider,
       connectionState,
       isSynced,
+      hasSyncedOnce,
       reconnect,
       userInfo: connection?.userInfo ?? userInfo,
     }),
-    [connection, provider, connectionState, isSynced, reconnect, userInfo]
+    [
+      connection,
+      provider,
+      connectionState,
+      isSynced,
+      hasSyncedOnce,
+      reconnect,
+      userInfo,
+    ],
   );
 }

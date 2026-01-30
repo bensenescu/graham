@@ -15,7 +15,15 @@ export const Route = createFileRoute("/test-collaboration/$roomId")({
 
 function TestCollaborationPage() {
   const { roomId } = Route.useParams();
-  const { doc, provider, connectionState, isSynced, reconnect, userInfo } = useCollab({
+  const {
+    doc,
+    provider,
+    connectionState,
+    isSynced,
+    hasSyncedOnce,
+    reconnect,
+    userInfo,
+  } = useCollab({
     url: "/api/test-collaboration",
     roomName: roomId,
   });
@@ -28,13 +36,15 @@ function TestCollaborationPage() {
     return "Disconnected";
   }, [connectionState, isSynced]);
 
-  // Only render editor when provider is ready AND synced
-  const isReady = doc && provider && connectionState === "connected" && isSynced;
+  // Only render editor after the first successful sync
+  const isReady = doc && provider && hasSyncedOnce;
 
   return (
     <div className="min-h-screen bg-base-200 px-6 py-10">
       <div className="max-w-2xl mx-auto bg-base-100 border border-base-300 rounded-lg p-6">
-        <h1 className="text-xl font-semibold text-base-content">Test Collaboration</h1>
+        <h1 className="text-xl font-semibold text-base-content">
+          Test Collaboration
+        </h1>
         <div className="mt-2 flex items-center gap-3 text-sm text-base-content/60">
           <span>Room: {roomId}</span>
           <span>Status: {connectionLabel}</span>
@@ -62,7 +72,9 @@ function TestCollaborationPage() {
                   ? "Connection error"
                   : connectionState === "connected"
                     ? "Syncing..."
-                    : "Connecting..."}
+                    : connectionState === "connecting"
+                      ? "Connecting..."
+                      : "Waiting for session..."}
               </div>
             )}
           </div>
@@ -105,7 +117,12 @@ interface CollabEditorProps {
   userColor: string;
 }
 
-function CollabEditor({ doc, provider, userName, userColor }: CollabEditorProps) {
+function CollabEditor({
+  doc,
+  provider,
+  userName,
+  userColor,
+}: CollabEditorProps) {
   const editor = useEditor({
     extensions: [
       StarterKit.configure({

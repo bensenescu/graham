@@ -105,20 +105,23 @@ export function QADocumentEditor({
 
   // Collaborative editing via Yjs
   const collab = usePageCollab({ pageId });
-  const { provider, connectionState, getTitleFragment, userInfo, reconnect } =
-    collab;
+  const {
+    provider,
+    connectionState,
+    getTitleFragment,
+    userInfo,
+    reconnect,
+    hasSyncedOnce,
+  } = collab;
 
-  // Whether collaboration is ready for local editing (provider exists)
-  const isReady = provider !== null;
-
-  useEffect(() => {
-    console.debug("[QADocumentEditor] collab status", {
-      pageId,
-      hasProvider: provider !== null,
-      connectionState,
-      isReady,
-    });
-  }, [pageId, provider, connectionState, isReady]);
+  // Track if we've ever successfully loaded - only show skeleton on first load
+  const hasLoadedRef = useRef(false);
+  if (hasSyncedOnce && !hasLoadedRef.current) {
+    hasLoadedRef.current = true;
+  }
+  const isReady = hasLoadedRef.current;
+  // Show skeleton only on initial load, not on reconnection
+  const showSkeleton = !isReady;
 
   // Sync title from Yjs to DB on blur
   const handleTitleBlur = useCallback(() => {
@@ -326,8 +329,8 @@ export function QADocumentEditor({
     <PageCollabContext.Provider value={collabContextValue}>
       <div ref={containerRef} className="pt-6 pb-6 px-6 min-h-screen">
         <div className="max-w-3xl mx-auto bg-base-100 rounded-lg px-4 py-2 border border-base-300 min-h-[calc(100vh-6rem)]">
-          {/* Loading state - skeleton loader until collaboration is ready */}
-          {!isReady ? (
+          {/* Loading state - skeleton loader only on initial load */}
+          {showSkeleton ? (
             <div className="animate-pulse pt-4">
               {/* Title skeleton */}
               <div className="h-8 bg-base-300 rounded w-1/3 mb-6" />
@@ -378,17 +381,23 @@ export function QADocumentEditor({
 
               {/* Page title */}
               <div className="pt-2 pb-2">
-                <CollabTextEditor
-                  fragment={getTitleFragment()!}
-                  provider={provider}
-                  userName={userInfo.userName}
-                  userColor={userInfo.userColor}
-                  placeholder="Untitled"
-                  className="text-2xl font-bold text-base-content [&_p]:m-0"
-                  onBlur={handleTitleBlur}
-                  initialContent={pageTitle || ""}
-                  singleLine
-                />
+                {isReady && provider ? (
+                  <CollabTextEditor
+                    fragment={getTitleFragment()!}
+                    provider={provider}
+                    userName={userInfo.userName}
+                    userColor={userInfo.userColor}
+                    placeholder="Untitled"
+                    className="text-2xl font-bold text-base-content [&_p]:m-0"
+                    onBlur={handleTitleBlur}
+                    initialContent={pageTitle || ""}
+                    singleLine
+                  />
+                ) : (
+                  <p className="text-2xl font-bold text-base-content">
+                    {pageTitle || "Untitled"}
+                  </p>
+                )}
               </div>
 
               {sortedBlocks.length === 0 ? (

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import * as Y from "yjs";
 import { WebsocketProvider } from "y-websocket";
 import { useCurrentUser } from "@every-app/sdk/tanstack";
+import { getSessionToken } from "@every-app/sdk/core";
 import {
   collabManager,
   type UserInfo,
@@ -15,6 +16,7 @@ export type { UserInfo, ConnectionState } from "@/client/lib/PageCollabManager";
 export interface UsePageCollabOptions {
   pageId: string;
   enabled?: boolean;
+  sessionToken?: string | null;
 }
 
 export interface UsePageCollabReturn {
@@ -22,6 +24,7 @@ export interface UsePageCollabReturn {
   provider: WebsocketProvider | null;
   connectionState: ConnectionState;
   isSynced: boolean;
+  hasSyncedOnce: boolean;
   reconnect: () => void;
   userInfo: UserInfo;
   /** Get a Y.XmlFragment for a named field (creates if doesn't exist) */
@@ -71,16 +74,21 @@ function generateUserColor(userId: string): string {
 export function usePageCollab({
   pageId,
   enabled = true,
+  sessionToken,
 }: UsePageCollabOptions): UsePageCollabReturn {
   const [connection, setConnection] = useState<CollabConnection | null>(null);
   const [provider, setProvider] = useState<WebsocketProvider | null>(null);
   const [connectionState, setConnectionState] =
     useState<ConnectionState>("disconnected");
   const [isSynced, setIsSynced] = useState(false);
+  const [hasSyncedOnce, setHasSyncedOnce] = useState(false);
+  const [resolvedToken, setResolvedToken] = useState<string | null>(
+    sessionToken ?? null,
+  );
 
   // Get user info from current session
   const currentUser = useCurrentUser();
-  const isSessionReady = currentUser !== null;
+  const sessionReady = !!currentUser?.userId;
   const userInfo = useMemo((): UserInfo => {
     const userId = currentUser?.userId ?? "anonymous";
     const userName = currentUser?.email ?? "Anonymous";
@@ -91,14 +99,9 @@ export function usePageCollab({
   const userInfoRef = useRef(userInfo);
   userInfoRef.current = userInfo;
 
-  // Get connection from manager - wait for session to be ready before connecting
+  // Get connection from manager (doc only; provider connects explicitly)
   useEffect(() => {
-    if (!enabled || !isSessionReady) {
-      setConnection(null);
-      setProvider(null);
-      setConnectionState("disconnected");
-      setIsSynced(false);
-      console.debug("[usePageCollab] not ready", { pageId, enabled, isSessionReady });
+    if (!enabled) {
       return;
     }
 
@@ -114,7 +117,7 @@ export function usePageCollab({
     });
 
     setConnection(conn);
-    setConnectionState("connecting");
+    setConnectionState("disconnected");
 
     // If provider is already available, use it
     if (conn.provider) {
@@ -155,9 +158,51 @@ export function usePageCollab({
       setConnection(null);
       setProvider(null);
       setIsSynced(false);
+      setHasSyncedOnce(false);
       console.debug("[usePageCollab] cleanup", { pageId });
     };
-  }, [pageId, enabled, isSessionReady]); // Don't include userInfo - we use ref to avoid recreation
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pageId, enabled]); // Don't include isSessionReady - session refresh shouldn't recreate connection
+
+  useEffect(() => {
+    if (sessionToken !== undefined) {
+      setResolvedToken(sessionToken ?? null);
+      return;
+    }
+
+    let isActive = true;
+
+    if (!sessionReady) {
+      setResolvedToken(null);
+      return () => {
+        isActive = false;
+      };
+    }
+
+    getSessionToken().then((token) => {
+      if (!isActive) return;
+      setResolvedToken(token ?? null);
+    });
+
+    return () => {
+      isActive = false;
+    };
+  }, [sessionReady, sessionToken]);
+
+  useEffect(() => {
+    if (!enabled || !resolvedToken) return;
+
+    const nextProvider = collabManager.connectWithToken({
+      roomName: pageId,
+      token: resolvedToken,
+      userInfo: userInfoRef.current,
+    });
+
+    if (nextProvider) {
+      setProvider(nextProvider);
+      setConnectionState(nextProvider.wsconnected ? "connected" : "connecting");
+    }
+  }, [enabled, resolvedToken, pageId]);
 
   // Update awareness when userInfo changes (without recreating connection)
   useEffect(() => {
@@ -191,6 +236,9 @@ export function usePageCollab({
 
     const handleSync = (synced: boolean) => {
       setIsSynced(synced);
+      if (synced) {
+        setHasSyncedOnce(true);
+      }
       console.debug("[usePageCollab] sync state", { pageId, synced });
     };
 
@@ -198,6 +246,7 @@ export function usePageCollab({
     // Check initial state
     if (provider.synced) {
       setIsSynced(true);
+      setHasSyncedOnce(true);
       console.debug("[usePageCollab] initial sync true", { pageId });
     }
 
@@ -207,8 +256,17 @@ export function usePageCollab({
   }, [provider]);
 
   const reconnect = useCallback(() => {
-    collabManager.reconnect(pageId);
-  }, [pageId]);
+    if (!resolvedToken) return;
+    const nextProvider = collabManager.connectWithToken({
+      roomName: pageId,
+      token: resolvedToken,
+      userInfo: userInfoRef.current,
+    });
+    if (nextProvider) {
+      setProvider(nextProvider);
+      setConnectionState(nextProvider.wsconnected ? "connected" : "connecting");
+    }
+  }, [pageId, resolvedToken]);
 
   const getFragment = useCallback(
     (name: string): Y.XmlFragment | null => {
@@ -242,6 +300,7 @@ export function usePageCollab({
       provider,
       connectionState,
       isSynced,
+      hasSyncedOnce,
       reconnect,
       userInfo: connection?.userInfo ?? userInfo,
       getFragment,
@@ -254,6 +313,7 @@ export function usePageCollab({
       provider,
       connectionState,
       isSynced,
+      hasSyncedOnce,
       reconnect,
       userInfo,
       getFragment,
