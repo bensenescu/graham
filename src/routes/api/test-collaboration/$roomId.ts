@@ -6,7 +6,7 @@ import {
 import { env } from "cloudflare:workers";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-export const Route = createFileRoute("/api/simple-collab/$docId" as any)({
+export const Route = createFileRoute("/api/test-collaboration/$roomId" as any)({
   server: {
     handlers: {
       GET: async ({
@@ -14,9 +14,9 @@ export const Route = createFileRoute("/api/simple-collab/$docId" as any)({
         params,
       }: {
         request: Request;
-        params: { docId: string };
+        params: { roomId: string };
       }) => {
-        const { docId } = params;
+        const { roomId } = params;
 
         const upgradeHeader = request.headers.get("Upgrade");
         if (upgradeHeader !== "websocket") {
@@ -47,7 +47,7 @@ export const Route = createFileRoute("/api/simple-collab/$docId" as any)({
             url.searchParams.get("userName") || session.email || "Anonymous";
           const userColor = url.searchParams.get("userColor") || "#808080";
 
-          const doId = env.SIMPLE_COLLAB_DO.idFromName(`doc-${docId}`);
+          const doId = env.SIMPLE_COLLAB_DO.idFromName(`room-${roomId}`);
           const doStub = env.SIMPLE_COLLAB_DO.get(doId);
 
           const doUrl = new URL(request.url);

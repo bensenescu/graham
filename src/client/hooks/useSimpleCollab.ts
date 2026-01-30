@@ -1,19 +1,19 @@
 import { useYjsWebSocket, type UserInfo } from "./useYjsWebSocket";
 
 export interface UseSimpleCollabOptions {
-  docId: string;
+  roomId: string;
   userInfo: UserInfo;
   enabled?: boolean;
 }
 
 export function useSimpleCollab({
-  docId,
+  roomId,
   userInfo,
   enabled = true,
 }: UseSimpleCollabOptions) {
   return useYjsWebSocket({
-    url: "/api/simple-collab",
-    roomName: docId,
+    url: "/api/test-collaboration",
+    roomName: roomId,
     userInfo,
     enabled,
   });

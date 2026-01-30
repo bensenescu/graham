@@ -11,12 +11,12 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as NewRouteImport } from './routes/new'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as TestCollaborationRoomIdRouteImport } from './routes/test-collaboration.$roomId'
 import { Route as PagePageIdRouteImport } from './routes/page.$pageId'
-import { Route as CollabTestBlockIdRouteImport } from './routes/collab-test.$blockId'
 import { Route as ApiTranscribeRouteImport } from './routes/api/transcribe'
 import { Route as ApiReviewRouteImport } from './routes/api/review'
 import { Route as ApiOverallReviewRouteImport } from './routes/api/overall-review'
-import { Route as ApiSimpleCollabDocIdRouteImport } from './routes/api/simple-collab/$docId'
+import { Route as ApiTestCollaborationRoomIdRouteImport } from './routes/api/test-collaboration/$roomId'
 import { Route as ApiCollabPagePageIdRouteImport } from './routes/api/collab/page.$pageId'
 import { Route as ApiCollabBlockBlockIdRouteImport } from './routes/api/collab/block.$blockId'
 
@@ -30,14 +30,14 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const TestCollaborationRoomIdRoute = TestCollaborationRoomIdRouteImport.update({
+  id: '/test-collaboration/$roomId',
+  path: '/test-collaboration/$roomId',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const PagePageIdRoute = PagePageIdRouteImport.update({
   id: '/page/$pageId',
   path: '/page/$pageId',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const CollabTestBlockIdRoute = CollabTestBlockIdRouteImport.update({
-  id: '/collab-test/$blockId',
-  path: '/collab-test/$blockId',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiTranscribeRoute = ApiTranscribeRouteImport.update({
@@ -55,11 +55,12 @@ const ApiOverallReviewRoute = ApiOverallReviewRouteImport.update({
   path: '/api/overall-review',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiSimpleCollabDocIdRoute = ApiSimpleCollabDocIdRouteImport.update({
-  id: '/api/simple-collab/$docId',
-  path: '/api/simple-collab/$docId',
-  getParentRoute: () => rootRouteImport,
-} as any)
+const ApiTestCollaborationRoomIdRoute =
+  ApiTestCollaborationRoomIdRouteImport.update({
+    id: '/api/test-collaboration/$roomId',
+    path: '/api/test-collaboration/$roomId',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiCollabPagePageIdRoute = ApiCollabPagePageIdRouteImport.update({
   id: '/api/collab/page/$pageId',
   path: '/api/collab/page/$pageId',
@@ -77,9 +78,9 @@ export interface FileRoutesByFullPath {
   '/api/overall-review': typeof ApiOverallReviewRoute
   '/api/review': typeof ApiReviewRoute
   '/api/transcribe': typeof ApiTranscribeRoute
-  '/collab-test/$blockId': typeof CollabTestBlockIdRoute
   '/page/$pageId': typeof PagePageIdRoute
-  '/api/simple-collab/$docId': typeof ApiSimpleCollabDocIdRoute
+  '/test-collaboration/$roomId': typeof TestCollaborationRoomIdRoute
+  '/api/test-collaboration/$roomId': typeof ApiTestCollaborationRoomIdRoute
   '/api/collab/block/$blockId': typeof ApiCollabBlockBlockIdRoute
   '/api/collab/page/$pageId': typeof ApiCollabPagePageIdRoute
 }
@@ -89,9 +90,9 @@ export interface FileRoutesByTo {
   '/api/overall-review': typeof ApiOverallReviewRoute
   '/api/review': typeof ApiReviewRoute
   '/api/transcribe': typeof ApiTranscribeRoute
-  '/collab-test/$blockId': typeof CollabTestBlockIdRoute
   '/page/$pageId': typeof PagePageIdRoute
-  '/api/simple-collab/$docId': typeof ApiSimpleCollabDocIdRoute
+  '/test-collaboration/$roomId': typeof TestCollaborationRoomIdRoute
+  '/api/test-collaboration/$roomId': typeof ApiTestCollaborationRoomIdRoute
   '/api/collab/block/$blockId': typeof ApiCollabBlockBlockIdRoute
   '/api/collab/page/$pageId': typeof ApiCollabPagePageIdRoute
 }
@@ -102,9 +103,9 @@ export interface FileRoutesById {
   '/api/overall-review': typeof ApiOverallReviewRoute
   '/api/review': typeof ApiReviewRoute
   '/api/transcribe': typeof ApiTranscribeRoute
-  '/collab-test/$blockId': typeof CollabTestBlockIdRoute
   '/page/$pageId': typeof PagePageIdRoute
-  '/api/simple-collab/$docId': typeof ApiSimpleCollabDocIdRoute
+  '/test-collaboration/$roomId': typeof TestCollaborationRoomIdRoute
+  '/api/test-collaboration/$roomId': typeof ApiTestCollaborationRoomIdRoute
   '/api/collab/block/$blockId': typeof ApiCollabBlockBlockIdRoute
   '/api/collab/page/$pageId': typeof ApiCollabPagePageIdRoute
 }
@@ -116,9 +117,9 @@ export interface FileRouteTypes {
     | '/api/overall-review'
     | '/api/review'
     | '/api/transcribe'
-    | '/collab-test/$blockId'
     | '/page/$pageId'
-    | '/api/simple-collab/$docId'
+    | '/test-collaboration/$roomId'
+    | '/api/test-collaboration/$roomId'
     | '/api/collab/block/$blockId'
     | '/api/collab/page/$pageId'
   fileRoutesByTo: FileRoutesByTo
@@ -128,9 +129,9 @@ export interface FileRouteTypes {
     | '/api/overall-review'
     | '/api/review'
     | '/api/transcribe'
-    | '/collab-test/$blockId'
     | '/page/$pageId'
-    | '/api/simple-collab/$docId'
+    | '/test-collaboration/$roomId'
+    | '/api/test-collaboration/$roomId'
     | '/api/collab/block/$blockId'
     | '/api/collab/page/$pageId'
   id:
@@ -140,9 +141,9 @@ export interface FileRouteTypes {
     | '/api/overall-review'
     | '/api/review'
     | '/api/transcribe'
-    | '/collab-test/$blockId'
     | '/page/$pageId'
-    | '/api/simple-collab/$docId'
+    | '/test-collaboration/$roomId'
+    | '/api/test-collaboration/$roomId'
     | '/api/collab/block/$blockId'
     | '/api/collab/page/$pageId'
   fileRoutesById: FileRoutesById
@@ -153,9 +154,9 @@ export interface RootRouteChildren {
   ApiOverallReviewRoute: typeof ApiOverallReviewRoute
   ApiReviewRoute: typeof ApiReviewRoute
   ApiTranscribeRoute: typeof ApiTranscribeRoute
-  CollabTestBlockIdRoute: typeof CollabTestBlockIdRoute
   PagePageIdRoute: typeof PagePageIdRoute
-  ApiSimpleCollabDocIdRoute: typeof ApiSimpleCollabDocIdRoute
+  TestCollaborationRoomIdRoute: typeof TestCollaborationRoomIdRoute
+  ApiTestCollaborationRoomIdRoute: typeof ApiTestCollaborationRoomIdRoute
   ApiCollabBlockBlockIdRoute: typeof ApiCollabBlockBlockIdRoute
   ApiCollabPagePageIdRoute: typeof ApiCollabPagePageIdRoute
 }
@@ -176,18 +177,18 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/test-collaboration/$roomId': {
+      id: '/test-collaboration/$roomId'
+      path: '/test-collaboration/$roomId'
+      fullPath: '/test-collaboration/$roomId'
+      preLoaderRoute: typeof TestCollaborationRoomIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/page/$pageId': {
       id: '/page/$pageId'
       path: '/page/$pageId'
       fullPath: '/page/$pageId'
       preLoaderRoute: typeof PagePageIdRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/collab-test/$blockId': {
-      id: '/collab-test/$blockId'
-      path: '/collab-test/$blockId'
-      fullPath: '/collab-test/$blockId'
-      preLoaderRoute: typeof CollabTestBlockIdRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/transcribe': {
@@ -211,11 +212,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiOverallReviewRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/simple-collab/$docId': {
-      id: '/api/simple-collab/$docId'
-      path: '/api/simple-collab/$docId'
-      fullPath: '/api/simple-collab/$docId'
-      preLoaderRoute: typeof ApiSimpleCollabDocIdRouteImport
+    '/api/test-collaboration/$roomId': {
+      id: '/api/test-collaboration/$roomId'
+      path: '/api/test-collaboration/$roomId'
+      fullPath: '/api/test-collaboration/$roomId'
+      preLoaderRoute: typeof ApiTestCollaborationRoomIdRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/collab/page/$pageId': {
@@ -241,9 +242,9 @@ const rootRouteChildren: RootRouteChildren = {
   ApiOverallReviewRoute: ApiOverallReviewRoute,
   ApiReviewRoute: ApiReviewRoute,
   ApiTranscribeRoute: ApiTranscribeRoute,
-  CollabTestBlockIdRoute: CollabTestBlockIdRoute,
   PagePageIdRoute: PagePageIdRoute,
-  ApiSimpleCollabDocIdRoute: ApiSimpleCollabDocIdRoute,
+  TestCollaborationRoomIdRoute: TestCollaborationRoomIdRoute,
+  ApiTestCollaborationRoomIdRoute: ApiTestCollaborationRoomIdRoute,
   ApiCollabBlockBlockIdRoute: ApiCollabBlockBlockIdRoute,
   ApiCollabPagePageIdRoute: ApiCollabPagePageIdRoute,
 }

@@ -10,15 +10,15 @@ import type { WebsocketProvider } from "y-websocket";
 import { useCollaborationUser } from "@/client/hooks/useCollaborationUser";
 import { useSimpleCollab } from "@/client/hooks/useSimpleCollab";
 
-export const Route = createFileRoute("/collab-test/$blockId")({
-  component: CollabTestPage,
+export const Route = createFileRoute("/test-collaboration/$roomId")({
+  component: TestCollaborationPage,
 });
 
-function CollabTestPage() {
-  const { blockId } = Route.useParams();
+function TestCollaborationPage() {
+  const { roomId } = Route.useParams();
   const { userInfo } = useCollaborationUser();
   const { doc, provider, connectionState, isSynced, reconnect } = useSimpleCollab({
-    docId: blockId,
+    roomId,
     userInfo,
     enabled: true,
   });
@@ -37,9 +37,9 @@ function CollabTestPage() {
   return (
     <div className="min-h-screen bg-base-200 px-6 py-10">
       <div className="max-w-2xl mx-auto bg-base-100 border border-base-300 rounded-lg p-6">
-        <h1 className="text-xl font-semibold text-base-content">Collab Test</h1>
+        <h1 className="text-xl font-semibold text-base-content">Test Collaboration</h1>
         <div className="mt-2 flex items-center gap-3 text-sm text-base-content/60">
-          <span>Block: {blockId}</span>
+          <span>Room: {roomId}</span>
           <span>Status: {connectionLabel}</span>
           <button
             type="button"
