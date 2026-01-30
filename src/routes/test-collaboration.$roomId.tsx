@@ -90,6 +90,7 @@ function TestCollaborationPage() {
                 provider={provider!}
                 userName={userInfo.userName}
                 userColor={userInfo.userColor}
+                userId={userInfo.userId}
               />
             ) : (
               <div className="min-h-[280px] flex items-center justify-center text-base-content/50">
@@ -140,6 +141,7 @@ interface CollabEditorProps {
   provider: WebsocketProvider;
   userName: string;
   userColor: string;
+  userId: string;
 }
 
 function CollabEditor({
@@ -147,6 +149,7 @@ function CollabEditor({
   provider,
   userName,
   userColor,
+  userId,
 }: CollabEditorProps) {
   const editor = useEditor({
     extensions: [
@@ -166,6 +169,11 @@ function CollabEditor({
           color: userColor,
         },
         render: (user) => {
+          // Don't render cursor for our own user
+          if (user.userId === userId) {
+            return document.createElement("span"); // Empty element
+          }
+
           const cursor = document.createElement("span");
           cursor.classList.add("collab-caret");
           cursor.style.borderColor = user.color;
@@ -178,9 +186,15 @@ function CollabEditor({
           cursor.appendChild(label);
           return cursor;
         },
-        selectionRender: (user) => ({
-          style: `background-color: ${user.color}20;`,
-        }),
+        selectionRender: (user) => {
+          // Don't render selection for our own user
+          if (user.userId === userId) {
+            return {};
+          }
+          return {
+            style: `background-color: ${user.color}20;`,
+          };
+        },
       }),
     ],
     editorProps: {

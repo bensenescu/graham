@@ -268,6 +268,47 @@ export function usePageCollab({
     };
   }, [provider]);
 
+  // Re-apply awareness on reconnect (provider status change) and visibility change
+  useEffect(() => {
+    if (!provider) return;
+
+    const applyAwareness = () => {
+      const currentUserInfo = userInfoRef.current;
+      console.debug("[usePageCollab] re-applying awareness", {
+        pageId,
+        userName: currentUserInfo.userName,
+        userId: currentUserInfo.userId,
+      });
+      provider.awareness.setLocalStateField("user", {
+        name: currentUserInfo.userName,
+        color: currentUserInfo.userColor,
+        userId: currentUserInfo.userId,
+      });
+    };
+
+    // Re-apply awareness when provider reconnects
+    const handleStatus = ({ status }: { status: string }) => {
+      if (status === "connected") {
+        applyAwareness();
+      }
+    };
+
+    // Re-apply awareness when tab becomes visible
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible" && provider.wsconnected) {
+        applyAwareness();
+      }
+    };
+
+    provider.on("status", handleStatus);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      provider.off("status", handleStatus);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [provider, pageId]);
+
   const reconnect = useCallback(() => {
     if (!resolvedToken) return;
     const nextProvider = collabManager.connectWithToken({

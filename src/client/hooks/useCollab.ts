@@ -140,7 +140,22 @@ export function useCollab({
       url,
     );
 
+    // Clear awareness on beforeunload to remove stale cursors
+    const handleBeforeUnload = () => {
+      const p = collabManager.getProvider(roomName, url);
+      if (p) {
+        p.awareness.setLocalState(null);
+      }
+    };
+    window.addEventListener("beforeunload", handleBeforeUnload);
+
     return () => {
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+      // Clear awareness before releasing connection
+      const p = collabManager.getProvider(roomName, url);
+      if (p) {
+        p.awareness.setLocalState(null);
+      }
       unsubProviderReady();
       collabManager.releaseConnection(roomName, url);
       setConnection(null);
@@ -205,24 +220,37 @@ export function useCollab({
   }, [enabled, resolvedToken, sessionReady, url, roomName]);
 
   // Update awareness when userInfo changes (without recreating connection)
+  // Only set awareness when session is ready (not Anonymous)
   useEffect(() => {
-    if (provider) {
-      console.debug("[useCollab] updating awareness", {
-        roomName,
-        userName: userInfo.userName,
-        userId: userInfo.userId,
-      });
-      provider.awareness.setLocalStateField("user", {
-        name: userInfo.userName,
-        color: userInfo.userColor,
-        userId: userInfo.userId,
-      });
-      console.debug("[useCollab] awareness updated", {
-        roomName,
-        localState: provider.awareness.getLocalState(),
-      });
+    if (!provider) return;
+
+    if (!sessionReady) {
+      // Don't set Anonymous awareness - clear it instead
+      console.debug(
+        "[useCollab] skipping awareness update (session not ready)",
+        {
+          roomName,
+          userId: userInfo.userId,
+        },
+      );
+      return;
     }
-  }, [provider, userInfo, roomName]);
+
+    console.debug("[useCollab] updating awareness", {
+      roomName,
+      userName: userInfo.userName,
+      userId: userInfo.userId,
+    });
+    provider.awareness.setLocalStateField("user", {
+      name: userInfo.userName,
+      color: userInfo.userColor,
+      userId: userInfo.userId,
+    });
+    console.debug("[useCollab] awareness updated", {
+      roomName,
+      localState: provider.awareness.getLocalState(),
+    });
+  }, [provider, userInfo, roomName, sessionReady]);
 
   // Subscribe to state changes from manager
   useEffect(() => {
@@ -258,6 +286,64 @@ export function useCollab({
       provider.off("sync", handleSync);
     };
   }, [provider]);
+
+  // Store sessionReady in a ref so we can check it in event handlers
+  const sessionReadyRef = useRef(sessionReady);
+  sessionReadyRef.current = sessionReady;
+
+  // Re-apply awareness on reconnect (provider status change) and visibility change
+  useEffect(() => {
+    if (!provider) return;
+
+    const applyAwareness = () => {
+      const currentUserInfo = userInfoRef.current;
+
+      // Don't apply Anonymous awareness
+      if (!sessionReadyRef.current || currentUserInfo.userId === "anonymous") {
+        console.debug(
+          "[useCollab] skipping re-apply awareness (session not ready)",
+          {
+            roomName,
+            userId: currentUserInfo.userId,
+          },
+        );
+        return;
+      }
+
+      console.debug("[useCollab] re-applying awareness", {
+        roomName,
+        userName: currentUserInfo.userName,
+        userId: currentUserInfo.userId,
+      });
+      provider.awareness.setLocalStateField("user", {
+        name: currentUserInfo.userName,
+        color: currentUserInfo.userColor,
+        userId: currentUserInfo.userId,
+      });
+    };
+
+    // Re-apply awareness when provider reconnects
+    const handleStatus = ({ status }: { status: string }) => {
+      if (status === "connected") {
+        applyAwareness();
+      }
+    };
+
+    // Re-apply awareness when tab becomes visible
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible" && provider.wsconnected) {
+        applyAwareness();
+      }
+    };
+
+    provider.on("status", handleStatus);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      provider.off("status", handleStatus);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [provider, roomName]);
 
   const reconnect = useCallback(() => {
     if (!resolvedToken) return;
