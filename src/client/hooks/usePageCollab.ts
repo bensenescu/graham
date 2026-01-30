@@ -25,7 +25,7 @@ export interface UsePageCollabReturn {
   connectionState: ConnectionState;
   isSynced: boolean;
   hasSyncedOnce: boolean;
-  reconnect: () => void;
+  reconnect: () => Promise<void>;
   userInfo: UserInfo;
   /** Get a Y.XmlFragment for a named field (creates if doesn't exist) */
   getFragment: (name: string) => Y.XmlFragment | null;
@@ -62,7 +62,7 @@ export function usePageCollab({
   const [hasSyncedOnce, setHasSyncedOnce] = useState(false);
 
   // Centralized session/token/userInfo logic
-  const { sessionReady, token, userInfo } = useSessionReadyToken({
+  const { sessionReady, token, userInfo, refreshToken } = useSessionReadyToken({
     sessionToken,
   });
 
@@ -162,6 +162,39 @@ export function usePageCollab({
     };
   }, [provider]);
 
+  // Reactive token refresh on auth errors
+  useEffect(() => {
+    if (!provider || !enabled) return;
+
+    const handleStatus = async ({ status }: { status: string }) => {
+      // On error, attempt to refresh the token and reconnect
+      if (status === "disconnected" || status === "error") {
+        // Only attempt refresh if we had a token before (auth failure scenario)
+        if (token) {
+          const freshToken = await refreshToken();
+          if (freshToken) {
+            const nextProvider = collabManager.connectWithToken({
+              roomName: pageId,
+              token: freshToken,
+              userInfo: userInfoRef.current,
+            });
+            if (nextProvider) {
+              setProvider(nextProvider);
+              setConnectionState(
+                nextProvider.wsconnected ? "connected" : "connecting",
+              );
+            }
+          }
+        }
+      }
+    };
+
+    provider.on("status", handleStatus);
+    return () => {
+      provider.off("status", handleStatus);
+    };
+  }, [provider, enabled, token, refreshToken, pageId]);
+
   // Centralized awareness management
   useCollabAwareness({
     provider,
@@ -170,18 +203,21 @@ export function usePageCollab({
     roomName: pageId,
   });
 
-  const reconnect = useCallback(() => {
-    if (!token) return;
+  const reconnect = useCallback(async () => {
+    // Refresh token first to handle expiration
+    const freshToken = await refreshToken();
+    if (!freshToken) return;
+
     const nextProvider = collabManager.connectWithToken({
       roomName: pageId,
-      token,
+      token: freshToken,
       userInfo: userInfoRef.current,
     });
     if (nextProvider) {
       setProvider(nextProvider);
       setConnectionState(nextProvider.wsconnected ? "connected" : "connecting");
     }
-  }, [pageId, token]);
+  }, [pageId, refreshToken]);
 
   const getFragment = useCallback(
     (name: string): Y.XmlFragment | null => {

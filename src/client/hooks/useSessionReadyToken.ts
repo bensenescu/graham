@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useCurrentUser } from "@every-app/sdk/tanstack";
 import { getSessionToken } from "@every-app/sdk/core";
 
@@ -42,6 +42,8 @@ export interface UseSessionReadyTokenReturn {
   token: string | null;
   /** User info derived from the session */
   userInfo: UserInfo;
+  /** Refresh the token (e.g., after auth error). Returns the new token or null. */
+  refreshToken: () => Promise<string | null>;
 }
 
 /**
@@ -56,6 +58,9 @@ export function useSessionReadyToken(
   const [resolvedToken, setResolvedToken] = useState<string | null>(
     sessionToken ?? null,
   );
+
+  // Guard against concurrent refresh calls
+  const refreshInFlightRef = useRef<Promise<string | null> | null>(null);
 
   const currentUser = useCurrentUser();
   const sessionReady = !!currentUser?.userId;
@@ -93,12 +98,41 @@ export function useSessionReadyToken(
     };
   }, [sessionReady, sessionToken]);
 
+  // Refresh token on demand (e.g., after auth error)
+  const refreshToken = useCallback(async (): Promise<string | null> => {
+    // If explicit token is provided, we can't refresh it
+    if (sessionToken !== undefined) {
+      return sessionToken ?? null;
+    }
+
+    // If session isn't ready, can't get a token
+    if (!sessionReady) {
+      return null;
+    }
+
+    // Dedupe concurrent refresh calls
+    if (refreshInFlightRef.current) {
+      return refreshInFlightRef.current;
+    }
+
+    const refreshPromise = getSessionToken().then((token) => {
+      const newToken = token ?? null;
+      setResolvedToken(newToken);
+      refreshInFlightRef.current = null;
+      return newToken;
+    });
+
+    refreshInFlightRef.current = refreshPromise;
+    return refreshPromise;
+  }, [sessionReady, sessionToken]);
+
   return useMemo(
     () => ({
       sessionReady,
       token: resolvedToken,
       userInfo,
+      refreshToken,
     }),
-    [sessionReady, resolvedToken, userInfo],
+    [sessionReady, resolvedToken, userInfo, refreshToken],
   );
 }

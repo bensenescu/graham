@@ -30,7 +30,7 @@ export interface UseCollabReturn {
   connectionState: ConnectionState;
   isSynced: boolean;
   hasSyncedOnce: boolean;
-  reconnect: () => void;
+  reconnect: () => Promise<void>;
   userInfo: UserInfo;
 }
 
@@ -54,7 +54,7 @@ export function useCollab({
   const [hasSyncedOnce, setHasSyncedOnce] = useState(false);
 
   // Centralized session/token/userInfo logic
-  const { sessionReady, token, userInfo } = useSessionReadyToken({
+  const { sessionReady, token, userInfo, refreshToken } = useSessionReadyToken({
     sessionToken,
   });
 
@@ -164,6 +164,40 @@ export function useCollab({
     };
   }, [provider]);
 
+  // Reactive token refresh on auth errors
+  useEffect(() => {
+    if (!provider || !enabled) return;
+
+    const handleStatus = async ({ status }: { status: string }) => {
+      // On error, attempt to refresh the token and reconnect
+      if (status === "disconnected" || status === "error") {
+        // Only attempt refresh if we had a token before (auth failure scenario)
+        if (token) {
+          const freshToken = await refreshToken();
+          if (freshToken) {
+            const nextProvider = collabManager.connectWithToken({
+              url,
+              roomName,
+              token: freshToken,
+              userInfo: userInfoRef.current,
+            });
+            if (nextProvider) {
+              setProvider(nextProvider);
+              setConnectionState(
+                nextProvider.wsconnected ? "connected" : "connecting",
+              );
+            }
+          }
+        }
+      }
+    };
+
+    provider.on("status", handleStatus);
+    return () => {
+      provider.off("status", handleStatus);
+    };
+  }, [provider, enabled, token, refreshToken, url, roomName]);
+
   // Centralized awareness management
   useCollabAwareness({
     provider,
@@ -172,19 +206,22 @@ export function useCollab({
     roomName,
   });
 
-  const reconnect = useCallback(() => {
-    if (!token) return;
+  const reconnect = useCallback(async () => {
+    // Refresh token first to handle expiration
+    const freshToken = await refreshToken();
+    if (!freshToken) return;
+
     const nextProvider = collabManager.connectWithToken({
       url,
       roomName,
-      token,
+      token: freshToken,
       userInfo: userInfoRef.current,
     });
     if (nextProvider) {
       setProvider(nextProvider);
       setConnectionState(nextProvider.wsconnected ? "connected" : "connecting");
     }
-  }, [url, roomName, token]);
+  }, [url, roomName, refreshToken]);
 
   return useMemo(
     () => ({
