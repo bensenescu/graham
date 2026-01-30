@@ -79,7 +79,29 @@ export class PageCollabDO implements DurableObject {
       return new Response("ok", { status: 200 });
     }
 
+    if (request.method === "DELETE") {
+      // Clear all state - used when page is deleted
+      await this.clearState();
+      return new Response("ok", { status: 200 });
+    }
+
     return new Response("Not found", { status: 404 });
+  }
+
+  private async clearState(): Promise<void> {
+    // Close all WebSocket connections
+    for (const ws of this.connections) {
+      ws.close(1000, "Page deleted");
+    }
+    this.connections.clear();
+
+    // Clear the Y.Doc
+    this.doc.destroy();
+    this.doc = new Y.Doc();
+    this.awareness = new awarenessProtocol.Awareness(this.doc);
+
+    // Delete persisted state
+    await this.state.storage.delete("yjs-state");
   }
 
   private async handleWebSocket(request: Request): Promise<Response> {

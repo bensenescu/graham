@@ -1,5 +1,5 @@
 import { db } from "@/db";
-import { blockReviews, pageBlocks, pages } from "@/db/schema";
+import { blockReviews, pageBlocks, pages, pageShares } from "@/db/schema";
 import { eq, and, inArray } from "drizzle-orm";
 
 type UpsertBlockReview = {
@@ -11,20 +11,28 @@ type UpsertBlockReview = {
 };
 
 /**
- * Find all reviews for blocks belonging to a user's pages.
+ * Find all reviews for blocks belonging to a user's accessible pages (owned + shared).
  */
 async function findAllByUserId(userId: string) {
-  // Get all page IDs for the user
+  // Get all page IDs for pages the user owns
   const userPages = await db.query.pages.findMany({
     where: eq(pages.userId, userId),
     columns: { id: true },
   });
 
-  if (userPages.length === 0) {
+  // Get all page IDs for pages shared with the user
+  const sharedPageRecords = await db.query.pageShares.findMany({
+    where: eq(pageShares.userId, userId),
+    columns: { pageId: true },
+  });
+
+  const ownedIds = userPages.map((p) => p.id);
+  const sharedIds = sharedPageRecords.map((s) => s.pageId);
+  const pageIds = [...new Set([...ownedIds, ...sharedIds])];
+
+  if (pageIds.length === 0) {
     return [];
   }
-
-  const pageIds = userPages.map((p) => p.id);
 
   // Get all block IDs for those pages
   const blocks = await db.query.pageBlocks.findMany({

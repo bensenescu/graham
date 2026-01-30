@@ -177,6 +177,7 @@ select {
   pointer-events: none;
   position: relative;
   word-break: normal;
+  animation: collab-caret-fade-in 0.2s ease-out;
 }
 
 .collab-caret-label {
@@ -193,6 +194,27 @@ select {
   user-select: none;
   white-space: nowrap;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+  animation: collab-caret-label-fade-in 0.3s ease-out;
+}
+
+@keyframes collab-caret-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes collab-caret-label-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 /* TipTap placeholder styling */

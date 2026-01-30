@@ -12,26 +12,22 @@ import {
 // Re-export types for consumers
 export type { UserInfo, ConnectionState } from "@/client/lib/PageCollabManager";
 
-export interface UsePageCollabOptions {
-  pageId: string;
+export interface UseCollabOptions {
+  /** Base URL for WebSocket connection */
+  url: string;
+  /** Room name for collaboration */
+  roomName: string;
+  /** Whether collaboration is enabled */
   enabled?: boolean;
 }
 
-export interface UsePageCollabReturn {
+export interface UseCollabReturn {
   doc: Y.Doc | null;
   provider: WebsocketProvider | null;
   connectionState: ConnectionState;
   isSynced: boolean;
   reconnect: () => void;
   userInfo: UserInfo;
-  /** Get a Y.XmlFragment for a named field (creates if doesn't exist) */
-  getFragment: (name: string) => Y.XmlFragment | null;
-  /** Get the title fragment */
-  getTitleFragment: () => Y.XmlFragment | null;
-  /** Get a block's question fragment */
-  getBlockQuestionFragment: (blockId: string) => Y.XmlFragment | null;
-  /** Get a block's answer fragment */
-  getBlockAnswerFragment: (blockId: string) => Y.XmlFragment | null;
 }
 
 const CURSOR_COLORS = [
@@ -57,21 +53,16 @@ function generateUserColor(userId: string): string {
 }
 
 /**
- * Hook for collaborative page editing using Yjs.
+ * Generic hook for Yjs collaboration using CollabManager.
  *
- * Uses PageCollabManager to create connections outside React's lifecycle,
+ * Uses CollabManager to create connections outside React's lifecycle,
  * avoiding race conditions and provider recreation issues.
- *
- * Connects to /api/page-collab/{pageId} and provides access to
- * multiple named Y.XmlFragment fields within a single Y.Doc:
- * - `title` - page title
- * - `block:{blockId}:question` - each block's question
- * - `block:{blockId}:answer` - each block's answer
  */
-export function usePageCollab({
-  pageId,
+export function useCollab({
+  url,
+  roomName,
   enabled = true,
-}: UsePageCollabOptions): UsePageCollabReturn {
+}: UseCollabOptions): UseCollabReturn {
   const [connection, setConnection] = useState<CollabConnection | null>(null);
   const [provider, setProvider] = useState<WebsocketProvider | null>(null);
   const [connectionState, setConnectionState] =
@@ -98,19 +89,14 @@ export function usePageCollab({
       setProvider(null);
       setConnectionState("disconnected");
       setIsSynced(false);
-      console.debug("[usePageCollab] disabled", { pageId });
       return;
     }
 
     // Get connection synchronously - doc available immediately for local editing
     const conn = collabManager.getConnection({
-      roomName: pageId,
+      url,
+      roomName,
       userInfo: userInfoRef.current,
-    });
-
-    console.debug("[usePageCollab] connection created", {
-      pageId,
-      hasProvider: !!conn.provider,
     });
 
     setConnection(conn);
@@ -119,20 +105,13 @@ export function usePageCollab({
     // If provider is already available, use it
     if (conn.provider) {
       setProvider(conn.provider);
-      setConnectionState(
-        conn.provider.wsconnected ? "connected" : "connecting",
-      );
+      setConnectionState(conn.provider.wsconnected ? "connected" : "connecting");
       setIsSynced(conn.provider.synced);
-      console.debug("[usePageCollab] provider already available", {
-        pageId,
-        wsconnected: conn.provider.wsconnected,
-        synced: conn.provider.synced,
-      });
     }
 
     // Subscribe to provider ready event
-    const unsubProviderReady = collabManager.onProviderReady(pageId, () => {
-      const p = collabManager.getProvider(pageId);
+    const unsubProviderReady = collabManager.onProviderReady(roomName, () => {
+      const p = collabManager.getProvider(roomName, url);
       if (p) {
         setProvider(p);
         // Update connection state based on provider status
@@ -141,23 +120,17 @@ export function usePageCollab({
         if (p.synced) {
           setIsSynced(true);
         }
-        console.debug("[usePageCollab] provider ready", {
-          pageId,
-          wsconnected: p.wsconnected,
-          synced: p.synced,
-        });
       }
-    });
+    }, url);
 
     return () => {
       unsubProviderReady();
-      collabManager.releaseConnection(pageId);
+      collabManager.releaseConnection(roomName, url);
       setConnection(null);
       setProvider(null);
       setIsSynced(false);
-      console.debug("[usePageCollab] cleanup", { pageId });
     };
-  }, [pageId, enabled]); // Don't include userInfo - we use ref to avoid recreation
+  }, [url, roomName, enabled]); // Don't include userInfo - we use ref to avoid recreation
 
   // Update awareness when userInfo changes (without recreating connection)
   useEffect(() => {
@@ -167,10 +140,6 @@ export function usePageCollab({
         color: userInfo.userColor,
         userId: userInfo.userId,
       });
-      console.debug("[usePageCollab] awareness updated", {
-        pageId,
-        userId: userInfo.userId,
-      });
     }
   }, [provider, userInfo]);
 
@@ -178,12 +147,13 @@ export function usePageCollab({
   useEffect(() => {
     if (!connection) return;
 
-    const unsubscribe = collabManager.onStateChange(pageId, (state) => {
-      setConnectionState(state);
-      console.debug("[usePageCollab] connection state", { pageId, state });
-    });
+    const unsubscribe = collabManager.onStateChange(
+      roomName,
+      setConnectionState,
+      url
+    );
     return unsubscribe;
-  }, [pageId, connection]);
+  }, [url, roomName, connection]);
 
   // Track sync state from provider
   useEffect(() => {
@@ -191,14 +161,12 @@ export function usePageCollab({
 
     const handleSync = (synced: boolean) => {
       setIsSynced(synced);
-      console.debug("[usePageCollab] sync state", { pageId, synced });
     };
 
     provider.on("sync", handleSync);
     // Check initial state
     if (provider.synced) {
       setIsSynced(true);
-      console.debug("[usePageCollab] initial sync true", { pageId });
     }
 
     return () => {
@@ -207,34 +175,8 @@ export function usePageCollab({
   }, [provider]);
 
   const reconnect = useCallback(() => {
-    collabManager.reconnect(pageId);
-  }, [pageId]);
-
-  const getFragment = useCallback(
-    (name: string): Y.XmlFragment | null => {
-      if (!connection) return null;
-      return connection.doc.getXmlFragment(name);
-    },
-    [connection],
-  );
-
-  const getTitleFragment = useCallback((): Y.XmlFragment | null => {
-    return getFragment("title");
-  }, [getFragment]);
-
-  const getBlockQuestionFragment = useCallback(
-    (blockId: string): Y.XmlFragment | null => {
-      return getFragment(`block:${blockId}:question`);
-    },
-    [getFragment],
-  );
-
-  const getBlockAnswerFragment = useCallback(
-    (blockId: string): Y.XmlFragment | null => {
-      return getFragment(`block:${blockId}:answer`);
-    },
-    [getFragment],
-  );
+    collabManager.reconnect(roomName, url);
+  }, [url, roomName]);
 
   return useMemo(
     () => ({
@@ -244,22 +186,7 @@ export function usePageCollab({
       isSynced,
       reconnect,
       userInfo: connection?.userInfo ?? userInfo,
-      getFragment,
-      getTitleFragment,
-      getBlockQuestionFragment,
-      getBlockAnswerFragment,
     }),
-    [
-      connection,
-      provider,
-      connectionState,
-      isSynced,
-      reconnect,
-      userInfo,
-      getFragment,
-      getTitleFragment,
-      getBlockQuestionFragment,
-      getBlockAnswerFragment,
-    ],
+    [connection, provider, connectionState, isSynced, reconnect, userInfo]
   );
 }

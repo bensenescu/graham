@@ -19,6 +19,13 @@ export const Route = createFileRoute("/api/page-collab/$pageId" as any)({
         const { pageId } = params;
 
         const upgradeHeader = request.headers.get("Upgrade");
+        const requestUrl = new URL(request.url);
+        const tokenParam = requestUrl.searchParams.get("token");
+        console.debug("[api/page-collab] incoming", {
+          pageId,
+          upgradeHeader,
+          hasTokenParam: !!tokenParam,
+        });
         if (upgradeHeader !== "websocket") {
           return new Response("Expected WebSocket upgrade", { status: 426 });
         }
@@ -34,9 +41,22 @@ export const Route = createFileRoute("/api/page-collab/$pageId" as any)({
             url.searchParams.delete("token");
           }
 
+          console.debug("[api/page-collab] auth header set", {
+            pageId,
+            hasToken: !!token,
+          });
+
           const session = await authenticateRequest(authConfig, request);
 
+          console.debug("[api/page-collab] auth result", {
+            pageId,
+            hasSession: !!session,
+            userId: session?.sub ?? null,
+            email: session?.email ?? null,
+          });
+
           if (!session || !session.sub) {
+            console.debug("[api/page-collab] unauthorized", { pageId });
             return new Response(JSON.stringify({ error: "Unauthorized" }), {
               status: 401,
               headers: { "Content-Type": "application/json" },
@@ -56,6 +76,10 @@ export const Route = createFileRoute("/api/page-collab/$pageId" as any)({
           doUrl.searchParams.set("userColor", userColor);
 
           const doRequest = new Request(doUrl.toString(), request);
+          console.debug("[api/page-collab] proxy to DO", {
+            pageId,
+            hasUserId: !!session.sub,
+          });
           return doStub.fetch(doRequest);
         } catch (error) {
           console.error("Page collab connection error:", error);

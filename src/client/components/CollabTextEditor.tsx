@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { useEditor, EditorContent } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Collaboration from "@tiptap/extension-collaboration";
@@ -48,19 +48,54 @@ export function CollabTextEditor({
   initialContent,
   singleLine = false,
 }: CollabTextEditorProps) {
-  // Seed fragment with initial content if it's empty
+  // Track if we've already seeded this fragment to prevent duplicates
+  const hasSeededRef = useRef(false);
+  const fragmentIdRef = useRef<string | null>(null);
+
+  // Reset seeding flag if fragment changes (different field)
+  const fragmentId = fragment.doc?.guid + "-" + fragment.toString();
+  if (fragmentIdRef.current !== fragmentId) {
+    fragmentIdRef.current = fragmentId;
+    hasSeededRef.current = false;
+  }
+
+  // Seed fragment with initial content if it's empty and synced
   useEffect(() => {
-    if (initialContent && fragment.length === 0) {
-      // Insert initial content as a paragraph
-      const paragraph = new Y.XmlElement("paragraph");
-      const text = new Y.XmlText(initialContent);
-      paragraph.insert(0, [text]);
-      fragment.insert(0, [paragraph]);
+    if (hasSeededRef.current) return;
+    if (!initialContent) return;
+
+    // Wait for provider to sync before checking if we should seed
+    const handleSync = () => {
+      // Double-check we haven't seeded yet (could have happened in another effect)
+      if (hasSeededRef.current) return;
+
+      // Only seed if fragment is truly empty after sync
+      if (fragment.length === 0) {
+        hasSeededRef.current = true;
+        const paragraph = new Y.XmlElement("paragraph");
+        const text = new Y.XmlText(initialContent);
+        paragraph.insert(0, [text]);
+        fragment.insert(0, [paragraph]);
+      } else {
+        // Fragment has content from server, don't seed
+        hasSeededRef.current = true;
+      }
+    };
+
+    // Check if provider is already synced
+    if (provider.synced) {
+      handleSync();
+    } else {
+      // Wait for sync event
+      provider.once("sync", handleSync);
+      return () => {
+        provider.off("sync", handleSync);
+      };
     }
-  }, [fragment, initialContent]);
+  }, [fragment, initialContent, provider]);
 
   const extensions = useMemo(() => {
-    const base = [
+    return [
       StarterKit.configure({
         // Disable undo/redo - Yjs handles it
         undoRedo: false,
@@ -87,6 +122,11 @@ export function CollabTextEditor({
           color: userColor,
         },
         render: (user) => {
+          // Don't render cursor for our own user
+          if (user.name === userName) {
+            return document.createElement("span"); // Empty element
+          }
+
           const cursor = document.createElement("span");
           cursor.classList.add("collab-caret");
           cursor.style.borderColor = user.color;
@@ -99,13 +139,17 @@ export function CollabTextEditor({
           cursor.appendChild(label);
           return cursor;
         },
-        selectionRender: (user) => ({
-          style: `background-color: ${user.color}20;`,
-        }),
+        selectionRender: (user) => {
+          // Don't render selection for our own user
+          if (user.name === userName) {
+            return {};
+          }
+          return {
+            style: `background-color: ${user.color}20;`,
+          };
+        },
       }),
     ];
-
-    return base;
   }, [fragment, provider, userName, userColor, placeholder, singleLine]);
 
   const editor = useEditor({

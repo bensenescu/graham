@@ -7,7 +7,7 @@ import CollaborationCaret from "@tiptap/extension-collaboration-caret";
 import Placeholder from "@tiptap/extension-placeholder";
 import * as Y from "yjs";
 import type { WebsocketProvider } from "y-websocket";
-import { useYjsWebSocket } from "@/client/hooks/useYjsWebSocket";
+import { useCollab } from "@/client/hooks/useCollab";
 
 export const Route = createFileRoute("/test-collaboration/$roomId")({
   component: TestCollaborationPage,
@@ -15,7 +15,7 @@ export const Route = createFileRoute("/test-collaboration/$roomId")({
 
 function TestCollaborationPage() {
   const { roomId } = Route.useParams();
-  const { doc, provider, connectionState, isSynced, reconnect, userInfo } = useYjsWebSocket({
+  const { doc, provider, connectionState, isSynced, reconnect, userInfo } = useCollab({
     url: "/api/test-collaboration",
     roomName: roomId,
   });
@@ -29,7 +29,7 @@ function TestCollaborationPage() {
   }, [connectionState, isSynced]);
 
   // Only render editor when provider is ready AND synced
-  const isReady = provider && connectionState === "connected" && isSynced;
+  const isReady = doc && provider && connectionState === "connected" && isSynced;
 
   return (
     <div className="min-h-screen bg-base-200 px-6 py-10">
@@ -51,8 +51,8 @@ function TestCollaborationPage() {
           <div className="border border-base-300 rounded-md p-3 bg-base-100">
             {isReady ? (
               <CollabEditor
-                doc={doc}
-                provider={provider}
+                doc={doc!}
+                provider={provider!}
                 userName={userInfo.userName}
                 userColor={userInfo.userColor}
               />

@@ -97,57 +97,39 @@ export function QADocumentEditor({
   onReviewRequest,
   onTitleChange,
 }: QADocumentEditorProps) {
-  // Local state for editing
+  // Local state for block management (drag/drop, add/remove)
   const [localBlocks, setLocalBlocks] = useState<PageBlock[]>(blocks);
-  const [localTitle, setLocalTitle] = useState(pageTitle || "");
   const [focusBlockId, setFocusBlockId] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const sensors = useDraggableSensors();
-  // Track if we've seeded initial content to Yjs
-  const hasSeededTitleRef = useRef(false);
 
   // Collaborative editing via Yjs
   const collab = usePageCollab({ pageId });
-  const { provider, isSynced, connectionState, getTitleFragment, userInfo } =
+  const { provider, connectionState, getTitleFragment, userInfo, reconnect } =
     collab;
 
-  // Whether collab is ready for editing
-  const isCollabReady =
-    provider !== null && connectionState === "connected" && isSynced;
+  // Whether collaboration is ready for local editing (provider exists)
+  const isReady = provider !== null;
 
-  // Reset seeding flag when pageId changes
   useEffect(() => {
-    hasSeededTitleRef.current = false;
-  }, [pageId]);
-
-  // Seed title fragment from DB when Yjs syncs (if fragment is empty)
-  useEffect(() => {
-    if (!isCollabReady || hasSeededTitleRef.current) return;
-
-    const titleFragment = getTitleFragment();
-    if (titleFragment.length === 0 && pageTitle) {
-      // Fragment is empty but DB has content - seed from DB
-      // Note: CollabTextEditor handles this via initialContent prop
-    }
-    hasSeededTitleRef.current = true;
-  }, [isCollabReady, getTitleFragment, pageTitle]);
+    console.debug("[QADocumentEditor] collab status", {
+      pageId,
+      hasProvider: provider !== null,
+      connectionState,
+      isReady,
+    });
+  }, [pageId, provider, connectionState, isReady]);
 
   // Sync title from Yjs to DB on blur
   const handleTitleBlur = useCallback(() => {
-    if (!isCollabReady) {
-      // Fallback: use local state
-      if (localTitle !== pageTitle) {
-        onTitleChange?.(localTitle);
-      }
-      return;
-    }
-
     const titleFragment = getTitleFragment();
+    if (!titleFragment) return;
+
     const yjsTitle = getFragmentText(titleFragment);
     if (yjsTitle !== pageTitle) {
       onTitleChange?.(yjsTitle);
     }
-  }, [isCollabReady, getTitleFragment, pageTitle, localTitle, onTitleChange]);
+  }, [getTitleFragment, pageTitle, onTitleChange]);
 
   // Sync local state when blocks change from parent
   useEffect(() => {
@@ -157,21 +139,6 @@ export function QADocumentEditor({
       setLocalBlocks(blocks);
     }
   }, [blocks]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Sync local title when pageTitle changes from parent (non-collab fallback)
-  useEffect(() => {
-    if (pageTitle !== undefined && pageTitle !== localTitle) {
-      setLocalTitle(pageTitle);
-    }
-  }, [pageTitle]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Handle title change - only update local state while typing (fallback mode)
-  const handleTitleChange = useCallback(
-    (e: React.ChangeEvent<HTMLInputElement>) => {
-      setLocalTitle(e.target.value);
-    },
-    [],
-  );
 
   // Sort blocks by sortKey
   const sortedBlocks = useMemo(() => {
@@ -349,105 +316,132 @@ export function QADocumentEditor({
   // Collab context value for child blocks
   const collabContextValue = useMemo<PageCollabContextValue>(
     () => ({
-      collab: isCollabReady ? collab : null,
-      isCollabReady,
+      collab: isReady ? collab : null,
+      isCollabReady: isReady,
     }),
-    [collab, isCollabReady],
+    [collab, isReady],
   );
 
   return (
     <PageCollabContext.Provider value={collabContextValue}>
       <div ref={containerRef} className="pt-6 pb-6 px-6 min-h-screen">
         <div className="max-w-3xl mx-auto bg-base-100 rounded-lg px-4 py-2 border border-base-300 min-h-[calc(100vh-6rem)]">
-          {/* Page title - collaborative or fallback */}
-          {isCollabReady && provider ? (
-            <div className="pt-4 pb-2">
-              <CollabTextEditor
-                fragment={getTitleFragment()}
-                provider={provider}
-                userName={userInfo.userName}
-                userColor={userInfo.userColor}
-                placeholder="Untitled"
-                className="text-2xl font-bold text-base-content [&_p]:m-0"
-                onBlur={handleTitleBlur}
-                initialContent={pageTitle || ""}
-                singleLine
-              />
+          {/* Loading state - show until collaboration is ready */}
+          {!isReady ? (
+            <div className="flex flex-col items-center justify-center py-20 text-base-content/60">
+              <span className="loading loading-spinner loading-lg mb-4" />
+              <span>Loading document...</span>
             </div>
           ) : (
-            <input
-              type="text"
-              value={localTitle}
-              onChange={handleTitleChange}
-              onBlur={handleTitleBlur}
-              placeholder="Untitled"
-              style={{ fontSize: "1.5rem", lineHeight: "2rem" }}
-              className="w-full font-bold text-base-content bg-transparent border-none outline-none pt-4 pb-2 placeholder:text-base-content/40"
-            />
-          )}
-
-        {sortedBlocks.length === 0 ? (
-          <div className="py-8">
-            <p className="text-base-content/50 mb-4">No questions yet</p>
-            <button
-              onClick={handleAddBlock}
-              className="btn btn-primary btn-sm gap-2"
-            >
-              <Plus className="h-4 w-4" />
-              Add Question
-            </button>
-          </div>
-        ) : (
-          <DndContext
-            sensors={sensors}
-            collisionDetection={closestCenter}
-            modifiers={[restrictToVerticalAxis]}
-            onDragEnd={handleDragEnd}
-          >
-            <SortableContext
-              items={sortedBlocks.map((block) => block.id)}
-              strategy={verticalListSortingStrategy}
-            >
-              <div>
-                {sortedBlocks.map((block) => (
-                  <QADocumentBlock
-                    key={block.id}
-                    block={block}
-                    review={reviews?.get(block.id)}
-                    isReviewLoading={loadingBlockIds?.has(block.id)}
-                    isActive={activeBlockId === block.id}
-                    showInlineReviews={showInlineReviews}
-                    onQuestionChange={handleQuestionChange}
-                    onAnswerChange={handleAnswerChange}
-                    onDelete={handleDelete}
-                    onReviewRequest={onReviewRequest}
-                    onFocus={onBlockFocus}
-                    isOnly={sortedBlocks.length === 1}
-                    autoFocusQuestion={block.id === focusBlockId}
-                    onAutoFocusDone={() => setFocusBlockId(null)}
+            <>
+              {/* Connection status indicator - simple dot */}
+              <div className="flex items-center gap-2 text-xs text-base-content/60 pt-2 h-6">
+                {connectionState === "connected" ? (
+                  <span
+                    className="w-2 h-2 rounded-full bg-success"
+                    title="Online"
                   />
-                ))}
+                ) : connectionState === "connecting" ? (
+                  <>
+                    <span className="loading loading-spinner loading-xs" />
+                    <span>Syncing...</span>
+                  </>
+                ) : (
+                  <>
+                    <span
+                      className="w-2 h-2 rounded-full bg-warning"
+                      title="Offline"
+                    />
+                    <span>Offline</span>
+                    <button
+                      onClick={reconnect}
+                      className="underline hover:text-base-content"
+                    >
+                      Reconnect
+                    </button>
+                  </>
+                )}
               </div>
-            </SortableContext>
-          </DndContext>
-        )}
 
-          {/* Add button at bottom */}
-          {sortedBlocks.length > 0 && (
-            <div className="pb-2">
-              <button
-                id={ADD_QUESTION_BUTTON_ID}
-                tabIndex={0}
-                onClick={handleAddBlock}
-                className="btn btn-ghost btn-sm gap-2 text-base-content/60 hover:text-base-content focus:bg-primary/10 focus:text-base-content"
-              >
-                <Plus className="h-4 w-4" />
-                Add Question
-                <kbd className="ml-1 px-1.5 py-0.5 text-xs font-mono bg-base-300 border border-base-content/20 rounded">
-                  a
-                </kbd>
-              </button>
-            </div>
+              {/* Page title */}
+              <div className="pt-2 pb-2">
+                <CollabTextEditor
+                  fragment={getTitleFragment()!}
+                  provider={provider}
+                  userName={userInfo.userName}
+                  userColor={userInfo.userColor}
+                  placeholder="Untitled"
+                  className="text-2xl font-bold text-base-content [&_p]:m-0"
+                  onBlur={handleTitleBlur}
+                  initialContent={pageTitle || ""}
+                  singleLine
+                />
+              </div>
+
+              {sortedBlocks.length === 0 ? (
+                <div className="py-8">
+                  <p className="text-base-content/50 mb-4">No questions yet</p>
+                  <button
+                    onClick={handleAddBlock}
+                    className="btn btn-primary btn-sm gap-2"
+                  >
+                    <Plus className="h-4 w-4" />
+                    Add Question
+                  </button>
+                </div>
+              ) : (
+                <DndContext
+                  sensors={sensors}
+                  collisionDetection={closestCenter}
+                  modifiers={[restrictToVerticalAxis]}
+                  onDragEnd={handleDragEnd}
+                >
+                  <SortableContext
+                    items={sortedBlocks.map((block) => block.id)}
+                    strategy={verticalListSortingStrategy}
+                  >
+                    <div>
+                      {sortedBlocks.map((block) => (
+                        <QADocumentBlock
+                          key={block.id}
+                          block={block}
+                          review={reviews?.get(block.id)}
+                          isReviewLoading={loadingBlockIds?.has(block.id)}
+                          isActive={activeBlockId === block.id}
+                          showInlineReviews={showInlineReviews}
+                          onQuestionChange={handleQuestionChange}
+                          onAnswerChange={handleAnswerChange}
+                          onDelete={handleDelete}
+                          onReviewRequest={onReviewRequest}
+                          onFocus={onBlockFocus}
+                          isOnly={sortedBlocks.length === 1}
+                          autoFocusQuestion={block.id === focusBlockId}
+                          onAutoFocusDone={() => setFocusBlockId(null)}
+                        />
+                      ))}
+                    </div>
+                  </SortableContext>
+                </DndContext>
+              )}
+
+              {/* Add button at bottom */}
+              {sortedBlocks.length > 0 && (
+                <div className="pb-2">
+                  <button
+                    id={ADD_QUESTION_BUTTON_ID}
+                    tabIndex={0}
+                    onClick={handleAddBlock}
+                    className="btn btn-ghost btn-sm gap-2 text-base-content/60 hover:text-base-content focus:bg-primary/10 focus:text-base-content"
+                  >
+                    <Plus className="h-4 w-4" />
+                    Add Question
+                    <kbd className="ml-1 px-1.5 py-0.5 text-xs font-mono bg-base-300 border border-base-content/20 rounded">
+                      a
+                    </kbd>
+                  </button>
+                </div>
+              )}
+            </>
           )}
         </div>
       </div>
