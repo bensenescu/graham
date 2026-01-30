@@ -1,7 +1,7 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "every-graham",
-  "main": "@tanstack/react-start/server-entry",
+  "main": "src/server.ts",
   "compatibility_date": "2025-09-02",
   "compatibility_flags": ["nodejs_compat"],
   "observability": {
@@ -23,8 +23,30 @@
     {
       "binding": "DB",
       "database_name": "every-graham",
-      "database_id": "98c1adbf-c0fa-408e-9754-7c22915d2e05",
+      "database_id": "aa916598-6afb-4c1e-a667-368b0fca1846",
       "migrations_dir": "drizzle",
+    },
+  ],
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "SIMPLE_COLLAB_DO",
+        "class_name": "SimpleCollabDO",
+      },
+      {
+        "name": "PAGE_COLLAB_DO",
+        "class_name": "PageCollabDO",
+      },
+    ],
+  },
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_classes": ["SimpleCollabDO"],
+    },
+    {
+      "tag": "v2",
+      "new_classes": ["PageCollabDO"],
     },
   ],
 }

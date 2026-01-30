@@ -1,7 +1,11 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useLiveQuery, eq } from "@tanstack/react-db";
 import { useCallback, useMemo, useRef, useState } from "react";
-import { pageCollection, pageBlockCollection } from "@/client/tanstack-db";
+import {
+  pageCollection,
+  pageBlockCollection,
+  sharedPageCollection,
+} from "@/client/tanstack-db";
 import { QADocumentEditor } from "@/client/components/QADocumentEditor";
 import { ResizablePanelLayout } from "@/client/components/ResizablePanelLayout";
 import { FloatingControls } from "@/client/components/FloatingControls";
@@ -48,9 +52,18 @@ function PageEditor() {
     });
   }, []);
 
-  // Live query for this specific page (filtered by ID)
-  const { data: pages, isLoading: isLoadingPages } = useLiveQuery((q) =>
-    q.from({ page: pageCollection }).where(({ page }) => eq(page.id, pageId)),
+  // Live query for this specific page from owned pages
+  const { data: ownedPages, isLoading: isLoadingOwnedPages } = useLiveQuery(
+    (q) =>
+      q.from({ page: pageCollection }).where(({ page }) => eq(page.id, pageId)),
+  );
+
+  // Live query for this specific page from shared pages
+  const { data: sharedPages, isLoading: isLoadingSharedPages } = useLiveQuery(
+    (q) =>
+      q
+        .from({ page: sharedPageCollection })
+        .where(({ page }) => eq(page.id, pageId)),
   );
 
   // Live query for blocks (filtered by pageId from the singleton collection)
@@ -60,7 +73,12 @@ function PageEditor() {
       .where(({ block }) => eq(block.pageId, pageId)),
   );
 
-  const page = pages?.[0];
+  // Determine if this is an owned or shared page
+  const ownedPage = ownedPages?.[0];
+  const sharedPage = sharedPages?.[0];
+  const page = ownedPage ?? sharedPage;
+  const isOwner = !!ownedPage;
+  const isLoadingPages = isLoadingOwnedPages || isLoadingSharedPages;
   const sortedBlocks = useMemo(() => {
     return [...(blocks ?? [])].sort((a, b) =>
       b.sortKey > a.sortKey ? 1 : b.sortKey < a.sortKey ? -1 : 0,
@@ -203,7 +221,7 @@ function PageEditor() {
       activeTab={activeTab}
       onTabChange={handleTabChange}
       onClose={handlePanelClose}
-      onDeletePage={handleDelete}
+      onDeletePage={isOwner ? handleDelete : undefined}
       externalHeader
     />
   );

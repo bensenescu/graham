@@ -13,6 +13,7 @@ import {
   batchCreatePageBlocksSchema,
 } from "@/types/schemas/pages";
 import { z } from "zod";
+import { env } from "cloudflare:workers";
 
 export const getAllPages = createServerFn()
   .middleware([useSessionTokenClientMiddleware, ensureUserMiddleware])
@@ -38,7 +39,20 @@ export const deletePage = createServerFn()
   .middleware([useSessionTokenClientMiddleware, ensureUserMiddleware])
   .inputValidator((data: unknown) => deletePageSchema.parse(data))
   .handler(async ({ data, context }) => {
-    return PageService.delete(context.userId, data);
+    // Delete the page from DB
+    const result = await PageService.delete(context.userId, data);
+
+    // Clear collaboration state from Durable Object
+    try {
+      const doId = env.PAGE_COLLAB_DO.idFromName(`page-${data.id}`);
+      const doStub = env.PAGE_COLLAB_DO.get(doId);
+      await doStub.fetch(new Request("https://do/delete", { method: "DELETE" }));
+    } catch (error) {
+      // Log but don't fail the deletion if collab cleanup fails
+      console.error("Failed to clear collab state:", error);
+    }
+
+    return result;
   });
 
 // === Page Block Server Functions ===
