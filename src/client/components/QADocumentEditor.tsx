@@ -326,11 +326,24 @@ export function QADocumentEditor({
     <PageCollabContext.Provider value={collabContextValue}>
       <div ref={containerRef} className="pt-6 pb-6 px-6 min-h-screen">
         <div className="max-w-3xl mx-auto bg-base-100 rounded-lg px-4 py-2 border border-base-300 min-h-[calc(100vh-6rem)]">
-          {/* Loading state - show until collaboration is ready */}
+          {/* Loading state - skeleton loader until collaboration is ready */}
           {!isReady ? (
-            <div className="flex flex-col items-center justify-center py-20 text-base-content/60">
-              <span className="loading loading-spinner loading-lg mb-4" />
-              <span>Loading document...</span>
+            <div className="animate-pulse pt-4">
+              {/* Title skeleton */}
+              <div className="h-8 bg-base-300 rounded w-1/3 mb-6" />
+              {/* Block skeletons */}
+              <div className="space-y-8">
+                <div className="space-y-3">
+                  <div className="h-5 bg-base-300 rounded w-2/3" />
+                  <div className="h-4 bg-base-300/60 rounded w-full" />
+                  <div className="h-4 bg-base-300/60 rounded w-4/5" />
+                </div>
+                <div className="space-y-3">
+                  <div className="h-5 bg-base-300 rounded w-1/2" />
+                  <div className="h-4 bg-base-300/60 rounded w-full" />
+                  <div className="h-4 bg-base-300/60 rounded w-3/4" />
+                </div>
+              </div>
             </div>
           ) : (
             <>

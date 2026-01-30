@@ -80,6 +80,7 @@ export function usePageCollab({
 
   // Get user info from current session
   const currentUser = useCurrentUser();
+  const isSessionReady = currentUser !== null;
   const userInfo = useMemo((): UserInfo => {
     const userId = currentUser?.userId ?? "anonymous";
     const userName = currentUser?.email ?? "Anonymous";
@@ -90,15 +91,14 @@ export function usePageCollab({
   const userInfoRef = useRef(userInfo);
   userInfoRef.current = userInfo;
 
-  // Get connection from manager (synchronous - doc available immediately)
-  // Create doc even before user session is ready so editing works offline
+  // Get connection from manager - wait for session to be ready before connecting
   useEffect(() => {
-    if (!enabled) {
+    if (!enabled || !isSessionReady) {
       setConnection(null);
       setProvider(null);
       setConnectionState("disconnected");
       setIsSynced(false);
-      console.debug("[usePageCollab] disabled", { pageId });
+      console.debug("[usePageCollab] not ready", { pageId, enabled, isSessionReady });
       return;
     }
 
@@ -157,7 +157,7 @@ export function usePageCollab({
       setIsSynced(false);
       console.debug("[usePageCollab] cleanup", { pageId });
     };
-  }, [pageId, enabled]); // Don't include userInfo - we use ref to avoid recreation
+  }, [pageId, enabled, isSessionReady]); // Don't include userInfo - we use ref to avoid recreation
 
   // Update awareness when userInfo changes (without recreating connection)
   useEffect(() => {
