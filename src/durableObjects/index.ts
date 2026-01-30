@@ -1,0 +1,1 @@
+export { SimpleCollabDO } from "./SimpleCollabDO";

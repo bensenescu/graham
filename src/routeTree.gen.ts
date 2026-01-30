@@ -11,10 +11,12 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as NewRouteImport } from './routes/new'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as TestCollaborationRoomIdRouteImport } from './routes/test-collaboration.$roomId'
 import { Route as PagePageIdRouteImport } from './routes/page.$pageId'
 import { Route as ApiTranscribeRouteImport } from './routes/api/transcribe'
 import { Route as ApiReviewRouteImport } from './routes/api/review'
 import { Route as ApiOverallReviewRouteImport } from './routes/api/overall-review'
+import { Route as ApiTestCollaborationRoomIdRouteImport } from './routes/api/test-collaboration/$roomId'
 
 const NewRoute = NewRouteImport.update({
   id: '/new',
@@ -24,6 +26,11 @@ const NewRoute = NewRouteImport.update({
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TestCollaborationRoomIdRoute = TestCollaborationRoomIdRouteImport.update({
+  id: '/test-collaboration/$roomId',
+  path: '/test-collaboration/$roomId',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PagePageIdRoute = PagePageIdRouteImport.update({
@@ -46,6 +53,12 @@ const ApiOverallReviewRoute = ApiOverallReviewRouteImport.update({
   path: '/api/overall-review',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiTestCollaborationRoomIdRoute =
+  ApiTestCollaborationRoomIdRouteImport.update({
+    id: '/api/test-collaboration/$roomId',
+    path: '/api/test-collaboration/$roomId',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -54,6 +67,8 @@ export interface FileRoutesByFullPath {
   '/api/review': typeof ApiReviewRoute
   '/api/transcribe': typeof ApiTranscribeRoute
   '/page/$pageId': typeof PagePageIdRoute
+  '/test-collaboration/$roomId': typeof TestCollaborationRoomIdRoute
+  '/api/test-collaboration/$roomId': typeof ApiTestCollaborationRoomIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -62,6 +77,8 @@ export interface FileRoutesByTo {
   '/api/review': typeof ApiReviewRoute
   '/api/transcribe': typeof ApiTranscribeRoute
   '/page/$pageId': typeof PagePageIdRoute
+  '/test-collaboration/$roomId': typeof TestCollaborationRoomIdRoute
+  '/api/test-collaboration/$roomId': typeof ApiTestCollaborationRoomIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -71,6 +88,8 @@ export interface FileRoutesById {
   '/api/review': typeof ApiReviewRoute
   '/api/transcribe': typeof ApiTranscribeRoute
   '/page/$pageId': typeof PagePageIdRoute
+  '/test-collaboration/$roomId': typeof TestCollaborationRoomIdRoute
+  '/api/test-collaboration/$roomId': typeof ApiTestCollaborationRoomIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -81,6 +100,8 @@ export interface FileRouteTypes {
     | '/api/review'
     | '/api/transcribe'
     | '/page/$pageId'
+    | '/test-collaboration/$roomId'
+    | '/api/test-collaboration/$roomId'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -89,6 +110,8 @@ export interface FileRouteTypes {
     | '/api/review'
     | '/api/transcribe'
     | '/page/$pageId'
+    | '/test-collaboration/$roomId'
+    | '/api/test-collaboration/$roomId'
   id:
     | '__root__'
     | '/'
@@ -97,6 +120,8 @@ export interface FileRouteTypes {
     | '/api/review'
     | '/api/transcribe'
     | '/page/$pageId'
+    | '/test-collaboration/$roomId'
+    | '/api/test-collaboration/$roomId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -106,6 +131,8 @@ export interface RootRouteChildren {
   ApiReviewRoute: typeof ApiReviewRoute
   ApiTranscribeRoute: typeof ApiTranscribeRoute
   PagePageIdRoute: typeof PagePageIdRoute
+  TestCollaborationRoomIdRoute: typeof TestCollaborationRoomIdRoute
+  ApiTestCollaborationRoomIdRoute: typeof ApiTestCollaborationRoomIdRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -122,6 +149,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/test-collaboration/$roomId': {
+      id: '/test-collaboration/$roomId'
+      path: '/test-collaboration/$roomId'
+      fullPath: '/test-collaboration/$roomId'
+      preLoaderRoute: typeof TestCollaborationRoomIdRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/page/$pageId': {
@@ -152,6 +186,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiOverallReviewRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/test-collaboration/$roomId': {
+      id: '/api/test-collaboration/$roomId'
+      path: '/api/test-collaboration/$roomId'
+      fullPath: '/api/test-collaboration/$roomId'
+      preLoaderRoute: typeof ApiTestCollaborationRoomIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -162,6 +203,8 @@ const rootRouteChildren: RootRouteChildren = {
   ApiReviewRoute: ApiReviewRoute,
   ApiTranscribeRoute: ApiTranscribeRoute,
   PagePageIdRoute: PagePageIdRoute,
+  TestCollaborationRoomIdRoute: TestCollaborationRoomIdRoute,
+  ApiTestCollaborationRoomIdRoute: ApiTestCollaborationRoomIdRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
