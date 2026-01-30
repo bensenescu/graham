@@ -3,6 +3,7 @@ import { useMemo } from "react";
 import { useEditor, EditorContent } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Collaboration from "@tiptap/extension-collaboration";
+import CollaborationCaret from "@tiptap/extension-collaboration-caret";
 import Placeholder from "@tiptap/extension-placeholder";
 import * as Y from "yjs";
 import type { WebsocketProvider } from "y-websocket";
@@ -16,21 +17,22 @@ export const Route = createFileRoute("/collab-test/$blockId")({
 function CollabTestPage() {
   const { blockId } = Route.useParams();
   const { userInfo } = useCollaborationUser();
-  const { doc, provider, connectionState, reconnect } = useSimpleCollab({
+  const { doc, provider, connectionState, isSynced, reconnect } = useSimpleCollab({
     docId: blockId,
     userInfo,
     enabled: true,
   });
 
   const connectionLabel = useMemo(() => {
-    if (connectionState === "connected") return "Connected";
+    if (connectionState === "connected" && isSynced) return "Connected";
+    if (connectionState === "connected" && !isSynced) return "Syncing...";
     if (connectionState === "connecting") return "Connecting";
     if (connectionState === "error") return "Error";
     return "Disconnected";
-  }, [connectionState]);
+  }, [connectionState, isSynced]);
 
   // Only render editor when provider is ready AND synced
-  const isReady = provider && connectionState === "connected";
+  const isReady = provider && connectionState === "connected" && isSynced;
 
   return (
     <div className="min-h-screen bg-base-200 px-6 py-10">
@@ -51,15 +53,50 @@ function CollabTestPage() {
         <div className="mt-6">
           <div className="border border-base-300 rounded-md p-3 bg-base-100">
             {isReady ? (
-              <CollabEditor doc={doc} provider={provider} />
+              <CollabEditor
+                doc={doc}
+                provider={provider}
+                userName={userInfo.userName}
+                userColor={userInfo.userColor}
+              />
             ) : (
               <div className="min-h-[280px] flex items-center justify-center text-base-content/50">
-                {connectionState === "error" ? "Connection error" : "Connecting..."}
+                {connectionState === "error"
+                  ? "Connection error"
+                  : connectionState === "connected"
+                    ? "Syncing..."
+                    : "Connecting..."}
               </div>
             )}
           </div>
         </div>
       </div>
+      <style>{`
+        .collab-caret {
+          border-left: 2px solid;
+          margin-left: -1px;
+          margin-right: -1px;
+          pointer-events: none;
+          position: relative;
+          word-break: normal;
+        }
+
+        .collab-caret-label {
+          border-radius: 4px 4px 4px 0;
+          color: #fff;
+          font-family: system-ui, -apple-system, sans-serif;
+          font-size: 11px;
+          font-weight: 500;
+          left: -2px;
+          line-height: 1;
+          padding: 3px 6px;
+          position: absolute;
+          top: -1.5em;
+          user-select: none;
+          white-space: nowrap;
+          box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+        }
+      `}</style>
     </div>
   );
 }
@@ -67,9 +104,11 @@ function CollabTestPage() {
 interface CollabEditorProps {
   doc: Y.Doc;
   provider: WebsocketProvider;
+  userName: string;
+  userColor: string;
 }
 
-function CollabEditor({ doc }: CollabEditorProps) {
+function CollabEditor({ doc, provider, userName, userColor }: CollabEditorProps) {
   const editor = useEditor({
     extensions: [
       StarterKit.configure({
@@ -81,6 +120,29 @@ function CollabEditor({ doc }: CollabEditorProps) {
       }),
       Collaboration.configure({
         document: doc,
+      }),
+      CollaborationCaret.configure({
+        provider,
+        user: {
+          name: userName,
+          color: userColor,
+        },
+        render: (user) => {
+          const cursor = document.createElement("span");
+          cursor.classList.add("collab-caret");
+          cursor.style.borderColor = user.color;
+
+          const label = document.createElement("span");
+          label.classList.add("collab-caret-label");
+          label.style.backgroundColor = user.color;
+          label.textContent = user.name;
+
+          cursor.appendChild(label);
+          return cursor;
+        },
+        selectionRender: (user) => ({
+          style: `background-color: ${user.color}20;`,
+        }),
       }),
     ],
     editorProps: {

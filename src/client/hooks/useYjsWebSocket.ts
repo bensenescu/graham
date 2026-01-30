@@ -34,6 +34,8 @@ export interface UseYjsWebSocketReturn {
   provider: WebsocketProvider | null;
   awareness: awarenessProtocol.Awareness | null;
   connectionState: ConnectionState;
+  /** Whether the initial document sync is complete */
+  isSynced: boolean;
   reconnect: () => void;
   /** Send a JSON message over the WebSocket (for custom messages) */
   sendJsonMessage: (data: Record<string, unknown>) => void;
@@ -49,6 +51,7 @@ export function useYjsWebSocket({
 }: UseYjsWebSocketOptions): UseYjsWebSocketReturn {
   const [connectionState, setConnectionState] =
     useState<ConnectionState>("disconnected");
+  const [isSynced, setIsSynced] = useState(false);
   const [provider, setProvider] = useState<WebsocketProvider | null>(null);
   const docRef = useRef<Y.Doc | null>(externalDoc ?? null);
   const cleanupRef = useRef<(() => void) | null>(null);
@@ -117,12 +120,23 @@ export function useYjsWebSocket({
         setConnectionState("connected");
       } else if (status === "disconnected") {
         setConnectionState("disconnected");
+        setIsSynced(false);
       }
     });
+
+    newProvider.on("sync", (synced: boolean) => {
+      setIsSynced(synced);
+    });
+
+    // Check if already synced (can happen if provider syncs before event listener is added)
+    if (newProvider.synced) {
+      setIsSynced(true);
+    }
 
     // Store cleanup function
     cleanupRef.current = () => {
       newProvider.destroy();
+      setIsSynced(false);
     };
 
     setProvider(newProvider);
@@ -165,6 +179,7 @@ export function useYjsWebSocket({
     provider,
     awareness: provider?.awareness ?? externalAwareness ?? null,
     connectionState,
+    isSynced,
     reconnect,
     sendJsonMessage,
   };
