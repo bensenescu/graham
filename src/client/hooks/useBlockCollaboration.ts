@@ -1,4 +1,4 @@
-import { useMemo, useCallback } from "react";
+import { useMemo, useCallback, useEffect, useState } from "react";
 import * as Y from "yjs";
 import * as awarenessProtocol from "y-protocols/awareness";
 import {
@@ -8,6 +8,7 @@ import {
 } from "./useYjsWebSocket";
 
 export interface BlockAwarenessUser {
+  clientId: number;
   userId: string;
   userName: string;
   userColor: string;
@@ -75,35 +76,45 @@ export function useBlockCollaboration({
   const questionText = useMemo(() => doc.getText("question"), [doc]);
   const answerText = useMemo(() => doc.getText("answer"), [doc]);
 
-  // Build the WebSocket URL
-  const wsUrl = `/api/collab/block/${blockId}`;
-
   // Connect via WebSocket
   const { connectionState, reconnect, sendJsonMessage } = useYjsWebSocket({
-    doc,
-    awareness,
-    url: wsUrl,
+    url: "/api/collab/block",
+    roomName: blockId,
     userInfo,
     enabled,
+    doc,
+    awareness,
   });
 
-  // Extract users from awareness state
-  const users = useMemo((): BlockAwarenessUser[] => {
-    const result: BlockAwarenessUser[] = [];
-    awareness.getStates().forEach((state, clientId) => {
-      // Don't include ourselves
-      if (clientId === awareness.clientID) return;
+  const [users, setUsers] = useState<BlockAwarenessUser[]>([]);
 
-      if (state.user) {
-        result.push({
-          userId: state.user.userId,
-          userName: state.user.name,
-          userColor: state.user.color,
-          cursor: state.cursor,
-        });
-      }
-    });
-    return result;
+  // Extract users from awareness state
+  useEffect(() => {
+    const updateUsers = () => {
+      const result: BlockAwarenessUser[] = [];
+      awareness.getStates().forEach((state, clientId) => {
+        // Don't include ourselves
+        if (clientId === awareness.clientID) return;
+
+        if (state.user) {
+          result.push({
+            clientId,
+            userId: state.user.userId,
+            userName: state.user.name,
+            userColor: state.user.color,
+            cursor: state.cursor,
+          });
+        }
+      });
+      setUsers(result);
+    };
+
+    updateUsers();
+    awareness.on("update", updateUsers);
+
+    return () => {
+      awareness.off("update", updateUsers);
+    };
   }, [awareness]);
 
   // Update cursor position in awareness

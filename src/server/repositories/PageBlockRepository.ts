@@ -1,5 +1,5 @@
 import { db } from "@/db";
-import { pageBlocks, pages } from "@/db/schema";
+import { pageBlocks, pages, pageShares } from "@/db/schema";
 import { eq, inArray } from "drizzle-orm";
 
 // Types for repository operations
@@ -19,20 +19,31 @@ type UpdatePageBlock = {
 };
 
 /**
- * Find all blocks for all pages owned by a user.
+ * Find all blocks for all pages accessible to a user (owned + shared).
  */
 async function findAllByUserId(userId: string) {
-  // Get all page IDs for the user
-  const userPages = await db.query.pages.findMany({
+  // Get all page IDs owned by the user
+  const ownedPages = await db.query.pages.findMany({
     where: eq(pages.userId, userId),
     columns: { id: true },
   });
 
-  if (userPages.length === 0) {
+  // Get all page IDs shared with the user
+  const sharedPages = await db.query.pageShares.findMany({
+    where: eq(pageShares.userId, userId),
+    columns: { pageId: true },
+  });
+
+  const pageIds = Array.from(
+    new Set([
+      ...ownedPages.map((p) => p.id),
+      ...sharedPages.map((s) => s.pageId),
+    ]),
+  );
+
+  if (pageIds.length === 0) {
     return [];
   }
-
-  const pageIds = userPages.map((p) => p.id);
 
   return db.query.pageBlocks.findMany({
     where: inArray(pageBlocks.pageId, pageIds),

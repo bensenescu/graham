@@ -34,7 +34,7 @@ export function BlockPresenceIndicator({
     <div className="flex items-center -space-x-1">
       {visibleUsers.map((user) => (
         <div
-          key={user.userId}
+          key={user.clientId}
           className={`${sizeClass} rounded-full border-2 border-white flex items-center justify-center font-medium text-white`}
           style={{ backgroundColor: user.userColor }}
           title={`${user.userName} is editing`}

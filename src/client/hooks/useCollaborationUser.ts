@@ -98,9 +98,10 @@ export function useCollaborationUser(): UseCollaborationUserReturn {
 
   const userInfo = useMemo((): UserInfo => {
     const userId = getClientId();
+    const userName = displayName;
     return {
       userId,
-      userName: displayName,
+      userName,
       userColor: generateUserColor(userId),
     };
   }, [displayName]);

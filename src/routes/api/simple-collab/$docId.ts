@@ -5,20 +5,8 @@ import {
 } from "@every-app/sdk/tanstack/server";
 import { env } from "cloudflare:workers";
 
-/**
- * WebSocket API route for page-level collaboration
- *
- * This route handles WebSocket connections for real-time editing
- * of page metadata (title, block ordering) using Yjs.
- *
- * Query parameters:
- * - userId: The user's ID
- * - userName: The user's display name
- * - userColor: The user's cursor color (hex)
- */
-// Route type will be generated during build
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-export const Route = createFileRoute("/api/collab/page/$pageId" as any)({
+export const Route = createFileRoute("/api/simple-collab/$docId" as any)({
   server: {
     handlers: {
       GET: async ({
@@ -26,18 +14,16 @@ export const Route = createFileRoute("/api/collab/page/$pageId" as any)({
         params,
       }: {
         request: Request;
-        params: { pageId: string };
+        params: { docId: string };
       }) => {
-        const { pageId } = params;
+        const { docId } = params;
 
-        // Check for WebSocket upgrade request
         const upgradeHeader = request.headers.get("Upgrade");
         if (upgradeHeader !== "websocket") {
           return new Response("Expected WebSocket upgrade", { status: 426 });
         }
 
         try {
-          // Authenticate the request
           const authConfig = getAuthConfig();
           const url = new URL(request.url);
           const token = url.searchParams.get("token");
@@ -57,26 +43,22 @@ export const Route = createFileRoute("/api/collab/page/$pageId" as any)({
             });
           }
 
-          // Get user info from query params (passed by client)
           const userName =
             url.searchParams.get("userName") || session.email || "Anonymous";
           const userColor = url.searchParams.get("userColor") || "#808080";
 
-          // Get the Durable Object for this page
-          const doId = env.PAGE_META_DO.idFromName(`page-${pageId}`);
-          const doStub = env.PAGE_META_DO.get(doId);
+          const doId = env.SIMPLE_COLLAB_DO.idFromName(`doc-${docId}`);
+          const doStub = env.SIMPLE_COLLAB_DO.get(doId);
 
-          // Build the URL for the Durable Object
           const doUrl = new URL(request.url);
           doUrl.searchParams.set("userId", session.sub);
           doUrl.searchParams.set("userName", userName);
           doUrl.searchParams.set("userColor", userColor);
 
-          // Forward the WebSocket request to the Durable Object
           const doRequest = new Request(doUrl.toString(), request);
           return doStub.fetch(doRequest);
         } catch (error) {
-          console.error("WebSocket page connection error:", error);
+          console.error("Simple collab connection error:", error);
           return new Response(
             JSON.stringify({
               error: "Failed to establish WebSocket connection",

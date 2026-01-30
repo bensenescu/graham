@@ -63,9 +63,10 @@ export class PageMetaDO implements DurableObject {
     this.doc.getText("title");
     this.doc.getArray<BlockOrderItem>("blockOrder");
 
-    // Listen for document updates to trigger D1 sync
-    this.doc.on("update", () => {
+    // Listen for document updates to trigger D1 sync and broadcast changes
+    this.doc.on("update", (update, origin) => {
       this.scheduleD1Sync();
+      this.broadcastDocUpdate(update, origin as WebSocketWithUser | null);
     });
 
     // Clean up awareness when clients disconnect
@@ -80,7 +81,9 @@ export class PageMetaDO implements DurableObject {
     // Block concurrency by default for Yjs consistency
     // Note: blockConcurrencyByDefault() may not be in all type definitions
     // but is a valid Cloudflare Durable Object method
-    (this.state as unknown as { blockConcurrencyByDefault?: () => void }).blockConcurrencyByDefault?.();
+    (
+      this.state as unknown as { blockConcurrencyByDefault?: () => void }
+    ).blockConcurrencyByDefault?.();
   }
 
   async fetch(request: Request): Promise<Response> {
@@ -159,26 +162,27 @@ export class PageMetaDO implements DurableObject {
       Y.applyUpdate(this.doc, new Uint8Array(storedState));
     }
 
-    // If no Yjs state, try to load from D1 and initialize
-    if (!storedState && this.pageId) {
-      const pageData = await this.loadPageFromD1();
-      if (pageData) {
-        const titleText = this.doc.getText("title");
-        const blockOrderArray =
-          this.doc.getArray<BlockOrderItem>("blockOrder");
+    if (this.pageId) {
+      const titleText = this.doc.getText("title");
+      const blockOrderArray = this.doc.getArray<BlockOrderItem>("blockOrder");
 
-        // Initialize with D1 content if Y.Text is empty
-        if (titleText.length === 0 && pageData.title) {
-          titleText.insert(0, pageData.title);
+      const needsTitle = titleText.length === 0;
+      const needsBlockOrder = blockOrderArray.length === 0;
+
+      // If no Yjs state or missing critical data, hydrate from D1
+      if (!storedState || needsTitle || needsBlockOrder) {
+        const pageData = await this.loadPageFromD1();
+        if (pageData) {
+          if (needsTitle && pageData.title) {
+            titleText.insert(0, pageData.title);
+          }
+
+          if (needsBlockOrder && pageData.blocks.length > 0) {
+            blockOrderArray.push(pageData.blocks);
+          }
+
+          await this.saveToStorage();
         }
-
-        // Initialize block order from D1
-        if (blockOrderArray.length === 0 && pageData.blocks.length > 0) {
-          blockOrderArray.push(pageData.blocks);
-        }
-
-        // Store the initial state
-        await this.saveToStorage();
       }
     }
 
@@ -293,12 +297,6 @@ export class PageMetaDO implements DurableObject {
       ws.send(encoding.toUint8Array(encoder));
     }
 
-    // Broadcast updates to other clients
-    if (syncMessageType === syncProtocol.messageYjsUpdate) {
-      // The doc was updated, broadcast to others
-      this.broadcastUpdate(ws);
-    }
-
     // Save state after receiving updates
     this.saveToStorage();
   }
@@ -324,8 +322,7 @@ export class PageMetaDO implements DurableObject {
         };
         const afterBlockId = data.afterBlockId as string | undefined;
 
-        const blockOrderArray =
-          this.doc.getArray<BlockOrderItem>("blockOrder");
+        const blockOrderArray = this.doc.getArray<BlockOrderItem>("blockOrder");
 
         if (afterBlockId) {
           // Find the position after the specified block
@@ -344,8 +341,7 @@ export class PageMetaDO implements DurableObject {
 
       case "removeBlock": {
         const blockIdToRemove = data.blockId as string;
-        const blockOrderArray =
-          this.doc.getArray<BlockOrderItem>("blockOrder");
+        const blockOrderArray = this.doc.getArray<BlockOrderItem>("blockOrder");
         const items = blockOrderArray.toArray();
         const index = items.findIndex((b) => b.id === blockIdToRemove);
         if (index !== -1) {
@@ -358,8 +354,7 @@ export class PageMetaDO implements DurableObject {
         const blockIdToMove = data.blockId as string;
         const newIndex = data.newIndex as number;
         const newSortKey = data.newSortKey as string;
-        const blockOrderArray =
-          this.doc.getArray<BlockOrderItem>("blockOrder");
+        const blockOrderArray = this.doc.getArray<BlockOrderItem>("blockOrder");
         const items = blockOrderArray.toArray();
         const currentIndex = items.findIndex((b) => b.id === blockIdToMove);
 
@@ -399,7 +394,9 @@ export class PageMetaDO implements DurableObject {
 
     // Process block management commands via HTTP (for server-side operations)
     await this.handleJsonMessage(
-      { userInfo: { userId: "system", userName: "System", userColor: "#000" } } as WebSocketWithUser,
+      {
+        userInfo: { userId: "system", userName: "System", userColor: "#000" },
+      } as WebSocketWithUser,
       data,
     );
 
@@ -408,14 +405,16 @@ export class PageMetaDO implements DurableObject {
     });
   }
 
-  private broadcastUpdate(sender: WebSocketWithUser): void {
-    const stateVector = Y.encodeStateVector(this.doc);
+  private broadcastDocUpdate(
+    update: Uint8Array,
+    origin: WebSocketWithUser | null,
+  ): void {
     const encoder = encoding.createEncoder();
     encoding.writeVarUint(encoder, MESSAGE_SYNC);
-    syncProtocol.writeSyncStep2(encoder, this.doc, stateVector);
+    syncProtocol.writeUpdate(encoder, update);
     const message = encoding.toUint8Array(encoder);
 
-    this.broadcast(message, sender);
+    this.broadcast(message, origin ?? undefined);
   }
 
   private broadcastAwarenessUpdate(changedClients: number[]): void {

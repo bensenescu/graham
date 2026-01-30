@@ -1,7 +1,12 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useLiveQuery, eq } from "@tanstack/react-db";
 import { useCallback, useMemo, useRef, useState } from "react";
-import { pageCollection, pageBlockCollection } from "@/client/tanstack-db";
+import { useCurrentUser } from "@every-app/sdk/tanstack";
+import {
+  pageCollection,
+  pageBlockCollection,
+  sharedPageCollection,
+} from "@/client/tanstack-db";
 import { CollaborativeQADocumentEditor } from "@/client/components/CollaborativeQADocumentEditor";
 import { PageCollaborationProvider } from "@/client/components/PageCollaborationProvider";
 import { ResizablePanelLayout } from "@/client/components/ResizablePanelLayout";
@@ -29,6 +34,8 @@ function PageEditor() {
 
   // Collaboration user info
   const { userInfo, isLoading: isLoadingUser } = useCollaborationUser();
+  const currentUser = useCurrentUser();
+  const collaborationEnabled = Boolean(currentUser);
 
   // Panel state
   const [isPanelOpen, setIsPanelOpen] = useState(false);
@@ -52,9 +59,17 @@ function PageEditor() {
     });
   }, []);
 
-  // Live query for this specific page (filtered by ID)
+  // Live query for this specific page (owned)
   const { data: pages, isLoading: isLoadingPages } = useLiveQuery((q) =>
     q.from({ page: pageCollection }).where(({ page }) => eq(page.id, pageId)),
+  );
+
+  // Live query for this specific page (shared)
+  const { data: sharedPages, isLoading: isLoadingSharedPages } = useLiveQuery(
+    (q) =>
+      q
+        .from({ page: sharedPageCollection })
+        .where(({ page }) => eq(page.id, pageId)),
   );
 
   // Live query for blocks (filtered by pageId from the singleton collection)
@@ -64,7 +79,7 @@ function PageEditor() {
       .where(({ block }) => eq(block.pageId, pageId)),
   );
 
-  const page = pages?.[0];
+  const page = pages?.[0] ?? sharedPages?.[0];
   const sortedBlocks = useMemo(() => {
     return [...(blocks ?? [])].sort((a, b) =>
       b.sortKey > a.sortKey ? 1 : b.sortKey < a.sortKey ? -1 : 0,
@@ -147,7 +162,7 @@ function PageEditor() {
     setIsPracticeModeOpen(false);
   }, []);
 
-  if (isLoadingPages || isLoadingBlocks) {
+  if (isLoadingPages || isLoadingSharedPages || isLoadingBlocks) {
     return (
       <div className="h-full flex items-center justify-center">
         <span className="loading loading-spinner loading-md"></span>
@@ -200,13 +215,18 @@ function PageEditor() {
         }
         storageKey="page-review-panel-width"
       >
-        <PageCollaborationProvider pageId={pageId} userInfo={userInfo}>
+        <PageCollaborationProvider
+          pageId={pageId}
+          userInfo={userInfo}
+          enabled={collaborationEnabled}
+        >
           <CollaborativeQADocumentEditor
             pageId={pageId}
             blocks={sortedBlocks}
             reviews={reviews}
             loadingBlockIds={loadingBlockIds}
             showInlineReviews={showInlineReviews}
+            collaborationEnabled={collaborationEnabled}
             onBlockCreate={handleBlockCreate}
             onBlockUpdate={handleBlockUpdate}
             onBlockDelete={handleBlockDelete}

@@ -57,6 +57,7 @@
     "sonner": "^2.0.7",
     "tailwindcss": "^4.1.16",
     "y-protocols": "^1.0.7",
+    "y-websocket": "^3.0.0",
     "yjs": "^13.6.29",
     "zod": "^4.1.12"
   },

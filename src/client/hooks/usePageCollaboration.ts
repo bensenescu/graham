@@ -14,6 +14,7 @@ export interface BlockOrderItem {
 }
 
 export interface PagePresenceUser {
+  clientId: number;
   userId: string;
   userName: string;
   userColor: string;
@@ -85,16 +86,14 @@ export function usePageCollaboration({
     [doc],
   );
 
-  // Build the WebSocket URL
-  const wsUrl = `/api/collab/page/${pageId}`;
-
   // Connect via WebSocket
   const { connectionState, reconnect, sendJsonMessage } = useYjsWebSocket({
-    doc,
-    awareness,
-    url: wsUrl,
+    url: "/api/collab/page",
+    roomName: pageId,
     userInfo,
     enabled,
+    doc,
+    awareness,
   });
 
   // Subscribe to block order changes
@@ -123,6 +122,7 @@ export function usePageCollaboration({
 
       if (state.user) {
         result.push({
+          clientId,
           userId: state.user.userId,
           userName: state.user.name,
           userColor: state.user.color,
@@ -217,11 +217,13 @@ export function usePageCollaboration({
         );
       } else {
         // Moving to middle - need to consider that we're removing from currentIndex
-        const adjustedIndex =
-          newIndex > currentIndex ? newIndex : newIndex - 1;
+        const adjustedIndex = newIndex > currentIndex ? newIndex : newIndex - 1;
         const beforeItem = items[adjustedIndex];
         const afterItem = items[adjustedIndex + 1];
-        newSortKey = generateSortKeyBetween(beforeItem?.sortKey, afterItem?.sortKey);
+        newSortKey = generateSortKeyBetween(
+          beforeItem?.sortKey,
+          afterItem?.sortKey,
+        );
       }
 
       // Remove from current position

@@ -43,6 +43,9 @@ function CollaborativeTextarea({
   placeholder,
   className,
   onKeyDown,
+  onKeyUp,
+  onMouseUp,
+  onSelect,
   onFocus,
   onBlur,
   inputRef,
@@ -52,6 +55,9 @@ function CollaborativeTextarea({
   placeholder: string;
   className?: string;
   onKeyDown?: (e: React.KeyboardEvent<HTMLTextAreaElement>) => void;
+  onKeyUp?: (e: React.KeyboardEvent<HTMLTextAreaElement>) => void;
+  onMouseUp?: (e: React.MouseEvent<HTMLTextAreaElement>) => void;
+  onSelect?: (e: React.SyntheticEvent<HTMLTextAreaElement>) => void;
   onFocus?: () => void;
   onBlur?: () => void;
   inputRef?: React.RefObject<HTMLTextAreaElement | null>;
@@ -105,6 +111,9 @@ function CollaborativeTextarea({
       value={value}
       onChange={handleChange}
       onKeyDown={onKeyDown}
+      onKeyUp={onKeyUp}
+      onMouseUp={onMouseUp}
+      onSelect={onSelect}
       onFocus={onFocus}
       onBlur={onBlur}
       placeholder={placeholder}
@@ -124,6 +133,9 @@ function AutoResizeTextarea({
   placeholder,
   className,
   onKeyDown,
+  onKeyUp,
+  onMouseUp,
+  onSelect,
   onFocus,
   inputRef,
 }: {
@@ -133,6 +145,9 @@ function AutoResizeTextarea({
   placeholder: string;
   className?: string;
   onKeyDown?: (e: React.KeyboardEvent<HTMLTextAreaElement>) => void;
+  onKeyUp?: (e: React.KeyboardEvent<HTMLTextAreaElement>) => void;
+  onMouseUp?: (e: React.MouseEvent<HTMLTextAreaElement>) => void;
+  onSelect?: (e: React.SyntheticEvent<HTMLTextAreaElement>) => void;
   onFocus?: () => void;
   inputRef?: React.RefObject<HTMLTextAreaElement | null>;
 }) {
@@ -154,12 +169,67 @@ function AutoResizeTextarea({
       onChange={(e) => onChange(e.target.value)}
       onBlur={onBlur}
       onKeyDown={onKeyDown}
+      onKeyUp={onKeyUp}
+      onMouseUp={onMouseUp}
+      onSelect={onSelect}
       onFocus={onFocus}
       placeholder={placeholder}
       className={`w-full resize-none overflow-hidden bg-transparent focus:outline-none ${className}`}
       rows={1}
     />
   );
+}
+
+interface CursorOverlay {
+  userId: string;
+  userName: string;
+  userColor: string;
+  top: number;
+  left: number;
+  height: number;
+}
+
+function getTextareaCaretCoordinates(
+  textarea: HTMLTextAreaElement,
+  position: number,
+): { top: number; left: number; height: number } {
+  const computed = window.getComputedStyle(textarea);
+  const div = document.createElement("div");
+  div.style.position = "absolute";
+  div.style.visibility = "hidden";
+  div.style.whiteSpace = "pre-wrap";
+  div.style.wordWrap = "break-word";
+  div.style.overflow = "hidden";
+  div.style.font = computed.font;
+  div.style.padding = computed.padding;
+  div.style.border = computed.border;
+  div.style.boxSizing = computed.boxSizing;
+  div.style.width = computed.width;
+  div.style.lineHeight = computed.lineHeight;
+  div.style.letterSpacing = computed.letterSpacing;
+  div.style.textTransform = computed.textTransform;
+  div.style.textIndent = computed.textIndent;
+  div.style.wordSpacing = computed.wordSpacing;
+  div.style.textAlign = computed.textAlign;
+
+  const text = textarea.value.substring(0, position);
+  div.textContent = text;
+  const span = document.createElement("span");
+  span.textContent = textarea.value.substring(position) || ".";
+  div.appendChild(span);
+
+  document.body.appendChild(div);
+  const top = span.offsetTop - textarea.scrollTop;
+  const left = span.offsetLeft - textarea.scrollLeft;
+  document.body.removeChild(div);
+
+  const fontSize = parseFloat(computed.fontSize || "16");
+  const lineHeight =
+    computed.lineHeight === "normal"
+      ? Math.round(fontSize * 1.2)
+      : parseFloat(computed.lineHeight || String(fontSize * 1.2));
+
+  return { top, left, height: lineHeight };
 }
 
 /**
@@ -202,6 +272,7 @@ export function CollaborativeQADocumentBlock({
   const [localQuestion, setLocalQuestion] = useState(block.question);
   const [localAnswer, setLocalAnswer] = useState(block.answer);
   const questionInputRef = useRef<HTMLTextAreaElement>(null);
+  const answerInputRef = useRef<HTMLTextAreaElement>(null);
   const [hasFocusWithin, setHasFocusWithin] = useState(false);
 
   // Determine if we're in collaborative mode
@@ -220,6 +291,16 @@ export function CollaborativeQADocumentBlock({
       setLocalAnswer(block.answer);
     }
   }, [block.answer, isCollaborative]);
+
+  useEffect(() => {
+    if (!isCollaborative) return;
+    if (questionText.length === 0 && block.question) {
+      questionText.insert(0, block.question);
+    }
+    if (answerText.length === 0 && block.answer) {
+      answerText.insert(0, block.answer);
+    }
+  }, [isCollaborative, questionText, answerText, block.question, block.answer]);
 
   const {
     attributes,
@@ -240,28 +321,38 @@ export function CollaborativeQADocumentBlock({
     onFocus?.(block.id);
   }, [block.id, onFocus]);
 
+  const updateQuestionCursorFromSelection = useCallback(() => {
+    if (!isCollaborative) return;
+    const textarea = questionInputRef.current;
+    if (!textarea) return;
+    updateCursor(
+      "question",
+      textarea.selectionStart ?? 0,
+      textarea.selectionEnd ?? 0,
+    );
+  }, [isCollaborative, updateCursor]);
+
+  const updateAnswerCursorFromSelection = useCallback(() => {
+    if (!isCollaborative) return;
+    const textarea = answerInputRef.current;
+    if (!textarea) return;
+    updateCursor(
+      "answer",
+      textarea.selectionStart ?? 0,
+      textarea.selectionEnd ?? 0,
+    );
+  }, [isCollaborative, updateCursor]);
+
   // Handle cursor updates for collaborative mode
   const handleQuestionFocus = useCallback(() => {
     handleFocus();
-    if (isCollaborative) {
-      const selection = window.getSelection();
-      if (selection && selection.rangeCount > 0) {
-        const range = selection.getRangeAt(0);
-        updateCursor("question", range.startOffset, range.endOffset);
-      }
-    }
-  }, [handleFocus, isCollaborative, updateCursor]);
+    updateQuestionCursorFromSelection();
+  }, [handleFocus, updateQuestionCursorFromSelection]);
 
   const handleAnswerFocus = useCallback(() => {
     handleFocus();
-    if (isCollaborative) {
-      const selection = window.getSelection();
-      if (selection && selection.rangeCount > 0) {
-        const range = selection.getRangeAt(0);
-        updateCursor("answer", range.startOffset, range.endOffset);
-      }
-    }
-  }, [handleFocus, isCollaborative, updateCursor]);
+    updateAnswerCursorFromSelection();
+  }, [handleFocus, updateAnswerCursorFromSelection]);
 
   const handleBlur = useCallback(() => {
     if (isCollaborative) {
@@ -337,6 +428,65 @@ export function CollaborativeQADocumentBlock({
   // Filter users editing this specific block
   const activeUsers = useMemo(() => users, [users]);
 
+  const [questionCursors, setQuestionCursors] = useState<CursorOverlay[]>([]);
+  const [answerCursors, setAnswerCursors] = useState<CursorOverlay[]>([]);
+
+  const buildCursorOverlays = useCallback(
+    (
+      field: "question" | "answer",
+      textareaRef: React.RefObject<HTMLTextAreaElement | null>,
+    ) => {
+      const textarea = textareaRef.current;
+      if (!textarea) return [];
+
+      return activeUsers
+        .filter((user) => user.cursor?.field === field)
+        .map((user) => {
+          const position = Math.max(
+            0,
+            Math.min(textarea.value.length, user.cursor?.head ?? 0),
+          );
+          const coords = getTextareaCaretCoordinates(textarea, position);
+          return {
+            userId: user.userId,
+            userName: user.userName,
+            userColor: user.userColor,
+            top: coords.top,
+            left: coords.left,
+            height: coords.height,
+          };
+        });
+    },
+    [activeUsers],
+  );
+
+  useEffect(() => {
+    if (!isCollaborative) {
+      setQuestionCursors([]);
+      setAnswerCursors([]);
+      return;
+    }
+
+    const nextQuestionCursors = buildCursorOverlays(
+      "question",
+      questionInputRef,
+    );
+    const nextAnswerCursors = buildCursorOverlays("answer", answerInputRef);
+    setQuestionCursors(nextQuestionCursors);
+    setAnswerCursors(nextAnswerCursors);
+  }, [isCollaborative, buildCursorOverlays]);
+
+  useEffect(() => {
+    if (!isCollaborative) return;
+    const handleResize = () => {
+      setQuestionCursors(buildCursorOverlays("question", questionInputRef));
+      setAnswerCursors(buildCursorOverlays("answer", answerInputRef));
+    };
+
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, [isCollaborative, buildCursorOverlays]);
+
   return (
     <div
       ref={setCombinedRef}
@@ -390,15 +540,48 @@ export function CollaborativeQADocumentBlock({
           {/* Question */}
           <div className="flex items-start gap-2">
             {isCollaborative ? (
-              <CollaborativeTextarea
-                yText={questionText}
-                placeholder="What question are you exploring?"
-                className="text-base font-semibold text-base-content placeholder:text-base-content/40 leading-relaxed"
-                onFocus={handleQuestionFocus}
-                onBlur={handleQuestionBlur}
-                inputRef={questionInputRef}
-                onChange={handleCollaborativeQuestionChange}
-              />
+              <div className="relative w-full">
+                {questionCursors.length > 0 && (
+                  <div className="absolute inset-0 pointer-events-none">
+                    {questionCursors.map((cursor) => (
+                      <div
+                        key={cursor.userId}
+                        className="absolute"
+                        style={{
+                          top: cursor.top,
+                          left: cursor.left,
+                        }}
+                      >
+                        <div
+                          className="w-0.5"
+                          style={{
+                            height: cursor.height,
+                            backgroundColor: cursor.userColor,
+                          }}
+                        />
+                        <div
+                          className="absolute -top-6 left-0 -translate-x-1/2 px-1.5 py-0.5 text-[10px] font-medium text-white rounded shadow"
+                          style={{ backgroundColor: cursor.userColor }}
+                        >
+                          {cursor.userName}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <CollaborativeTextarea
+                  yText={questionText}
+                  placeholder="What question are you exploring?"
+                  className="text-base font-semibold text-base-content placeholder:text-base-content/40 leading-relaxed"
+                  onFocus={handleQuestionFocus}
+                  onBlur={handleQuestionBlur}
+                  onKeyUp={updateQuestionCursorFromSelection}
+                  onMouseUp={updateQuestionCursorFromSelection}
+                  onSelect={updateQuestionCursorFromSelection}
+                  inputRef={questionInputRef}
+                  onChange={handleCollaborativeQuestionChange}
+                />
+              </div>
             ) : (
               <AutoResizeTextarea
                 value={localQuestion}
@@ -415,14 +598,48 @@ export function CollaborativeQADocumentBlock({
           {/* Answer */}
           <div className="mt-2">
             {isCollaborative ? (
-              <CollaborativeTextarea
-                yText={answerText}
-                placeholder="Write your answer here..."
-                className="text-base text-base-content/80 placeholder:text-base-content/40 leading-relaxed"
-                onFocus={handleAnswerFocus}
-                onBlur={handleAnswerBlur}
-                onChange={handleCollaborativeAnswerChange}
-              />
+              <div className="relative w-full">
+                {answerCursors.length > 0 && (
+                  <div className="absolute inset-0 pointer-events-none">
+                    {answerCursors.map((cursor) => (
+                      <div
+                        key={cursor.userId}
+                        className="absolute"
+                        style={{
+                          top: cursor.top,
+                          left: cursor.left,
+                        }}
+                      >
+                        <div
+                          className="w-0.5"
+                          style={{
+                            height: cursor.height,
+                            backgroundColor: cursor.userColor,
+                          }}
+                        />
+                        <div
+                          className="absolute -top-6 left-0 -translate-x-1/2 px-1.5 py-0.5 text-[10px] font-medium text-white rounded shadow"
+                          style={{ backgroundColor: cursor.userColor }}
+                        >
+                          {cursor.userName}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <CollaborativeTextarea
+                  yText={answerText}
+                  placeholder="Write your answer here..."
+                  className="text-base text-base-content/80 placeholder:text-base-content/40 leading-relaxed"
+                  onFocus={handleAnswerFocus}
+                  onBlur={handleAnswerBlur}
+                  onKeyUp={updateAnswerCursorFromSelection}
+                  onMouseUp={updateAnswerCursorFromSelection}
+                  onSelect={updateAnswerCursorFromSelection}
+                  inputRef={answerInputRef}
+                  onChange={handleCollaborativeAnswerChange}
+                />
+              </div>
             ) : (
               <AutoResizeTextarea
                 value={localAnswer}

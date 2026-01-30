@@ -21,7 +21,13 @@ import { env } from "cloudflare:workers";
 export const Route = createFileRoute("/api/collab/block/$blockId" as any)({
   server: {
     handlers: {
-      GET: async ({ request, params }: { request: Request; params: { blockId: string } }) => {
+      GET: async ({
+        request,
+        params,
+      }: {
+        request: Request;
+        params: { blockId: string };
+      }) => {
         const { blockId } = params;
 
         // Check for WebSocket upgrade request
@@ -33,6 +39,15 @@ export const Route = createFileRoute("/api/collab/block/$blockId" as any)({
         try {
           // Authenticate the request
           const authConfig = getAuthConfig();
+          const url = new URL(request.url);
+          const token = url.searchParams.get("token");
+          if (token) {
+            const headers = new Headers(request.headers);
+            headers.set("Authorization", `Bearer ${token}`);
+            request = new Request(request, { headers });
+            url.searchParams.delete("token");
+          }
+
           const session = await authenticateRequest(authConfig, request);
 
           if (!session || !session.sub) {
@@ -43,7 +58,6 @@ export const Route = createFileRoute("/api/collab/block/$blockId" as any)({
           }
 
           // Get user info from query params (passed by client)
-          const url = new URL(request.url);
           const userName =
             url.searchParams.get("userName") || session.email || "Anonymous";
           const userColor = url.searchParams.get("userColor") || "#808080";
@@ -59,9 +73,8 @@ export const Route = createFileRoute("/api/collab/block/$blockId" as any)({
           doUrl.searchParams.set("userColor", userColor);
 
           // Forward the WebSocket request to the Durable Object
-          return doStub.fetch(doUrl.toString(), {
-            headers: request.headers,
-          });
+          const doRequest = new Request(doUrl.toString(), request);
+          return doStub.fetch(doRequest);
         } catch (error) {
           console.error("WebSocket block connection error:", error);
           return new Response(

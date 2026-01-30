@@ -7,3 +7,4 @@
 
 export { PageBlockDO } from "./PageBlockDO";
 export { PageMetaDO } from "./PageMetaDO";
+export { SimpleCollabDO } from "./SimpleCollabDO";

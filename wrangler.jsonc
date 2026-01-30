@@ -1,7 +1,7 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "every-graham",
-  "main": "@tanstack/react-start/server-entry",
+  "main": "src/server.ts",
   "compatibility_date": "2025-09-02",
   "compatibility_flags": ["nodejs_compat"],
   "observability": {
@@ -37,12 +37,20 @@
         "name": "PAGE_META_DO",
         "class_name": "PageMetaDO",
       },
+      {
+        "name": "SIMPLE_COLLAB_DO",
+        "class_name": "SimpleCollabDO",
+      },
     ],
   },
   "migrations": [
     {
       "tag": "v1",
       "new_classes": ["PageBlockDO", "PageMetaDO"],
+    },
+    {
+      "tag": "v2",
+      "new_classes": ["SimpleCollabDO"],
     },
   ],
 }

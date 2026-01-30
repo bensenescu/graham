@@ -7,6 +7,7 @@ declare namespace Cloudflare {
 		DB: D1Database;
 		PAGE_BLOCK_DO: DurableObjectNamespace /* PageBlockDO */;
 		PAGE_META_DO: DurableObjectNamespace /* PageMetaDO */;
+		SIMPLE_COLLAB_DO: DurableObjectNamespace /* SimpleCollabDO */;
 		EVERY_APP_GATEWAY: Fetcher /* every-app-gateway */;
 	}
 }

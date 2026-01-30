@@ -57,9 +57,10 @@ export class PageBlockDO implements DurableObject {
     this.doc.getText("question");
     this.doc.getText("answer");
 
-    // Listen for document updates to trigger D1 sync
-    this.doc.on("update", () => {
+    // Listen for document updates to trigger D1 sync and broadcast changes
+    this.doc.on("update", (update, origin) => {
       this.scheduleD1Sync();
+      this.broadcastDocUpdate(update, origin as WebSocketWithUser | null);
     });
 
     // Clean up awareness when clients disconnect
@@ -74,7 +75,9 @@ export class PageBlockDO implements DurableObject {
     // Block concurrency by default for Yjs consistency
     // Note: blockConcurrencyByDefault() may not be in all type definitions
     // but is a valid Cloudflare Durable Object method
-    (this.state as unknown as { blockConcurrencyByDefault?: () => void }).blockConcurrencyByDefault?.();
+    (
+      this.state as unknown as { blockConcurrencyByDefault?: () => void }
+    ).blockConcurrencyByDefault?.();
   }
 
   async fetch(request: Request): Promise<Response> {
@@ -148,23 +151,26 @@ export class PageBlockDO implements DurableObject {
       Y.applyUpdate(this.doc, new Uint8Array(storedState));
     }
 
-    // If no Yjs state, try to load from D1 and initialize
-    if (!storedState && this.blockId) {
-      const block = await this.loadBlockFromD1();
-      if (block) {
-        const questionText = this.doc.getText("question");
-        const answerText = this.doc.getText("answer");
+    if (this.blockId) {
+      const questionText = this.doc.getText("question");
+      const answerText = this.doc.getText("answer");
 
-        // Initialize with D1 content if Y.Text is empty
-        if (questionText.length === 0 && block.question) {
-          questionText.insert(0, block.question);
-        }
-        if (answerText.length === 0 && block.answer) {
-          answerText.insert(0, block.answer);
-        }
+      const needsQuestion = questionText.length === 0;
+      const needsAnswer = answerText.length === 0;
 
-        // Store the initial state
-        await this.saveToStorage();
+      // If no Yjs state or missing critical data, hydrate from D1
+      if (!storedState || needsQuestion || needsAnswer) {
+        const block = await this.loadBlockFromD1();
+        if (block) {
+          if (needsQuestion && block.question) {
+            questionText.insert(0, block.question);
+          }
+          if (needsAnswer && block.answer) {
+            answerText.insert(0, block.answer);
+          }
+
+          await this.saveToStorage();
+        }
       }
     }
 
@@ -267,12 +273,6 @@ export class PageBlockDO implements DurableObject {
       ws.send(encoding.toUint8Array(encoder));
     }
 
-    // Broadcast updates to other clients
-    if (syncMessageType === syncProtocol.messageYjsUpdate) {
-      // The doc was updated, broadcast to others
-      this.broadcastUpdate(ws);
-    }
-
     // Save state after receiving updates
     this.saveToStorage();
   }
@@ -306,14 +306,16 @@ export class PageBlockDO implements DurableObject {
     }
   }
 
-  private broadcastUpdate(sender: WebSocketWithUser): void {
-    const stateVector = Y.encodeStateVector(this.doc);
+  private broadcastDocUpdate(
+    update: Uint8Array,
+    origin: WebSocketWithUser | null,
+  ): void {
     const encoder = encoding.createEncoder();
     encoding.writeVarUint(encoder, MESSAGE_SYNC);
-    syncProtocol.writeSyncStep2(encoder, this.doc, stateVector);
+    syncProtocol.writeUpdate(encoder, update);
     const message = encoding.toUint8Array(encoder);
 
-    this.broadcast(message, sender);
+    this.broadcast(message, origin ?? undefined);
   }
 
   private broadcastAwarenessUpdate(changedClients: number[]): void {

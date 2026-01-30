@@ -12,9 +12,13 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as NewRouteImport } from './routes/new'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as PagePageIdRouteImport } from './routes/page.$pageId'
+import { Route as CollabTestBlockIdRouteImport } from './routes/collab-test.$blockId'
 import { Route as ApiTranscribeRouteImport } from './routes/api/transcribe'
 import { Route as ApiReviewRouteImport } from './routes/api/review'
 import { Route as ApiOverallReviewRouteImport } from './routes/api/overall-review'
+import { Route as ApiSimpleCollabDocIdRouteImport } from './routes/api/simple-collab/$docId'
+import { Route as ApiCollabPagePageIdRouteImport } from './routes/api/collab/page.$pageId'
+import { Route as ApiCollabBlockBlockIdRouteImport } from './routes/api/collab/block.$blockId'
 
 const NewRoute = NewRouteImport.update({
   id: '/new',
@@ -29,6 +33,11 @@ const IndexRoute = IndexRouteImport.update({
 const PagePageIdRoute = PagePageIdRouteImport.update({
   id: '/page/$pageId',
   path: '/page/$pageId',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CollabTestBlockIdRoute = CollabTestBlockIdRouteImport.update({
+  id: '/collab-test/$blockId',
+  path: '/collab-test/$blockId',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiTranscribeRoute = ApiTranscribeRouteImport.update({
@@ -46,6 +55,21 @@ const ApiOverallReviewRoute = ApiOverallReviewRouteImport.update({
   path: '/api/overall-review',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiSimpleCollabDocIdRoute = ApiSimpleCollabDocIdRouteImport.update({
+  id: '/api/simple-collab/$docId',
+  path: '/api/simple-collab/$docId',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiCollabPagePageIdRoute = ApiCollabPagePageIdRouteImport.update({
+  id: '/api/collab/page/$pageId',
+  path: '/api/collab/page/$pageId',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiCollabBlockBlockIdRoute = ApiCollabBlockBlockIdRouteImport.update({
+  id: '/api/collab/block/$blockId',
+  path: '/api/collab/block/$blockId',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -53,7 +77,11 @@ export interface FileRoutesByFullPath {
   '/api/overall-review': typeof ApiOverallReviewRoute
   '/api/review': typeof ApiReviewRoute
   '/api/transcribe': typeof ApiTranscribeRoute
+  '/collab-test/$blockId': typeof CollabTestBlockIdRoute
   '/page/$pageId': typeof PagePageIdRoute
+  '/api/simple-collab/$docId': typeof ApiSimpleCollabDocIdRoute
+  '/api/collab/block/$blockId': typeof ApiCollabBlockBlockIdRoute
+  '/api/collab/page/$pageId': typeof ApiCollabPagePageIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -61,7 +89,11 @@ export interface FileRoutesByTo {
   '/api/overall-review': typeof ApiOverallReviewRoute
   '/api/review': typeof ApiReviewRoute
   '/api/transcribe': typeof ApiTranscribeRoute
+  '/collab-test/$blockId': typeof CollabTestBlockIdRoute
   '/page/$pageId': typeof PagePageIdRoute
+  '/api/simple-collab/$docId': typeof ApiSimpleCollabDocIdRoute
+  '/api/collab/block/$blockId': typeof ApiCollabBlockBlockIdRoute
+  '/api/collab/page/$pageId': typeof ApiCollabPagePageIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -70,7 +102,11 @@ export interface FileRoutesById {
   '/api/overall-review': typeof ApiOverallReviewRoute
   '/api/review': typeof ApiReviewRoute
   '/api/transcribe': typeof ApiTranscribeRoute
+  '/collab-test/$blockId': typeof CollabTestBlockIdRoute
   '/page/$pageId': typeof PagePageIdRoute
+  '/api/simple-collab/$docId': typeof ApiSimpleCollabDocIdRoute
+  '/api/collab/block/$blockId': typeof ApiCollabBlockBlockIdRoute
+  '/api/collab/page/$pageId': typeof ApiCollabPagePageIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -80,7 +116,11 @@ export interface FileRouteTypes {
     | '/api/overall-review'
     | '/api/review'
     | '/api/transcribe'
+    | '/collab-test/$blockId'
     | '/page/$pageId'
+    | '/api/simple-collab/$docId'
+    | '/api/collab/block/$blockId'
+    | '/api/collab/page/$pageId'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -88,7 +128,11 @@ export interface FileRouteTypes {
     | '/api/overall-review'
     | '/api/review'
     | '/api/transcribe'
+    | '/collab-test/$blockId'
     | '/page/$pageId'
+    | '/api/simple-collab/$docId'
+    | '/api/collab/block/$blockId'
+    | '/api/collab/page/$pageId'
   id:
     | '__root__'
     | '/'
@@ -96,7 +140,11 @@ export interface FileRouteTypes {
     | '/api/overall-review'
     | '/api/review'
     | '/api/transcribe'
+    | '/collab-test/$blockId'
     | '/page/$pageId'
+    | '/api/simple-collab/$docId'
+    | '/api/collab/block/$blockId'
+    | '/api/collab/page/$pageId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -105,7 +153,11 @@ export interface RootRouteChildren {
   ApiOverallReviewRoute: typeof ApiOverallReviewRoute
   ApiReviewRoute: typeof ApiReviewRoute
   ApiTranscribeRoute: typeof ApiTranscribeRoute
+  CollabTestBlockIdRoute: typeof CollabTestBlockIdRoute
   PagePageIdRoute: typeof PagePageIdRoute
+  ApiSimpleCollabDocIdRoute: typeof ApiSimpleCollabDocIdRoute
+  ApiCollabBlockBlockIdRoute: typeof ApiCollabBlockBlockIdRoute
+  ApiCollabPagePageIdRoute: typeof ApiCollabPagePageIdRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -131,6 +183,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PagePageIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/collab-test/$blockId': {
+      id: '/collab-test/$blockId'
+      path: '/collab-test/$blockId'
+      fullPath: '/collab-test/$blockId'
+      preLoaderRoute: typeof CollabTestBlockIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/transcribe': {
       id: '/api/transcribe'
       path: '/api/transcribe'
@@ -152,6 +211,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiOverallReviewRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/simple-collab/$docId': {
+      id: '/api/simple-collab/$docId'
+      path: '/api/simple-collab/$docId'
+      fullPath: '/api/simple-collab/$docId'
+      preLoaderRoute: typeof ApiSimpleCollabDocIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/collab/page/$pageId': {
+      id: '/api/collab/page/$pageId'
+      path: '/api/collab/page/$pageId'
+      fullPath: '/api/collab/page/$pageId'
+      preLoaderRoute: typeof ApiCollabPagePageIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/collab/block/$blockId': {
+      id: '/api/collab/block/$blockId'
+      path: '/api/collab/block/$blockId'
+      fullPath: '/api/collab/block/$blockId'
+      preLoaderRoute: typeof ApiCollabBlockBlockIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -161,7 +241,11 @@ const rootRouteChildren: RootRouteChildren = {
   ApiOverallReviewRoute: ApiOverallReviewRoute,
   ApiReviewRoute: ApiReviewRoute,
   ApiTranscribeRoute: ApiTranscribeRoute,
+  CollabTestBlockIdRoute: CollabTestBlockIdRoute,
   PagePageIdRoute: PagePageIdRoute,
+  ApiSimpleCollabDocIdRoute: ApiSimpleCollabDocIdRoute,
+  ApiCollabBlockBlockIdRoute: ApiCollabBlockBlockIdRoute,
+  ApiCollabPagePageIdRoute: ApiCollabPagePageIdRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

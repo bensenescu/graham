@@ -39,6 +39,7 @@ interface CollaborativeQADocumentEditorProps {
   loadingBlockIds?: Set<string>;
   activeBlockId?: string | null;
   showInlineReviews?: boolean;
+  collaborationEnabled?: boolean;
   onBlockCreate: (block: PageBlock) => void;
   onBlockUpdate: (id: string, updates: Partial<PageBlock>) => void;
   onBlockDelete: (id: string) => void;
@@ -119,6 +120,7 @@ export function CollaborativeQADocumentEditor({
   loadingBlockIds,
   activeBlockId,
   showInlineReviews = true,
+  collaborationEnabled = true,
   onBlockCreate,
   onBlockUpdate,
   onBlockDelete,
@@ -316,15 +318,7 @@ export function CollaborativeQADocumentEditor({
     <div ref={containerRef} className="pt-6 pb-6 px-6 min-h-screen">
       <div className="max-w-3xl mx-auto bg-base-100 rounded-lg px-4 py-2 border border-base-300 min-h-[calc(100vh-6rem)]">
         {/* Page title - editable */}
-        <input
-          type="text"
-          value={localTitle}
-          onChange={handleTitleChange}
-          onBlur={handleTitleBlur}
-          placeholder="Untitled"
-          style={{ fontSize: "1.5rem", lineHeight: "2rem" }}
-          className="w-full font-bold text-base-content bg-transparent border-none outline-none pt-4 pb-2 placeholder:text-base-content/40"
-        />
+        <CollaborativeTitle collaboration={collaboration} />
 
         {sortedBlocks.length === 0 ? (
           <div className="py-8">
@@ -366,7 +360,7 @@ export function CollaborativeQADocumentEditor({
                     autoFocusQuestion={block.id === focusBlockId}
                     onAutoFocusDone={() => setFocusBlockId(null)}
                     userInfo={userInfo}
-                    collaborationEnabled={connectionState === "connected"}
+                    collaborationEnabled={collaborationEnabled}
                   />
                 ))}
               </div>
