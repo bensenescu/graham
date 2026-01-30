@@ -17,8 +17,8 @@ async function getAll(userId: string) {
  * Returns settings with expanded selected prompts.
  */
 async function getByPageId(userId: string, pageId: string) {
-  // Verify user owns the page
-  const page = await PageRepository.findByIdAndUserId(pageId, userId);
+  // Verify user has access to the page (owner or collaborator)
+  const { page } = await PageRepository.findByIdWithAccess(pageId, userId);
   if (!page) {
     throw new Error("Page not found");
   }

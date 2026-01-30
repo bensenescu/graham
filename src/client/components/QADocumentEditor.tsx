@@ -1,4 +1,12 @@
-import { useCallback, useMemo, useRef, useState, useEffect } from "react";
+import {
+  useCallback,
+  useMemo,
+  useRef,
+  useState,
+  useEffect,
+  createContext,
+  useContext,
+} from "react";
 import { Plus } from "lucide-react";
 import {
   DndContext,
@@ -17,6 +25,7 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { QADocumentBlock } from "./QADocumentBlock";
+import { CollabTextEditor, getFragmentText } from "./CollabTextEditor";
 import type { PageBlock } from "@/types/schemas/pages";
 import type { BlockReview } from "@/types/schemas/reviews";
 import {
@@ -28,6 +37,25 @@ import {
   getBlockItemId,
   ADD_QUESTION_BUTTON_ID,
 } from "@/client/lib/element-ids";
+import {
+  usePageCollab,
+  type UsePageCollabReturn,
+} from "@/client/hooks/usePageCollab";
+
+// Context for passing collab state to child blocks
+export interface PageCollabContextValue {
+  collab: UsePageCollabReturn | null;
+  isCollabReady: boolean;
+}
+
+export const PageCollabContext = createContext<PageCollabContextValue>({
+  collab: null,
+  isCollabReady: false,
+});
+
+export function usePageCollabContext() {
+  return useContext(PageCollabContext);
+}
 
 interface QADocumentEditorProps {
   pageId: string;
@@ -69,12 +97,42 @@ export function QADocumentEditor({
   onReviewRequest,
   onTitleChange,
 }: QADocumentEditorProps) {
-  // Local state for editing
+  // Local state for block management (drag/drop, add/remove)
   const [localBlocks, setLocalBlocks] = useState<PageBlock[]>(blocks);
-  const [localTitle, setLocalTitle] = useState(pageTitle || "");
   const [focusBlockId, setFocusBlockId] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const sensors = useDraggableSensors();
+
+  // Collaborative editing via Yjs
+  const collab = usePageCollab({ pageId });
+  const {
+    provider,
+    connectionState,
+    getTitleFragment,
+    userInfo,
+    reconnect,
+    hasSyncedOnce,
+  } = collab;
+
+  // Track if we've ever successfully loaded - only show skeleton on first load
+  const hasLoadedRef = useRef(false);
+  if (hasSyncedOnce && !hasLoadedRef.current) {
+    hasLoadedRef.current = true;
+  }
+  const isReady = hasLoadedRef.current;
+  // Show skeleton only on initial load, not on reconnection
+  const showSkeleton = !isReady;
+
+  // Sync title from Yjs to DB on blur
+  const handleTitleBlur = useCallback(() => {
+    const titleFragment = getTitleFragment();
+    if (!titleFragment) return;
+
+    const yjsTitle = getFragmentText(titleFragment);
+    if (yjsTitle !== pageTitle) {
+      onTitleChange?.(yjsTitle);
+    }
+  }, [getTitleFragment, pageTitle, onTitleChange]);
 
   // Sync local state when blocks change from parent
   useEffect(() => {
@@ -84,28 +142,6 @@ export function QADocumentEditor({
       setLocalBlocks(blocks);
     }
   }, [blocks]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Sync local title when pageTitle changes from parent
-  useEffect(() => {
-    if (pageTitle !== undefined && pageTitle !== localTitle) {
-      setLocalTitle(pageTitle);
-    }
-  }, [pageTitle]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Handle title change - only update local state while typing
-  const handleTitleChange = useCallback(
-    (e: React.ChangeEvent<HTMLInputElement>) => {
-      setLocalTitle(e.target.value);
-    },
-    [],
-  );
-
-  // Save title on blur
-  const handleTitleBlur = useCallback(() => {
-    if (localTitle !== pageTitle) {
-      onTitleChange?.(localTitle);
-    }
-  }, [localTitle, pageTitle, onTitleChange]);
 
   // Sort blocks by sortKey
   const sortedBlocks = useMemo(() => {
@@ -280,85 +316,159 @@ export function QADocumentEditor({
     [localBlocks, onBlockUpdate],
   );
 
+  // Collab context value for child blocks
+  const collabContextValue = useMemo<PageCollabContextValue>(
+    () => ({
+      collab: isReady ? collab : null,
+      isCollabReady: isReady,
+    }),
+    [collab, isReady],
+  );
+
   return (
-    <div ref={containerRef} className="pt-6 pb-6 px-6 min-h-screen">
-      <div className="max-w-3xl mx-auto bg-base-100 rounded-lg px-4 py-2 border border-base-300 min-h-[calc(100vh-6rem)]">
-        {/* Page title - editable */}
-        <input
-          type="text"
-          value={localTitle}
-          onChange={handleTitleChange}
-          onBlur={handleTitleBlur}
-          placeholder="Untitled"
-          style={{ fontSize: "1.5rem", lineHeight: "2rem" }}
-          className="w-full font-bold text-base-content bg-transparent border-none outline-none pt-4 pb-2 placeholder:text-base-content/40"
-        />
-
-        {sortedBlocks.length === 0 ? (
-          <div className="py-8">
-            <p className="text-base-content/50 mb-4">No questions yet</p>
-            <button
-              onClick={handleAddBlock}
-              className="btn btn-primary btn-sm gap-2"
-            >
-              <Plus className="h-4 w-4" />
-              Add Question
-            </button>
-          </div>
-        ) : (
-          <DndContext
-            sensors={sensors}
-            collisionDetection={closestCenter}
-            modifiers={[restrictToVerticalAxis]}
-            onDragEnd={handleDragEnd}
-          >
-            <SortableContext
-              items={sortedBlocks.map((block) => block.id)}
-              strategy={verticalListSortingStrategy}
-            >
-              <div>
-                {sortedBlocks.map((block) => (
-                  <QADocumentBlock
-                    key={block.id}
-                    block={block}
-                    review={reviews?.get(block.id)}
-                    isReviewLoading={loadingBlockIds?.has(block.id)}
-                    isActive={activeBlockId === block.id}
-                    showInlineReviews={showInlineReviews}
-                    onQuestionChange={handleQuestionChange}
-                    onAnswerChange={handleAnswerChange}
-                    onDelete={handleDelete}
-                    onReviewRequest={onReviewRequest}
-                    onFocus={onBlockFocus}
-                    isOnly={sortedBlocks.length === 1}
-                    autoFocusQuestion={block.id === focusBlockId}
-                    onAutoFocusDone={() => setFocusBlockId(null)}
-                  />
-                ))}
+    <PageCollabContext.Provider value={collabContextValue}>
+      <div ref={containerRef} className="pt-6 pb-6 px-6 min-h-screen">
+        <div className="max-w-3xl mx-auto bg-base-100 rounded-lg px-4 py-2 border border-base-300 min-h-[calc(100vh-6rem)]">
+          {/* Loading state - skeleton loader only on initial load */}
+          {showSkeleton ? (
+            <div className="animate-pulse pt-4">
+              {/* Title skeleton */}
+              <div className="h-8 bg-base-300 rounded w-1/3 mb-6" />
+              {/* Block skeletons */}
+              <div className="space-y-8">
+                <div className="space-y-3">
+                  <div className="h-5 bg-base-300 rounded w-2/3" />
+                  <div className="h-4 bg-base-300/60 rounded w-full" />
+                  <div className="h-4 bg-base-300/60 rounded w-4/5" />
+                </div>
+                <div className="space-y-3">
+                  <div className="h-5 bg-base-300 rounded w-1/2" />
+                  <div className="h-4 bg-base-300/60 rounded w-full" />
+                  <div className="h-4 bg-base-300/60 rounded w-3/4" />
+                </div>
               </div>
-            </SortableContext>
-          </DndContext>
-        )}
+            </div>
+          ) : (
+            <>
+              {/* Connection status indicator - simple dot */}
+              <div className="flex items-center gap-2 text-xs text-base-content/60 pt-2 h-6">
+                {connectionState === "connected" ? (
+                  <span
+                    className="w-2 h-2 rounded-full bg-success"
+                    title="Online"
+                  />
+                ) : connectionState === "connecting" ? (
+                  <>
+                    <span className="loading loading-spinner loading-xs" />
+                    <span>Syncing...</span>
+                  </>
+                ) : (
+                  <>
+                    <span
+                      className="w-2 h-2 rounded-full bg-warning"
+                      title="Offline"
+                    />
+                    <span>Offline</span>
+                    <button
+                      onClick={reconnect}
+                      className="underline hover:text-base-content"
+                    >
+                      Reconnect
+                    </button>
+                  </>
+                )}
+              </div>
 
-        {/* Add button at bottom */}
-        {sortedBlocks.length > 0 && (
-          <div className="pb-2">
-            <button
-              id={ADD_QUESTION_BUTTON_ID}
-              tabIndex={0}
-              onClick={handleAddBlock}
-              className="btn btn-ghost btn-sm gap-2 text-base-content/60 hover:text-base-content focus:bg-primary/10 focus:text-base-content"
-            >
-              <Plus className="h-4 w-4" />
-              Add Question
-              <kbd className="ml-1 px-1.5 py-0.5 text-xs font-mono bg-base-300 border border-base-content/20 rounded">
-                a
-              </kbd>
-            </button>
-          </div>
-        )}
+              {/* Page title */}
+              <div className="pt-2 pb-2">
+                {isReady && provider ? (
+                  <CollabTextEditor
+                    fragment={getTitleFragment()!}
+                    provider={provider}
+                    userId={userInfo.userId}
+                    userName={userInfo.userName}
+                    userColor={userInfo.userColor}
+                    placeholder="Untitled"
+                    className="text-2xl font-bold text-base-content [&_p]:m-0"
+                    onBlur={handleTitleBlur}
+                    initialContent={pageTitle || ""}
+                    singleLine
+                  />
+                ) : (
+                  <p className="text-2xl font-bold text-base-content">
+                    {pageTitle || "Untitled"}
+                  </p>
+                )}
+              </div>
+
+              {sortedBlocks.length === 0 ? (
+                <div className="py-8">
+                  <p className="text-base-content/50 mb-4">No questions yet</p>
+                  <button
+                    onClick={handleAddBlock}
+                    className="btn btn-primary btn-sm gap-2"
+                  >
+                    <Plus className="h-4 w-4" />
+                    Add Question
+                  </button>
+                </div>
+              ) : (
+                <DndContext
+                  sensors={sensors}
+                  collisionDetection={closestCenter}
+                  modifiers={[restrictToVerticalAxis]}
+                  onDragEnd={handleDragEnd}
+                >
+                  <SortableContext
+                    items={sortedBlocks.map((block) => block.id)}
+                    strategy={verticalListSortingStrategy}
+                  >
+                    <div>
+                      {sortedBlocks.map((block) => (
+                        <QADocumentBlock
+                          key={block.id}
+                          block={block}
+                          review={reviews?.get(block.id)}
+                          isReviewLoading={loadingBlockIds?.has(block.id)}
+                          isActive={activeBlockId === block.id}
+                          showInlineReviews={showInlineReviews}
+                          onQuestionChange={handleQuestionChange}
+                          onAnswerChange={handleAnswerChange}
+                          onDelete={handleDelete}
+                          onReviewRequest={onReviewRequest}
+                          onFocus={onBlockFocus}
+                          isOnly={sortedBlocks.length === 1}
+                          autoFocusQuestion={block.id === focusBlockId}
+                          onAutoFocusDone={() => setFocusBlockId(null)}
+                        />
+                      ))}
+                    </div>
+                  </SortableContext>
+                </DndContext>
+              )}
+
+              {/* Add button at bottom */}
+              {sortedBlocks.length > 0 && (
+                <div className="pb-2">
+                  <button
+                    id={ADD_QUESTION_BUTTON_ID}
+                    tabIndex={0}
+                    onClick={handleAddBlock}
+                    className="btn btn-ghost btn-sm gap-2 text-base-content/60 hover:text-base-content focus:bg-primary/10 focus:text-base-content"
+                  >
+                    <Plus className="h-4 w-4" />
+                    Add Question
+                    <kbd className="ml-1 px-1.5 py-0.5 text-xs font-mono bg-base-300 border border-base-content/20 rounded">
+                      a
+                    </kbd>
+                  </button>
+                </div>
+              )}
+            </>
+          )}
+        </div>
       </div>
-    </div>
+    </PageCollabContext.Provider>
   );
 }
 

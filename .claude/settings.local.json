@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx tsc:*)",
+      "Bash(pnpm wrangler types:*)",
+      "Bash(pnpm build:*)",
+      "Bash(pnpm tsc:*)",
+      "WebFetch(domain:context7.com)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "WebFetch(domain:tiptap.dev)",
+      "WebFetch(domain:github.com)",
+      "WebSearch"
+    ]
+  }
+}
