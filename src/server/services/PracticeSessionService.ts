@@ -15,6 +15,33 @@ import type {
   PracticePoolMode,
 } from "@/types/schemas/practice";
 
+async function getSessionForUser(userId: string, sessionId: string) {
+  const session = await PracticeSessionRepository.findSessionById(sessionId);
+  if (!session) {
+    throw new Error("Session not found");
+  }
+
+  await ensurePageAccess(session.pageId, userId);
+  return session;
+}
+
+async function getAnswerAndSessionForUser(userId: string, answerId: string) {
+  const answer = await PracticeAnswerRepository.findAnswerById(answerId);
+  if (!answer) {
+    throw new Error("Answer not found");
+  }
+
+  const session = await PracticeSessionRepository.findSessionById(
+    answer.sessionId,
+  );
+  if (!session) {
+    throw new Error("Session not found");
+  }
+
+  await ensurePageAccess(session.pageId, userId);
+  return { answer, session };
+}
+
 async function getPoolSettings(userId: string, pageId: string) {
   await ensurePageAccess(pageId, userId);
 
@@ -117,13 +144,7 @@ async function getIncompleteSession(userId: string, pageId: string) {
 }
 
 async function getSession(userId: string, sessionId: string) {
-  const session = await PracticeSessionRepository.findSessionById(sessionId);
-  if (!session) {
-    throw new Error("Session not found");
-  }
-
-  await ensurePageAccess(session.pageId, userId);
-
+  const session = await getSessionForUser(userId, sessionId);
   return { session };
 }
 
@@ -154,12 +175,7 @@ async function createSession(userId: string, data: CreatePracticeSessionInput) {
 }
 
 async function updateSession(userId: string, data: UpdatePracticeSessionInput) {
-  const session = await PracticeSessionRepository.findSessionById(data.id);
-  if (!session) {
-    throw new Error("Session not found");
-  }
-
-  await ensurePageAccess(session.pageId, userId);
+  await getSessionForUser(userId, data.id);
 
   await PracticeSessionRepository.updateSession(data.id, {
     status: data.status,
@@ -170,26 +186,14 @@ async function updateSession(userId: string, data: UpdatePracticeSessionInput) {
 }
 
 async function deleteSession(userId: string, sessionId: string) {
-  const session = await PracticeSessionRepository.findSessionById(sessionId);
-  if (!session) {
-    throw new Error("Session not found");
-  }
-
-  await ensurePageAccess(session.pageId, userId);
+  await getSessionForUser(userId, sessionId);
 
   await PracticeSessionRepository.deleteSession(sessionId);
   return { success: true };
 }
 
 async function createAnswer(userId: string, data: CreatePracticeAnswerInput) {
-  const session = await PracticeSessionRepository.findSessionById(
-    data.sessionId,
-  );
-  if (!session) {
-    throw new Error("Session not found");
-  }
-
-  await ensurePageAccess(session.pageId, userId);
+  await getSessionForUser(userId, data.sessionId);
 
   await PracticeAnswerRepository.deleteAnswerBySessionAndBlock(
     data.sessionId,
@@ -207,19 +211,7 @@ async function createAnswer(userId: string, data: CreatePracticeAnswerInput) {
 }
 
 async function updateAnswer(userId: string, data: UpdatePracticeAnswerInput) {
-  const answer = await PracticeAnswerRepository.findAnswerById(data.id);
-  if (!answer) {
-    throw new Error("Answer not found");
-  }
-
-  const session = await PracticeSessionRepository.findSessionById(
-    answer.sessionId,
-  );
-  if (!session) {
-    throw new Error("Session not found");
-  }
-
-  await ensurePageAccess(session.pageId, userId);
+  await getAnswerAndSessionForUser(userId, data.id);
 
   await PracticeAnswerRepository.updateAnswer(data.id, {
     transcription: data.transcription,
@@ -230,19 +222,7 @@ async function updateAnswer(userId: string, data: UpdatePracticeAnswerInput) {
 }
 
 async function deleteAnswer(userId: string, data: DeletePracticeAnswerInput) {
-  const answer = await PracticeAnswerRepository.findAnswerById(data.id);
-  if (!answer) {
-    throw new Error("Answer not found");
-  }
-
-  const session = await PracticeSessionRepository.findSessionById(
-    answer.sessionId,
-  );
-  if (!session) {
-    throw new Error("Session not found");
-  }
-
-  await ensurePageAccess(session.pageId, userId);
+  await getAnswerAndSessionForUser(userId, data.id);
 
   await PracticeAnswerRepository.deleteAnswer(data.id);
   return { success: true };
@@ -252,19 +232,7 @@ async function saveRatings(
   userId: string,
   data: BatchCreatePracticeAnswerRatingsInput,
 ) {
-  const answer = await PracticeAnswerRepository.findAnswerById(data.answerId);
-  if (!answer) {
-    throw new Error("Answer not found");
-  }
-
-  const session = await PracticeSessionRepository.findSessionById(
-    answer.sessionId,
-  );
-  if (!session) {
-    throw new Error("Session not found");
-  }
-
-  await ensurePageAccess(session.pageId, userId);
+  await getAnswerAndSessionForUser(userId, data.answerId);
 
   await PracticeRatingRepository.deleteRatingsByAnswerId(data.answerId);
   await PracticeRatingRepository.batchCreateRatings(

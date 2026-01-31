@@ -1,6 +1,6 @@
 import { db } from "@/db";
 import { prompts } from "@/db/schema";
-import { eq, and } from "drizzle-orm";
+import { eq, and, inArray } from "drizzle-orm";
 
 type CreatePrompt = {
   id: string;
@@ -31,6 +31,17 @@ async function findAllByUserId(userId: string) {
 async function findByIdAndUserId(id: string, userId: string) {
   return db.query.prompts.findFirst({
     where: and(eq(prompts.id, id), eq(prompts.userId, userId)),
+  });
+}
+
+/**
+ * Find prompts by IDs (regardless of owner).
+ * Used for fetching prompts referenced by shared page settings.
+ */
+async function findByIds(ids: string[]) {
+  if (ids.length === 0) return [];
+  return db.query.prompts.findMany({
+    where: inArray(prompts.id, ids),
   });
 }
 
@@ -71,6 +82,7 @@ async function deleteById(id: string, userId: string) {
 export const PromptRepository = {
   findAllByUserId,
   findByIdAndUserId,
+  findByIds,
   create,
   update,
   delete: deleteById,

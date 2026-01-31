@@ -4,6 +4,11 @@ import { createOpenAI } from "@ai-sdk/openai";
 import { requireApiAuth } from "@/middleware/apiAuth";
 import { env } from "cloudflare:workers";
 import { z } from "zod";
+import {
+  errorResponse,
+  jsonResponse,
+  validationErrorResponse,
+} from "./helpers/apiResponses";
 
 // Request schema for reviewing a block
 const reviewBlockRequestSchema = z.object({
@@ -63,17 +68,7 @@ export const Route = createFileRoute("/api/review")({
             await reviewBlockRequestSchema.safeParseAsync(rawData);
 
           if (!validationResult.success) {
-            const firstError = validationResult.error.issues[0];
-            return new Response(
-              JSON.stringify({
-                error: firstError?.message || "Invalid request",
-                path: firstError?.path?.join("."),
-              }),
-              {
-                status: 400,
-                headers: { "Content-Type": "application/json" },
-              },
-            );
+            return validationErrorResponse(validationResult.error);
           }
 
           const { question, answer, customInstructions } =
@@ -81,16 +76,11 @@ export const Route = createFileRoute("/api/review")({
 
           // Skip review for empty answers
           if (!answer || answer.trim() === "") {
-            return new Response(
-              JSON.stringify({
-                error: "Cannot review empty answer",
-                details: "Please provide an answer before requesting a review.",
-              }),
-              {
-                status: 400,
-                headers: { "Content-Type": "application/json" },
-              },
-            );
+            return errorResponse({
+              error: "Cannot review empty answer",
+              details: "Please provide an answer before requesting a review.",
+              status: 400,
+            });
           }
 
           // Build the system prompt: base prompt + optional custom instructions
@@ -152,56 +142,38 @@ Return { "suggestion": null } if the answer is solid and you have nothing meanin
             reviewData = reviewResponseSchema.parse(parsed);
           } catch (parseError) {
             console.error("[Review] Failed to parse LLM response:", parseError);
-            return new Response(
-              JSON.stringify({
-                error: "Failed to parse review response",
-                details:
-                  parseError instanceof Error
-                    ? parseError.message
-                    : "Unknown error",
-              }),
-              {
-                status: 500,
-                headers: { "Content-Type": "application/json" },
-              },
-            );
+            return errorResponse({
+              error: "Failed to parse review response",
+              details:
+                parseError instanceof Error
+                  ? parseError.message
+                  : "Unknown error",
+              status: 500,
+            });
           }
 
-          return new Response(
-            JSON.stringify({
-              suggestion: reviewData.suggestion,
-            }),
+          return jsonResponse(
             {
-              status: 200,
-              headers: { "Content-Type": "application/json" },
+              suggestion: reviewData.suggestion,
             },
+            { status: 200 },
           );
         } catch (error) {
           // Check if this was a timeout/abort error
           if (error instanceof Error && error.name === "AbortError") {
-            return new Response(
-              JSON.stringify({
-                error: "Review request timed out",
-                details: `The AI took too long to respond (>${REVIEW_TIMEOUT_MS / 1000}s). Please try again.`,
-              }),
-              {
-                status: 504,
-                headers: { "Content-Type": "application/json" },
-              },
-            );
+            return errorResponse({
+              error: "Review request timed out",
+              details: `The AI took too long to respond (>${REVIEW_TIMEOUT_MS / 1000}s). Please try again.`,
+              status: 504,
+            });
           }
 
           console.error("[Review] Error:", error);
-          return new Response(
-            JSON.stringify({
-              error: "Failed to process review request",
-              details: error instanceof Error ? error.message : "Unknown error",
-            }),
-            {
-              status: 500,
-              headers: { "Content-Type": "application/json" },
-            },
-          );
+          return errorResponse({
+            error: "Failed to process review request",
+            details: error instanceof Error ? error.message : "Unknown error",
+            status: 500,
+          });
         }
       },
     },

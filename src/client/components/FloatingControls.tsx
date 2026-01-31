@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { Eye, EyeOff, Sparkles, Settings2, FileText, Mic } from "lucide-react";
+import { LoadingSpinner } from "@/client/components/LoadingSpinner";
 
 interface FloatingControlsProps {
   /** Whether inline AI reviews are visible */
@@ -139,7 +140,7 @@ export function FloatingControls({
           >
             {isReviewingAll ? (
               <>
-                <span className="loading loading-spinner loading-xs" />
+                <LoadingSpinner size="xs" />
                 <span className="text-xs">Reviewing...</span>
               </>
             ) : (

@@ -1,4 +1,5 @@
 import { PromptRepository } from "../repositories/PromptRepository";
+import { PageReviewSettingsRepository } from "../repositories/PageReviewSettingsRepository";
 import type {
   CreatePromptInput,
   UpdatePromptInput,
@@ -7,9 +8,27 @@ import type {
 
 /**
  * Get all prompts for a user.
+ * Also includes prompts referenced by shared page settings (for collaborators).
  */
 async function getAll(userId: string) {
-  const prompts = await PromptRepository.findAllByUserId(userId);
+  // Get user's own prompts
+  const userPrompts = await PromptRepository.findAllByUserId(userId);
+  const userPromptIds = new Set(userPrompts.map((p) => p.id));
+
+  // Get all page review settings accessible to user (including shared pages)
+  const allSettings =
+    await PageReviewSettingsRepository.findAllByUserId(userId);
+
+  // Find prompt IDs from settings that user doesn't own
+  const sharedPromptIds = allSettings
+    .map((s) => s.defaultPromptId)
+    .filter((id): id is string => id !== null && !userPromptIds.has(id));
+
+  // Fetch those shared prompts
+  const sharedPrompts = await PromptRepository.findByIds(sharedPromptIds);
+
+  // Combine and deduplicate
+  const prompts = [...userPrompts, ...sharedPrompts];
   return { prompts };
 }
 

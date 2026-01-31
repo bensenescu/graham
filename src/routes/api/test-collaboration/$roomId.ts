@@ -20,6 +20,11 @@ export const Route = createFileRoute("/api/test-collaboration/$roomId" as any)({
           doNamespace: env.SIMPLE_COLLAB_DO,
           logTag: "api/test-collaboration",
           logContext: { roomId },
+          checkAccess: async (userId: string) => {
+            if (roomId !== userId) {
+              throw new Error("Not authorized for this room");
+            }
+          },
         });
       },
     },

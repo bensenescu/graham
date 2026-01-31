@@ -3,6 +3,7 @@ import { Mic, Square, SkipForward } from "lucide-react";
 import { useAudioRecorder } from "@/client/hooks/useAudioRecorder";
 import { useTranscription } from "@/client/hooks/useTranscription";
 import type { PageBlock } from "@/types/schemas/pages";
+import { LoadingSpinner } from "@/client/components/LoadingSpinner";
 
 export interface PracticingPhaseProps {
   blocks: PageBlock[];
@@ -112,7 +113,7 @@ export function PracticingPhase({
   if (!currentBlock) {
     return (
       <div className="flex items-center justify-center h-full">
-        <span className="loading loading-spinner loading-lg" />
+        <LoadingSpinner size="lg" />
       </div>
     );
   }

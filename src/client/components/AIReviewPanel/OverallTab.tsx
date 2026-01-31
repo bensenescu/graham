@@ -4,6 +4,7 @@ import type { PageBlock } from "@/types/schemas/pages";
 import { usePageReviewSettings } from "@/client/hooks/usePageReviewSettings";
 import { useOverallReview } from "@/client/hooks/useOverallReview";
 import { formatDateTime } from "@/client/lib/date-utils";
+import { LoadingSpinner } from "@/client/components/LoadingSpinner";
 
 const THINKING_PHRASES = [
   "Analyzing your responses...",
@@ -66,7 +67,7 @@ export function OverallTab({
   if (isLoading) {
     return (
       <div className="p-4 flex items-center justify-center">
-        <span className="loading loading-spinner loading-sm" />
+        <LoadingSpinner size="sm" />
       </div>
     );
   }

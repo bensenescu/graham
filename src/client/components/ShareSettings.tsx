@@ -1,6 +1,7 @@
 import { useState, useCallback, useMemo, useRef, useEffect } from "react";
 import { X, UserPlus, Users, ChevronDown } from "lucide-react";
 import { usePageSharing } from "@/client/hooks/usePageSharing";
+import { LoadingSpinner } from "@/client/components/LoadingSpinner";
 
 interface ShareSettingsProps {
   pageId: string;
@@ -88,7 +89,7 @@ export function ShareSettings({ pageId }: ShareSettingsProps) {
           Sharing
         </label>
         <div className="flex items-center justify-center py-4">
-          <span className="loading loading-spinner loading-sm" />
+          <LoadingSpinner size="sm" />
         </div>
       </div>
     );
@@ -159,7 +160,7 @@ export function ShareSettings({ pageId }: ShareSettingsProps) {
                   className="btn btn-primary btn-sm w-full"
                 >
                   {isAddingShares ? (
-                    <span className="loading loading-spinner loading-xs" />
+                    <LoadingSpinner size="xs" />
                   ) : (
                     `Add ${selectedUserIds.length} collaborator${selectedUserIds.length > 1 ? "s" : ""}`
                   )}
@@ -192,7 +193,7 @@ export function ShareSettings({ pageId }: ShareSettingsProps) {
                   aria-label={`Remove ${share.userEmail}`}
                 >
                   {isRemovingShare ? (
-                    <span className="loading loading-spinner loading-xs" />
+                    <LoadingSpinner size="xs" />
                   ) : (
                     <X className="h-3.5 w-3.5" />
                   )}

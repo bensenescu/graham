@@ -24,27 +24,23 @@ export const prompts = sqliteTable(
 );
 
 // Page Review Settings table (per-page configuration)
-export const pageReviewSettings = sqliteTable(
-  "page_review_settings",
-  {
-    id: text("id").primaryKey(),
-    pageId: text("page_id")
-      .notNull()
-      .unique()
-      .references(() => pages.id, { onDelete: "cascade" }),
-    model: text("model").notNull().default("openai-gpt-5.2-high"),
-    defaultPromptId: text("default_prompt_id").references(() => prompts.id, {
-      onDelete: "set null",
-    }),
-    createdAt: text("created_at")
-      .notNull()
-      .default(sql`(current_timestamp)`),
-    updatedAt: text("updated_at")
-      .notNull()
-      .default(sql`(current_timestamp)`),
-  },
-  (table) => [index("page_review_settings_page_id_idx").on(table.pageId)],
-);
+export const pageReviewSettings = sqliteTable("page_review_settings", {
+  id: text("id").primaryKey(),
+  pageId: text("page_id")
+    .notNull()
+    .unique()
+    .references(() => pages.id, { onDelete: "cascade" }),
+  model: text("model").notNull().default("openai-gpt-5.2-high"),
+  defaultPromptId: text("default_prompt_id").references(() => prompts.id, {
+    onDelete: "set null",
+  }),
+  createdAt: text("created_at")
+    .notNull()
+    .default(sql`(current_timestamp)`),
+  updatedAt: text("updated_at")
+    .notNull()
+    .default(sql`(current_timestamp)`),
+});
 
 // Users table
 export const users = sqliteTable("users", {
@@ -112,9 +108,6 @@ export const pageOverallReviewSettings = sqliteTable(
       .notNull()
       .default(sql`(current_timestamp)`),
   },
-  (table) => [
-    index("page_overall_review_settings_page_id_idx").on(table.pageId),
-  ],
 );
 
 // Junction table for selected prompts in overall review (enforces FK constraints)
@@ -136,27 +129,23 @@ export const pageOverallReviewSelectedPrompts = sqliteTable(
 );
 
 // Page Overall Reviews table (AI-generated narrative summary for entire page)
-export const pageOverallReviews = sqliteTable(
-  "page_overall_reviews",
-  {
-    id: text("id").primaryKey(),
-    pageId: text("page_id")
-      .notNull()
-      .unique()
-      .references(() => pages.id, { onDelete: "cascade" }),
-    promptId: text("prompt_id").references(() => prompts.id, {
-      onDelete: "set null",
-    }), // which prompt was used
-    summary: text("summary").notNull(), // the narrative summary from LLM
-    createdAt: text("created_at")
-      .notNull()
-      .default(sql`(current_timestamp)`),
-    updatedAt: text("updated_at")
-      .notNull()
-      .default(sql`(current_timestamp)`),
-  },
-  (table) => [index("page_overall_reviews_page_id_idx").on(table.pageId)],
-);
+export const pageOverallReviews = sqliteTable("page_overall_reviews", {
+  id: text("id").primaryKey(),
+  pageId: text("page_id")
+    .notNull()
+    .unique()
+    .references(() => pages.id, { onDelete: "cascade" }),
+  promptId: text("prompt_id").references(() => prompts.id, {
+    onDelete: "set null",
+  }), // which prompt was used
+  summary: text("summary").notNull(), // the narrative summary from LLM
+  createdAt: text("created_at")
+    .notNull()
+    .default(sql`(current_timestamp)`),
+  updatedAt: text("updated_at")
+    .notNull()
+    .default(sql`(current_timestamp)`),
+});
 
 // Block Reviews table (AI-generated reviews for each block/prompt combination)
 export const blockReviews = sqliteTable(
@@ -211,24 +200,20 @@ export const practiceCriteria = sqliteTable(
 );
 
 // Practice Pool Settings table (per-page configuration for which questions to practice)
-export const practicePoolSettings = sqliteTable(
-  "practice_pool_settings",
-  {
-    id: text("id").primaryKey(),
-    pageId: text("page_id")
-      .notNull()
-      .unique()
-      .references(() => pages.id, { onDelete: "cascade" }),
-    mode: text("mode").notNull().default("all"), // "all" | "selected" | "low_rated"
-    createdAt: text("created_at")
-      .notNull()
-      .default(sql`(current_timestamp)`),
-    updatedAt: text("updated_at")
-      .notNull()
-      .default(sql`(current_timestamp)`),
-  },
-  (table) => [index("practice_pool_settings_page_id_idx").on(table.pageId)],
-);
+export const practicePoolSettings = sqliteTable("practice_pool_settings", {
+  id: text("id").primaryKey(),
+  pageId: text("page_id")
+    .notNull()
+    .unique()
+    .references(() => pages.id, { onDelete: "cascade" }),
+  mode: text("mode").notNull().default("all"), // "all" | "selected" | "low_rated"
+  createdAt: text("created_at")
+    .notNull()
+    .default(sql`(current_timestamp)`),
+  updatedAt: text("updated_at")
+    .notNull()
+    .default(sql`(current_timestamp)`),
+});
 
 // Practice Pool Blocks table (selected blocks for "selected" mode)
 export const practicePoolBlocks = sqliteTable(

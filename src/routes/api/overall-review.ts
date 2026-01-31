@@ -4,6 +4,7 @@ import { createOpenAI } from "@ai-sdk/openai";
 import { requireApiAuth } from "@/middleware/apiAuth";
 import { env } from "cloudflare:workers";
 import { z } from "zod";
+import { errorResponse, validationErrorResponse } from "./helpers/apiResponses";
 
 // Request schema for overall review
 const overallReviewRequestSchema = z.object({
@@ -49,17 +50,7 @@ export const Route = createFileRoute("/api/overall-review")({
             await overallReviewRequestSchema.safeParseAsync(rawData);
 
           if (!validationResult.success) {
-            const firstError = validationResult.error.issues[0];
-            return new Response(
-              JSON.stringify({
-                error: firstError?.message || "Invalid request",
-                path: firstError?.path?.join("."),
-              }),
-              {
-                status: 400,
-                headers: { "Content-Type": "application/json" },
-              },
-            );
+            return validationErrorResponse(validationResult.error);
           }
 
           const { blocks, customInstructions } = validationResult.data;
@@ -70,17 +61,12 @@ export const Route = createFileRoute("/api/overall-review")({
           );
 
           if (answeredBlocks.length === 0) {
-            return new Response(
-              JSON.stringify({
-                error: "No answers to review",
-                details:
-                  "Please provide answers to at least one question before requesting an overall review.",
-              }),
-              {
-                status: 400,
-                headers: { "Content-Type": "application/json" },
-              },
-            );
+            return errorResponse({
+              error: "No answers to review",
+              details:
+                "Please provide answers to at least one question before requesting an overall review.",
+              status: 400,
+            });
           }
 
           // Build the system prompt: base prompt + optional custom instructions
@@ -161,16 +147,11 @@ ${qaContent}`,
           });
         } catch (error) {
           console.error("[OverallReview] Error:", error);
-          return new Response(
-            JSON.stringify({
-              error: "Failed to process overall review request",
-              details: error instanceof Error ? error.message : "Unknown error",
-            }),
-            {
-              status: 500,
-              headers: { "Content-Type": "application/json" },
-            },
-          );
+          return errorResponse({
+            error: "Failed to process overall review request",
+            details: error instanceof Error ? error.message : "Unknown error",
+            status: 500,
+          });
         }
       },
     },

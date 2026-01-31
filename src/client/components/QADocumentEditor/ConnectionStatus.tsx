@@ -1,4 +1,5 @@
 import type { ConnectionState } from "@/client/lib/PageCollabManager";
+import { LoadingSpinner } from "@/client/components/LoadingSpinner";
 
 interface ConnectionStatusProps {
   connectionState: ConnectionState;
@@ -18,7 +19,7 @@ export function ConnectionStatus({
         <span className="w-2 h-2 rounded-full bg-success" title="Online" />
       ) : connectionState === "connecting" ? (
         <>
-          <span className="loading loading-spinner loading-xs" />
+          <LoadingSpinner size="xs" />
           <span>Syncing...</span>
         </>
       ) : (

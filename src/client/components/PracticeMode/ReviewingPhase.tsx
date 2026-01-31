@@ -3,6 +3,7 @@ import { Eye, EyeOff } from "lucide-react";
 import type { usePractice } from "@/client/hooks/practice";
 import type { PageBlock } from "@/types/schemas/pages";
 import type { RatingValue, PracticeCriterion } from "@/types/schemas/practice";
+import { LoadingSpinner } from "@/client/components/LoadingSpinner";
 
 export interface ReviewingPhaseProps {
   blocks: PageBlock[];
@@ -72,7 +73,7 @@ export function ReviewingPhase({
   if (!currentAnswer || !currentBlock) {
     return (
       <div className="flex items-center justify-center h-full">
-        <span className="loading loading-spinner loading-lg" />
+        <LoadingSpinner size="lg" />
       </div>
     );
   }
@@ -92,7 +93,7 @@ export function ReviewingPhase({
         <div className="text-sm text-base-content/60 mb-2">Your answer:</div>
         {currentAnswer.transcriptionStatus === "pending" ? (
           <div className="flex items-center gap-2 text-base-content/60">
-            <span className="loading loading-spinner loading-sm" />
+            <LoadingSpinner size="sm" />
             Transcribing...
           </div>
         ) : currentAnswer.transcriptionStatus === "failed" ? (
@@ -168,7 +169,7 @@ export function ReviewingPhase({
           className="btn btn-primary w-full"
         >
           {isSaving ? (
-            <span className="loading loading-spinner loading-sm" />
+            <LoadingSpinner size="sm" />
           ) : isLastReview ? (
             "Complete Session"
           ) : (

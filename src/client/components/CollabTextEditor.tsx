@@ -28,6 +28,8 @@ export interface CollabTextEditorProps {
   onFocus?: () => void;
   /** Initial content to seed if fragment is empty (plain text) */
   initialContent?: string;
+  /** Stable identifier for this fragment (used to prevent duplicate seeding) */
+  fragmentName: string;
   /** Whether this is a single-line editor (no line breaks allowed) */
   singleLine?: boolean;
 }
@@ -49,6 +51,7 @@ export function CollabTextEditor({
   onBlur,
   onFocus,
   initialContent,
+  fragmentName,
   singleLine = false,
 }: CollabTextEditorProps) {
   // Track if we've already seeded this fragment to prevent duplicates
@@ -56,7 +59,8 @@ export function CollabTextEditor({
   const fragmentIdRef = useRef<string | null>(null);
 
   // Reset seeding flag if fragment changes (different field)
-  const fragmentId = fragment.doc?.guid + "-" + fragment.toString();
+  // Use fragmentName (stable) instead of fragment.toString() (content-based, unstable)
+  const fragmentId = fragment.doc?.guid + "-" + fragmentName;
   if (fragmentIdRef.current !== fragmentId) {
     fragmentIdRef.current = fragmentId;
     hasSeededRef.current = false;
