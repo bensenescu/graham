@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useLiveQuery } from "@tanstack/react-db";
-import { Plus, Trash2 } from "lucide-react";
-import { pageCollection } from "@/client/tanstack-db";
+import { Plus, Trash2, Users } from "lucide-react";
+import { pageCollection, sharedPageCollection } from "@/client/tanstack-db";
 import { NewPageOptions } from "@/client/components/NewPageOptions";
 
 export const Route = createFileRoute("/")({
@@ -9,16 +9,38 @@ export const Route = createFileRoute("/")({
 });
 
 function Home() {
-  // Live query that updates automatically when data changes (sorted by updatedAt desc)
+  // Live query for owned pages (sorted by updatedAt desc)
   const {
-    data: pages,
-    isLoading,
-    isError,
+    data: ownedPages,
+    isLoading: isLoadingOwned,
+    isError: isErrorOwned,
   } = useLiveQuery((q) =>
     q
       .from({ page: pageCollection })
       .orderBy(({ page }) => page.updatedAt, "desc"),
   );
+
+  // Live query for shared pages (sorted by updatedAt desc)
+  const {
+    data: sharedPages,
+    isLoading: isLoadingShared,
+    isError: isErrorShared,
+  } = useLiveQuery((q) =>
+    q
+      .from({ page: sharedPageCollection })
+      .orderBy(({ page }) => page.updatedAt, "desc"),
+  );
+
+  const isLoading = isLoadingOwned || isLoadingShared;
+  const isError = isErrorOwned || isErrorShared;
+
+  // Combine and sort all pages by updatedAt
+  const pages = [...(ownedPages ?? []), ...(sharedPages ?? [])].sort(
+    (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime(),
+  );
+
+  // Track which pages are shared (not owned by user)
+  const sharedPageIds = new Set(sharedPages?.map((p) => p.id) ?? []);
 
   const handleDeletePage = (e: React.MouseEvent, pageId: string) => {
     e.preventDefault();
@@ -59,40 +81,58 @@ function Home() {
           </div>
         ) : (
           <div className="space-y-2">
-            {pages.map((page) => (
-              <Link
-                key={page.id}
-                to="/page/$pageId"
-                params={{ pageId: page.id }}
-                className="block bg-base-100 rounded-lg border border-base-300 p-4 hover:border-primary/50 transition-colors group"
-              >
-                <div className="flex items-center justify-between">
-                  <div className="flex-1 min-w-0">
-                    <h3 className="font-medium text-base-content truncate">
-                      {page.title || "Untitled"}
-                    </h3>
-                    <p className="text-sm text-base-content/60 mt-1">
-                      {new Date(page.updatedAt).toLocaleDateString(undefined, {
-                        month: "short",
-                        day: "numeric",
-                        year:
-                          new Date(page.updatedAt).getFullYear() !==
-                          new Date().getFullYear()
-                            ? "numeric"
-                            : undefined,
-                      })}
-                    </p>
+            {pages.map((page) => {
+              const isShared = sharedPageIds.has(page.id);
+              return (
+                <Link
+                  key={page.id}
+                  to="/page/$pageId"
+                  params={{ pageId: page.id }}
+                  className="block bg-base-100 rounded-lg border border-base-300 p-4 hover:border-primary/50 transition-colors group"
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <h3 className="font-medium text-base-content truncate">
+                          {page.title || "Untitled"}
+                        </h3>
+                        {isShared && (
+                          <span
+                            className="flex-shrink-0 text-base-content/50"
+                            title="Shared with you"
+                          >
+                            <Users className="h-4 w-4" />
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-sm text-base-content/60 mt-1">
+                        {new Date(page.updatedAt).toLocaleDateString(
+                          undefined,
+                          {
+                            month: "short",
+                            day: "numeric",
+                            year:
+                              new Date(page.updatedAt).getFullYear() !==
+                              new Date().getFullYear()
+                                ? "numeric"
+                                : undefined,
+                          },
+                        )}
+                      </p>
+                    </div>
+                    {!isShared && (
+                      <button
+                        onClick={(e) => handleDeletePage(e, page.id)}
+                        className="btn btn-ghost btn-sm btn-square opacity-0 group-hover:opacity-100 transition-opacity text-error"
+                        aria-label="Delete page"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    )}
                   </div>
-                  <button
-                    onClick={(e) => handleDeletePage(e, page.id)}
-                    className="btn btn-ghost btn-sm btn-square opacity-0 group-hover:opacity-100 transition-opacity text-error"
-                    aria-label="Delete page"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </button>
-                </div>
-              </Link>
-            ))}
+                </Link>
+              );
+            })}
           </div>
         )}
       </div>

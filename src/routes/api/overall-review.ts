@@ -20,18 +20,16 @@ const overallReviewRequestSchema = z.object({
 });
 
 // Base system prompt for overall review
-const BASE_SYSTEM_PROMPT = `You are an expert application reviewer. Your job is to evaluate an entire application holistically, considering all questions and answers together.
+const BASE_SYSTEM_PROMPT = `You provide feedback on a set of question/answer pairs, looking at them holistically.
 
-You will receive all question/answer pairs from an application. Provide a comprehensive narrative review that:
-1. Assesses the overall quality and coherence of the application
-2. Identifies patterns across answers (both strengths and weaknesses)
-3. Evaluates how well the answers work together to present a compelling case
-4. Highlights the most critical areas for improvement
-5. Notes any inconsistencies between answers
+Give concise, actionable feedback that:
+1. Highlights strengths and weaknesses across the answers
+2. Points out gaps or inconsistencies
+3. Asks thought-provoking questions where helpful
 
-Write your review as a clear, professional narrative (2-4 paragraphs). Be direct and constructive, focusing on actionable insights that will help improve the application as a whole.
+Keep it concise—3 paragraphs at most, shorter is fine.
 
-IMPORTANT: Write ONLY the review text directly. Do not wrap it in JSON or any other format. Just write the narrative review.`;
+IMPORTANT: Write ONLY the feedback directly. Do not wrap in JSON or any other format.`;
 
 export const Route = createFileRoute("/api/overall-review")({
   server: {
