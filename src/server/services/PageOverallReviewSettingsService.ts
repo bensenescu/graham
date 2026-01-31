@@ -1,9 +1,6 @@
 import { PageOverallReviewSettingsRepository } from "../repositories/PageOverallReviewSettingsRepository";
 import { PromptRepository } from "../repositories/PromptRepository";
-import {
-  ensurePageAccess,
-  ensurePageAccessWithSharing,
-} from "./helpers/ensurePageAccess";
+import { ensurePageAccessWithSharing } from "./helpers/ensurePageAccess";
 import type { UpdatePageOverallReviewSettingsInput } from "@/types/schemas/prompts";
 
 /**
@@ -40,22 +37,28 @@ async function update(
   userId: string,
   data: UpdatePageOverallReviewSettingsInput,
 ) {
-  // Verify user owns the page
-  await ensurePageAccess(data.pageId, userId);
+  // Verify user has access to the page
+  const { page } = await ensurePageAccessWithSharing(data.pageId, userId);
 
   // Verify all selected prompts belong to user if provided
   if (data.selectedPromptIds && data.selectedPromptIds.length > 0) {
     const userPrompts = await PromptRepository.findAllByUserId(userId);
-    const userPromptIds = new Set(userPrompts.map((p) => p.id));
+    const ownerPrompts =
+      page.userId === userId
+        ? []
+        : await PromptRepository.findAllByUserId(page.userId);
+    const userPromptIds = new Set(
+      [...userPrompts, ...ownerPrompts].map((p: { id: string }) => p.id),
+    );
 
     for (const promptId of data.selectedPromptIds) {
       if (!userPromptIds.has(promptId)) {
-        throw new Error(`Prompt ${promptId} not found or not owned by user`);
+        throw new Error(`Prompt ${promptId} not found or not accessible`);
       }
     }
   }
 
-  await PageOverallReviewSettingsRepository.update(data.pageId, {
+  await PageOverallReviewSettingsRepository.update(data.pageId, userId, {
     mode: data.mode,
     selectedPromptIds: data.selectedPromptIds,
   });

@@ -1,19 +1,23 @@
 import { PracticeRatingRepository } from "../repositories/PracticeRatingRepository";
 import { PracticeSessionRepository } from "../repositories/PracticeSessionRepository";
-import { ensurePageAccess } from "./helpers/ensurePageAccess";
+import { ensurePageAccessWithSharing } from "./helpers/ensurePageAccess";
 
 async function getBlockStats(userId: string, pageId: string) {
-  await ensurePageAccess(pageId, userId);
+  await ensurePageAccessWithSharing(pageId, userId);
 
-  const stats = await PracticeRatingRepository.getBlockPracticeStats(pageId);
+  const stats = await PracticeRatingRepository.getBlockPracticeStats(
+    pageId,
+    userId,
+  );
   return { stats };
 }
 
 async function getLastPracticeDate(userId: string, pageId: string) {
-  await ensurePageAccess(pageId, userId);
+  await ensurePageAccessWithSharing(pageId, userId);
 
   const sessions = await PracticeSessionRepository.findSessionsByPageId(
     pageId,
+    userId,
     1,
   );
   const lastSession = sessions[0];

@@ -1,4 +1,14 @@
 import { requireApiAuth } from "@/middleware/apiAuth";
+import { z } from "zod";
+
+const websocketQuerySchema = z.object({
+  token: z.string().min(1).optional(),
+  userName: z.string().min(1).max(64).optional(),
+  userColor: z
+    .string()
+    .regex(/^#?[0-9a-fA-F]{6}$/)
+    .optional(),
+});
 
 type DurableObjectNamespace = {
   idFromName: (name: string) => any;
@@ -34,10 +44,34 @@ export async function proxyWebsocketRequest({
 
   try {
     const url = new URL(request.url);
-    const token = url.searchParams.get("token");
-    if (token) {
+    const token = url.searchParams.get("token") ?? undefined;
+    const userNameParam = url.searchParams.get("userName") ?? undefined;
+    const userColorParam = url.searchParams.get("userColor") ?? undefined;
+    const validationResult = websocketQuerySchema.safeParse({
+      token,
+      userName: userNameParam,
+      userColor: userColorParam,
+    });
+
+    if (!validationResult.success) {
+      return new Response(
+        JSON.stringify({
+          error: "Invalid query parameters",
+          details: validationResult.error.issues[0]?.message,
+        }),
+        { status: 400, headers: { "Content-Type": "application/json" } },
+      );
+    }
+
+    const {
+      token: validatedToken,
+      userName,
+      userColor,
+    } = validationResult.data;
+
+    if (validatedToken) {
       const headers = new Headers(request.headers);
-      headers.set("Authorization", `Bearer ${token}`);
+      headers.set("Authorization", `Bearer ${validatedToken}`);
       request = new Request(request, { headers });
       url.searchParams.delete("token");
     }
@@ -71,17 +105,16 @@ export async function proxyWebsocketRequest({
       }
     }
 
-    const userName =
-      url.searchParams.get("userName") || session.email || "Anonymous";
-    const userColor = url.searchParams.get("userColor") || "#808080";
+    const resolvedUserName = userName || session.email || "Anonymous";
+    const resolvedUserColor = userColor || "#808080";
 
     const doId = doNamespace.idFromName(roomName);
     const doStub = doNamespace.get(doId);
 
     const doUrl = new URL(request.url);
     doUrl.searchParams.set("userId", session.sub);
-    doUrl.searchParams.set("userName", userName);
-    doUrl.searchParams.set("userColor", userColor);
+    doUrl.searchParams.set("userName", resolvedUserName);
+    doUrl.searchParams.set("userColor", resolvedUserColor);
 
     const doRequest = new Request(doUrl.toString(), request);
     return doStub.fetch(doRequest);

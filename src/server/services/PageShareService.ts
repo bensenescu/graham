@@ -1,5 +1,5 @@
 import { PageShareRepository } from "../repositories/PageShareRepository";
-import { ensurePageAccess } from "./helpers/ensurePageAccess";
+import { ensurePageAccessWithSharing } from "./helpers/ensurePageAccess";
 import type {
   AddPageShareInput,
   RemovePageShareInput,
@@ -8,10 +8,10 @@ import type {
 
 /**
  * Get all shares for a page.
- * Only the page owner can list shares.
+ * Any user with access can list shares.
  */
 async function getSharesForPage(userId: string, data: ListPageSharesInput) {
-  await ensurePageAccess(data.pageId, userId);
+  await ensurePageAccessWithSharing(data.pageId, userId);
 
   const shares = await PageShareRepository.findAllByPageId(data.pageId);
   return { shares };
@@ -19,24 +19,28 @@ async function getSharesForPage(userId: string, data: ListPageSharesInput) {
 
 /**
  * Add collaborators to a page.
- * Only the page owner can add collaborators.
+ * Any user with access can add collaborators.
  */
 async function addShares(userId: string, data: AddPageShareInput) {
-  await ensurePageAccess(data.pageId, userId);
+  await ensurePageAccessWithSharing(data.pageId, userId);
 
   // Filter out any userIds that are already shared or are the owner
   const existingShares = await PageShareRepository.findAllByPageId(data.pageId);
-  const existingUserIds = new Set(existingShares.map((s) => s.userId));
+  const existingUserIds = new Set(
+    existingShares.map((s: { userId: string }) => s.userId),
+  );
   existingUserIds.add(userId); // Can't share with yourself
 
-  const newUserIds = data.userIds.filter((id) => !existingUserIds.has(id));
+  const newUserIds = data.userIds.filter(
+    (id: string) => !existingUserIds.has(id),
+  );
 
   if (newUserIds.length === 0) {
     return { success: true, added: 0 };
   }
 
   // Create shares for new users
-  const shares = newUserIds.map((shareUserId) => ({
+  const shares = newUserIds.map((shareUserId: string) => ({
     id: crypto.randomUUID(),
     pageId: data.pageId,
     userId: shareUserId,
@@ -50,10 +54,10 @@ async function addShares(userId: string, data: AddPageShareInput) {
 
 /**
  * Remove a collaborator from a page.
- * Only the page owner can remove collaborators.
+ * Any user with access can remove collaborators.
  */
 async function removeShare(userId: string, data: RemovePageShareInput) {
-  await ensurePageAccess(data.pageId, userId);
+  await ensurePageAccessWithSharing(data.pageId, userId);
 
   await PageShareRepository.deleteByPageAndUser(data.pageId, data.userId);
 
@@ -74,7 +78,9 @@ async function getSharedPages(userId: string) {
 async function getAllUsers(currentUserId: string) {
   const users = await PageShareRepository.getAllUsers();
   // Filter out the current user from the list
-  const filteredUsers = users.filter((u) => u.id !== currentUserId);
+  const filteredUsers = users.filter(
+    (u: { id: string }) => u.id !== currentUserId,
+  );
   return { users: filteredUsers };
 }
 

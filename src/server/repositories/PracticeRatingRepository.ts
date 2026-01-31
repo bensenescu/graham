@@ -1,6 +1,10 @@
 import { db } from "@/db";
 import { practiceAnswerRatings, practiceSessions } from "@/db/schema";
-import { eq } from "drizzle-orm";
+import { eq, and, inArray } from "drizzle-orm";
+import {
+  getAccessibleAnswerIdsForUser,
+  getAccessiblePageIdsForUser,
+} from "./helpers/access";
 
 export async function createRating(data: {
   id: string;
@@ -34,15 +38,38 @@ export async function batchCreateRatings(
   await db.batch([first, ...rest]);
 }
 
-export async function deleteRatingsByAnswerId(answerId: string) {
+export async function deleteRatingsByAnswerId(
+  answerId: string,
+  userId: string,
+) {
+  const answerIds = await getAccessibleAnswerIdsForUser(userId);
+
+  if (answerIds.length === 0) {
+    return;
+  }
+
   await db
     .delete(practiceAnswerRatings)
-    .where(eq(practiceAnswerRatings.answerId, answerId));
+    .where(
+      and(
+        eq(practiceAnswerRatings.answerId, answerId),
+        inArray(practiceAnswerRatings.answerId, answerIds),
+      ),
+    );
 }
 
-export async function getBlockPracticeStats(pageId: string) {
+export async function getBlockPracticeStats(pageId: string, userId: string) {
+  const pageIds = await getAccessiblePageIdsForUser(userId);
+
+  if (!pageIds.includes(pageId)) {
+    return [];
+  }
+
   const sessions = await db.query.practiceSessions.findMany({
-    where: eq(practiceSessions.pageId, pageId),
+    where: and(
+      eq(practiceSessions.pageId, pageId),
+      inArray(practiceSessions.pageId, pageIds),
+    ),
     with: {
       answers: {
         with: {

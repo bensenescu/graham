@@ -3,9 +3,9 @@ import {
   pageOverallReviewSettings,
   pageOverallReviewSelectedPrompts,
 } from "@/db/schema";
-import { eq, inArray } from "drizzle-orm";
+import { eq, inArray, and } from "drizzle-orm";
 import type { OverallReviewMode } from "@/types/schemas/prompts";
-import { PageRepository } from "./PageRepository";
+import { getAccessiblePageIdsForUser } from "./helpers/access";
 
 type CreatePageOverallReviewSettings = {
   id: string;
@@ -23,7 +23,7 @@ type UpdatePageOverallReviewSettings = {
  * Find all overall review settings for pages accessible by a user (owned + shared).
  */
 async function findAllByUserId(userId: string) {
-  const pageIds = await PageRepository.getAccessiblePageIds(userId);
+  const pageIds = await getAccessiblePageIdsForUser(userId);
 
   if (pageIds.length === 0) {
     return [];
@@ -41,10 +41,14 @@ async function findAllByUserId(userId: string) {
   });
 
   // Transform to flatten the selected prompts
-  return settingsList.map((settings) => ({
-    ...settings,
-    selectedPrompts: settings.selectedPrompts.map((sp) => sp.prompt),
-  }));
+  return settingsList.map(
+    (settings: { selectedPrompts: Array<{ prompt: unknown }> }) => ({
+      ...settings,
+      selectedPrompts: settings.selectedPrompts.map(
+        (sp: { prompt: unknown }) => sp.prompt,
+      ),
+    }),
+  );
 }
 
 /**
@@ -69,7 +73,9 @@ async function findByPageId(pageId: string) {
   // Transform to flatten the selected prompts
   return {
     ...settings,
-    selectedPrompts: settings.selectedPrompts.map((sp) => sp.prompt),
+    selectedPrompts: settings.selectedPrompts.map(
+      (sp: { prompt: unknown }) => sp.prompt,
+    ),
   };
 }
 
@@ -103,7 +109,17 @@ async function create(data: CreatePageOverallReviewSettings) {
 /**
  * Update overall review settings.
  */
-async function update(pageId: string, data: UpdatePageOverallReviewSettings) {
+async function update(
+  pageId: string,
+  userId: string,
+  data: UpdatePageOverallReviewSettings,
+) {
+  const accessiblePageIds = await getAccessiblePageIdsForUser(userId);
+
+  if (accessiblePageIds.length === 0) {
+    return;
+  }
+
   // First, get the existing settings to get the ID
   const existing = await db.query.pageOverallReviewSettings.findFirst({
     where: eq(pageOverallReviewSettings.pageId, pageId),
@@ -125,7 +141,12 @@ async function update(pageId: string, data: UpdatePageOverallReviewSettings) {
   await db
     .update(pageOverallReviewSettings)
     .set(updateData)
-    .where(eq(pageOverallReviewSettings.pageId, pageId));
+    .where(
+      and(
+        eq(pageOverallReviewSettings.pageId, pageId),
+        inArray(pageOverallReviewSettings.pageId, accessiblePageIds),
+      ),
+    );
 
   // Update selected prompts if provided
   if (data.selectedPromptIds !== undefined) {
@@ -155,13 +176,13 @@ async function update(pageId: string, data: UpdatePageOverallReviewSettings) {
 /**
  * Upsert overall review settings (create if not exists, update if exists).
  */
-async function upsert(data: CreatePageOverallReviewSettings) {
+async function upsert(data: CreatePageOverallReviewSettings, userId: string) {
   const existing = await db.query.pageOverallReviewSettings.findFirst({
     where: eq(pageOverallReviewSettings.pageId, data.pageId),
   });
 
   if (existing) {
-    await update(data.pageId, {
+    await update(data.pageId, userId, {
       mode: data.mode,
       selectedPromptIds: data.selectedPromptIds,
     });
@@ -174,11 +195,22 @@ async function upsert(data: CreatePageOverallReviewSettings) {
 /**
  * Delete overall review settings by page ID.
  */
-async function deleteByPageId(pageId: string) {
+async function deleteByPageId(pageId: string, userId: string) {
+  const accessiblePageIds = await getAccessiblePageIdsForUser(userId);
+
+  if (accessiblePageIds.length === 0) {
+    return;
+  }
+
   // The junction table entries will be deleted automatically due to CASCADE
   await db
     .delete(pageOverallReviewSettings)
-    .where(eq(pageOverallReviewSettings.pageId, pageId));
+    .where(
+      and(
+        eq(pageOverallReviewSettings.pageId, pageId),
+        inArray(pageOverallReviewSettings.pageId, accessiblePageIds),
+      ),
+    );
 }
 
 export const PageOverallReviewSettingsRepository = {

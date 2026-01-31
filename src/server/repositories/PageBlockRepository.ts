@@ -1,7 +1,7 @@
 import { db } from "@/db";
 import { pageBlocks } from "@/db/schema";
 import { eq, and, inArray } from "drizzle-orm";
-import { PageRepository } from "./PageRepository";
+import { getAccessiblePageIdsForUser } from "./helpers/access";
 
 // Types for repository operations
 type CreatePageBlock = {
@@ -23,7 +23,7 @@ type UpdatePageBlock = {
  * Find all blocks for all pages accessible by user (owned + shared).
  */
 async function findAllByUserId(userId: string) {
-  const pageIds = await PageRepository.getAccessiblePageIds(userId);
+  const pageIds = await getAccessiblePageIdsForUser(userId);
 
   if (pageIds.length === 0) {
     return [];
@@ -112,24 +112,53 @@ async function batchCreate(blocks: CreatePageBlock[]) {
  * Update a page block.
  * Defense-in-depth: includes pageId in WHERE clause.
  */
-async function update(id: string, pageId: string, data: UpdatePageBlock) {
+async function update(
+  id: string,
+  pageId: string,
+  userId: string,
+  data: UpdatePageBlock,
+) {
+  const pageIds = await getAccessiblePageIdsForUser(userId);
+
+  if (pageIds.length === 0) {
+    return;
+  }
+
   await db
     .update(pageBlocks)
     .set({
       ...data,
       updatedAt: new Date().toISOString(),
     })
-    .where(and(eq(pageBlocks.id, id), eq(pageBlocks.pageId, pageId)));
+    .where(
+      and(
+        eq(pageBlocks.id, id),
+        eq(pageBlocks.pageId, pageId),
+        inArray(pageBlocks.pageId, pageIds),
+      ),
+    );
 }
 
 /**
  * Delete a page block.
  * Defense-in-depth: includes pageId in WHERE clause.
  */
-async function deleteById(id: string, pageId: string) {
+async function deleteById(id: string, pageId: string, userId: string) {
+  const pageIds = await getAccessiblePageIdsForUser(userId);
+
+  if (pageIds.length === 0) {
+    return;
+  }
+
   await db
     .delete(pageBlocks)
-    .where(and(eq(pageBlocks.id, id), eq(pageBlocks.pageId, pageId)));
+    .where(
+      and(
+        eq(pageBlocks.id, id),
+        eq(pageBlocks.pageId, pageId),
+        inArray(pageBlocks.pageId, pageIds),
+      ),
+    );
 }
 
 /**

@@ -8,7 +8,11 @@ import type { BlockReview } from "@/types/schemas/reviews";
 import { InlineBlockReview } from "./InlineBlockReview";
 import { getBlockItemId } from "@/client/lib/element-ids";
 import { usePageCollabContext } from "@/client/contexts/PageCollabContext";
-import { CollabTextEditor, getFragmentText } from "./CollabTextEditor";
+import {
+  CollabTextEditor,
+  getFragmentText,
+  type CollabTextEditorHandle,
+} from "./CollabTextEditor";
 import { LoadingSpinner } from "@/client/components/LoadingSpinner";
 
 interface QADocumentBlockProps {
@@ -53,6 +57,7 @@ export function QADocumentBlock({
   const { collab, isCollabReady } = usePageCollabContext();
 
   const questionInputRef = useRef<HTMLTextAreaElement>(null);
+  const questionEditorRef = useRef<CollabTextEditorHandle>(null);
   // Track if block has focus within for accessibility (controls should only be tabbable when block is focused)
   const [hasFocusWithin, setHasFocusWithin] = useState(false);
 
@@ -74,6 +79,10 @@ export function QADocumentBlock({
   const handleFocus = useCallback(() => {
     onFocus?.(block.id);
   }, [block.id, onFocus]);
+
+  const handleAutoFocusDone = useCallback(() => {
+    onAutoFocusDone?.(block.id);
+  }, [block.id, onAutoFocusDone]);
 
   // Save on blur handlers - sync Yjs content to DB
   const handleQuestionBlur = useCallback(() => {
@@ -104,11 +113,12 @@ export function QADocumentBlock({
     }
   }, [isCollabReady, collab, block.id, block.answer, onAnswerChange]);
 
+  // For non-collab mode, auto-focus the textarea
   useEffect(() => {
-    if (!autoFocusQuestion) return;
+    if (!autoFocusQuestion || isCollabReady) return;
     questionInputRef.current?.focus();
     onAutoFocusDone?.(block.id);
-  }, [autoFocusQuestion, block.id, onAutoFocusDone]);
+  }, [autoFocusQuestion, block.id, onAutoFocusDone, isCollabReady]);
 
   // Handle container focus (for keyboard navigation)
   const containerRef = useRef<HTMLDivElement>(null);
@@ -181,6 +191,7 @@ export function QADocumentBlock({
           <div className="flex items-start gap-2 w-full">
             {isCollabReady && collab?.provider ? (
               <CollabTextEditor
+                ref={questionEditorRef}
                 fragment={collab.getBlockQuestionFragment(block.id)!}
                 fragmentName={`block:${block.id}:question`}
                 provider={collab.provider}
@@ -192,6 +203,8 @@ export function QADocumentBlock({
                 onBlur={handleQuestionBlur}
                 onFocus={handleFocus}
                 initialContent={block.question}
+                autoFocus={autoFocusQuestion}
+                onAutoFocusDone={handleAutoFocusDone}
               />
             ) : (
               <p className="text-base font-semibold text-base-content/50 leading-relaxed">

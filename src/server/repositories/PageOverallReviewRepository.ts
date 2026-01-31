@@ -1,7 +1,7 @@
 import { db } from "@/db";
 import { pageOverallReviews } from "@/db/schema";
 import { eq, and, inArray } from "drizzle-orm";
-import { PageRepository } from "./PageRepository";
+import { getAccessiblePageIdsForUser } from "./helpers/access";
 
 type UpsertPageOverallReview = {
   id: string;
@@ -15,7 +15,7 @@ type UpsertPageOverallReview = {
  */
 async function findAllByUserId(userId: string) {
   // Get all page IDs accessible by the user (owned + shared)
-  const pageIds = await PageRepository.getAccessiblePageIds(userId);
+  const pageIds = await getAccessiblePageIdsForUser(userId);
 
   if (pageIds.length === 0) {
     return [];
@@ -48,7 +48,13 @@ async function findByPageId(pageId: string) {
  * Upsert a page overall review (insert or update based on pageId).
  * Defense-in-depth: update includes pageId in WHERE clause.
  */
-async function upsert(data: UpsertPageOverallReview) {
+async function upsert(data: UpsertPageOverallReview, userId: string) {
+  const pageIds = await getAccessiblePageIdsForUser(userId);
+
+  if (!pageIds.includes(data.pageId)) {
+    throw new Error("Page not found or access denied");
+  }
+
   const existing = await findByPageId(data.pageId);
 
   if (existing) {
@@ -64,6 +70,7 @@ async function upsert(data: UpsertPageOverallReview) {
         and(
           eq(pageOverallReviews.id, existing.id),
           eq(pageOverallReviews.pageId, data.pageId),
+          inArray(pageOverallReviews.pageId, pageIds),
         ),
       );
 
@@ -88,11 +95,21 @@ async function upsert(data: UpsertPageOverallReview) {
  * Delete an overall review by ID.
  * Defense-in-depth: includes pageId in WHERE clause.
  */
-async function deleteById(id: string, pageId: string) {
+async function deleteById(id: string, pageId: string, userId: string) {
+  const pageIds = await getAccessiblePageIdsForUser(userId);
+
+  if (pageIds.length === 0) {
+    return;
+  }
+
   await db
     .delete(pageOverallReviews)
     .where(
-      and(eq(pageOverallReviews.id, id), eq(pageOverallReviews.pageId, pageId)),
+      and(
+        eq(pageOverallReviews.id, id),
+        eq(pageOverallReviews.pageId, pageId),
+        inArray(pageOverallReviews.pageId, pageIds),
+      ),
     );
 }
 
