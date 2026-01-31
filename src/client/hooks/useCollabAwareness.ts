@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 import type { WebsocketProvider } from "y-websocket";
-import type { UserInfo } from "./useSessionReadyToken";
+import type { UserInfo } from "./collabTypes";
 
 const DEBUG_AWARENESS = false;
 
@@ -15,8 +15,8 @@ export interface UseCollabAwarenessOptions {
   provider: WebsocketProvider | null;
   /** User info to set in awareness */
   userInfo: UserInfo;
-  /** Whether the session is ready (user is authenticated) */
-  sessionReady: boolean;
+  /** Whether a session token is available */
+  hasToken: boolean;
   /** Room name for logging */
   roomName: string;
 }
@@ -32,21 +32,21 @@ export interface UseCollabAwarenessOptions {
 export function useCollabAwareness({
   provider,
   userInfo,
-  sessionReady,
+  hasToken,
   roomName,
 }: UseCollabAwarenessOptions): void {
   // Keep refs for use in event handlers
   const userInfoRef = useRef(userInfo);
   userInfoRef.current = userInfo;
 
-  const sessionReadyRef = useRef(sessionReady);
-  sessionReadyRef.current = sessionReady;
+  const hasTokenRef = useRef(hasToken);
+  hasTokenRef.current = hasToken;
 
   // Set awareness when userInfo changes (only when session is ready)
   useEffect(() => {
     if (!provider) return;
 
-    if (!sessionReady) {
+    if (!hasToken) {
       debugLog("skipping awareness update (session not ready)", {
         roomName,
         userId: userInfo.userId,
@@ -65,7 +65,7 @@ export function useCollabAwareness({
       color: userInfo.userColor,
       userId: userInfo.userId,
     });
-  }, [provider, userInfo, sessionReady, roomName]);
+  }, [provider, userInfo, hasToken, roomName]);
 
   // Re-apply awareness on reconnect and visibility change
   useEffect(() => {
@@ -75,7 +75,7 @@ export function useCollabAwareness({
       const currentUserInfo = userInfoRef.current;
 
       // Don't apply Anonymous awareness
-      if (!sessionReadyRef.current || currentUserInfo.userId === "anonymous") {
+      if (!hasTokenRef.current || currentUserInfo.userId === "anonymous") {
         debugLog("skipping re-apply awareness (session not ready)", {
           roomName,
           userId: currentUserInfo.userId,

@@ -6,11 +6,14 @@ import {
   type ConnectionState,
   type CollabConnection,
 } from "@/client/lib/PageCollabManager";
-import { useSessionReadyToken, type UserInfo } from "./useSessionReadyToken";
+import { useCurrentUser } from "@/client/every-app";
+import { generateUserColor } from "@/client/lib/user-colors";
 import { useCollabAwareness } from "./useCollabAwareness";
+import { useSessionToken } from "./useSessionToken";
+import type { UserInfo } from "./collabTypes";
 
 // Re-export types for consumers
-export type { UserInfo } from "./useSessionReadyToken";
+export type { UserInfo } from "./collabTypes";
 export type { ConnectionState } from "@/client/lib/PageCollabManager";
 
 export interface UseCollabOptions {
@@ -53,10 +56,33 @@ export function useCollab({
   const [isSynced, setIsSynced] = useState(false);
   const [hasSyncedOnce, setHasSyncedOnce] = useState(false);
 
-  // Centralized session/token/userInfo logic
-  const { sessionReady, token, userInfo, refreshToken } = useSessionReadyToken({
+  // DEBUG: Track hook mount time
+  const hookMountTimeRef = useRef(performance.now());
+  useEffect(() => {
+    console.log(
+      "[useCollab] mounted, roomName:",
+      roomName,
+      "enabled:",
+      enabled,
+    );
+    return () => {
+      console.log("[useCollab] unmounted, roomName:", roomName);
+    };
+  }, [roomName, enabled]);
+
+  const { token, refreshSessionToken } = useSessionToken({
     sessionToken,
   });
+  const currentUser = useCurrentUser();
+  const userInfo = useMemo<UserInfo>(() => {
+    const userId = currentUser?.userId ?? "anonymous";
+    const userName = currentUser?.email ?? "Anonymous";
+    return {
+      userId,
+      userName,
+      userColor: generateUserColor(userId),
+    };
+  }, [currentUser?.userId, currentUser?.email]);
 
   // Store userInfo in a ref for use in callbacks
   const userInfoRef = useRef(userInfo);
@@ -113,9 +139,20 @@ export function useCollab({
     };
   }, [url, roomName, enabled]);
 
-  // Connect provider when session is ready and token is available
+  // Connect provider when token is available
   useEffect(() => {
-    if (!enabled || !token || !sessionReady) return;
+    if (!enabled || !token) {
+      console.log(
+        "[useCollab] connectWithToken blocked:",
+        `enabled=${enabled}, hasToken=${!!token}, roomName=${roomName}`,
+      );
+      return;
+    }
+
+    const elapsed = performance.now() - hookMountTimeRef.current;
+    console.log(
+      `[useCollab] connectWithToken starting: roomName=${roomName}, elapsedSinceMount=${elapsed.toFixed(0)}ms`,
+    );
 
     const nextProvider = collabManager.connectWithToken({
       url,
@@ -128,7 +165,7 @@ export function useCollab({
       setProvider(nextProvider);
       setConnectionState(nextProvider.wsconnected ? "connected" : "connecting");
     }
-  }, [enabled, token, sessionReady, url, roomName]);
+  }, [enabled, token, url, roomName]);
 
   // Subscribe to state changes from manager
   useEffect(() => {
@@ -147,6 +184,10 @@ export function useCollab({
     if (!provider) return;
 
     const handleSync = (synced: boolean) => {
+      const elapsed = performance.now() - hookMountTimeRef.current;
+      console.log(
+        `[useCollab] sync event: synced=${synced}, roomName=${roomName}, elapsedSinceMount=${elapsed.toFixed(0)}ms`,
+      );
       setIsSynced(synced);
       if (synced) {
         setHasSyncedOnce(true);
@@ -155,6 +196,10 @@ export function useCollab({
 
     provider.on("sync", handleSync);
     if (provider.synced) {
+      const elapsed = performance.now() - hookMountTimeRef.current;
+      console.log(
+        `[useCollab] provider already synced: roomName=${roomName}, elapsedSinceMount=${elapsed.toFixed(0)}ms`,
+      );
       setIsSynced(true);
       setHasSyncedOnce(true);
     }
@@ -162,7 +207,7 @@ export function useCollab({
     return () => {
       provider.off("sync", handleSync);
     };
-  }, [provider]);
+  }, [provider, roomName]);
 
   // Reactive token refresh on auth errors
   useEffect(() => {
@@ -173,7 +218,7 @@ export function useCollab({
       if (status === "disconnected" || status === "error") {
         // Only attempt refresh if we had a token before (auth failure scenario)
         if (token) {
-          const freshToken = await refreshToken();
+          const freshToken = await refreshSessionToken();
           if (freshToken) {
             const nextProvider = collabManager.connectWithToken({
               url,
@@ -196,19 +241,19 @@ export function useCollab({
     return () => {
       provider.off("status", handleStatus);
     };
-  }, [provider, enabled, token, refreshToken, url, roomName]);
+  }, [provider, enabled, token, refreshSessionToken, url, roomName]);
 
   // Centralized awareness management
   useCollabAwareness({
     provider,
     userInfo,
-    sessionReady,
+    hasToken: !!token,
     roomName,
   });
 
   const reconnect = useCallback(async () => {
     // Refresh token first to handle expiration
-    const freshToken = await refreshToken();
+    const freshToken = await refreshSessionToken();
     if (!freshToken) return;
 
     const nextProvider = collabManager.connectWithToken({
@@ -221,7 +266,7 @@ export function useCollab({
       setProvider(nextProvider);
       setConnectionState(nextProvider.wsconnected ? "connected" : "connecting");
     }
-  }, [url, roomName, refreshToken]);
+  }, [url, roomName, refreshSessionToken]);
 
   return useMemo(
     () => ({

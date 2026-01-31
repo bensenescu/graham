@@ -73,6 +73,7 @@ class CollabManager {
   getConnection(options: GetConnectionOptions): CollabConnection {
     const url = options.url ?? DEFAULT_URL;
     const key = this.getKey(url, options.roomName);
+    console.log("[CollabManager] getConnection:", options.roomName);
 
     // If we have an existing connection, increment ref count and return it
     const existing = this.connections.get(key);
@@ -90,6 +91,9 @@ class CollabManager {
     return this.createConnection(url, options.roomName, options.userInfo);
   }
 
+  // DEBUG: Track connection start times per room
+  private connectionStartTimes = new Map<string, number>();
+
   /**
    * Create or update a provider with a valid token.
    * If a provider already exists with the same token, no-op.
@@ -104,6 +108,10 @@ class CollabManager {
     const url = options.url ?? DEFAULT_URL;
     const key = this.getKey(url, options.roomName);
 
+    // DEBUG: Start timing
+    this.connectionStartTimes.set(key, performance.now());
+    console.log("[CollabManager] connectWithToken starting:", options.roomName);
+
     const existing = this.connections.get(key);
     const conn =
       existing ??
@@ -112,10 +120,18 @@ class CollabManager {
     conn.userInfo = options.userInfo;
 
     if (conn.provider && conn.token === options.token) {
+      console.log(
+        "[CollabManager] connectWithToken: reusing existing provider:",
+        options.roomName,
+      );
       return conn.provider;
     }
 
     if (conn.provider) {
+      console.log(
+        "[CollabManager] connectWithToken: destroying old provider:",
+        options.roomName,
+      );
       conn.provider.destroy();
       conn.provider = null;
     }
@@ -258,6 +274,11 @@ class CollabManager {
       const wsUrl = new URL(conn.url, window.location.origin);
       wsUrl.protocol = wsUrl.protocol === "https:" ? "wss:" : "ws:";
 
+      console.log(
+        "[CollabManager] createProvider: creating WebsocketProvider for:",
+        conn.roomName,
+      );
+
       const provider = new WebsocketProvider(
         wsUrl.origin + wsUrl.pathname,
         conn.roomName,
@@ -283,6 +304,12 @@ class CollabManager {
       });
 
       provider.on("status", ({ status }: { status: string }) => {
+        const startTime = this.connectionStartTimes.get(key);
+        const elapsed = startTime ? performance.now() - startTime : 0;
+        console.log(
+          `[CollabManager] provider status: ${status}, room=${conn.roomName}, elapsed=${elapsed.toFixed(0)}ms`,
+        );
+
         if (status === "connected") {
           this.updateState(key, "connected");
         } else if (status === "disconnected") {
@@ -293,8 +320,22 @@ class CollabManager {
         }
       });
 
-      provider.on("connection-error", () => {
+      provider.on("connection-error", (error: unknown) => {
+        console.error(
+          "[CollabManager] connection-error:",
+          conn.roomName,
+          error,
+        );
         this.updateState(key, "error");
+      });
+
+      // DEBUG: Track sync event
+      provider.on("sync", (synced: boolean) => {
+        const startTime = this.connectionStartTimes.get(key);
+        const elapsed = startTime ? performance.now() - startTime : 0;
+        console.log(
+          `[CollabManager] provider sync: synced=${synced}, room=${conn.roomName}, elapsed=${elapsed.toFixed(0)}ms`,
+        );
       });
 
       conn.provider = provider;
