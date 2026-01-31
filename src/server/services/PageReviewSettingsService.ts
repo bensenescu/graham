@@ -4,10 +4,7 @@ import {
   ensurePageAccess,
   ensurePageAccessWithSharing,
 } from "./helpers/ensurePageAccess";
-import {
-  DEFAULT_PAGE_REVIEW_MODEL,
-  DEFAULT_PAGE_REVIEW_PROMPT,
-} from "@/constants/defaults";
+import { DEFAULT_PAGE_REVIEW_MODEL } from "@/constants/defaults";
 import type {
   CreatePageReviewSettingsInput,
   UpdatePageReviewSettingsInput,
@@ -91,40 +88,9 @@ async function update(userId: string, data: UpdatePageReviewSettingsInput) {
   return { success: true };
 }
 
-/**
- * Initialize default settings for a new page.
- * Creates a default prompt named "{Page Title} - Default" and sets it as the default.
- */
-async function initializeForPage(
-  userId: string,
-  pageId: string,
-  pageTitle: string,
-) {
-  // Create the default prompt
-  const promptId = crypto.randomUUID();
-  await PromptRepository.create({
-    id: promptId,
-    userId,
-    name: `${pageTitle} - Default`,
-    prompt: DEFAULT_PAGE_REVIEW_PROMPT,
-  });
-
-  // Create the page review settings
-  const settingsId = crypto.randomUUID();
-  await PageReviewSettingsRepository.create({
-    id: settingsId,
-    pageId,
-    model: DEFAULT_PAGE_REVIEW_MODEL,
-    defaultPromptId: promptId,
-  });
-
-  return { promptId, settingsId };
-}
-
 export const PageReviewSettingsService = {
   getAll,
   getByPageId,
   upsert,
   update,
-  initializeForPage,
 } as const;

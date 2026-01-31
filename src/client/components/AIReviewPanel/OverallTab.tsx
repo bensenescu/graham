@@ -3,6 +3,7 @@ import { X, RefreshCw, Sparkles, Brain } from "lucide-react";
 import type { PageBlock } from "@/types/schemas/pages";
 import { usePageReviewSettings } from "@/client/hooks/usePageReviewSettings";
 import { useOverallReview } from "@/client/hooks/useOverallReview";
+import { formatDateTime } from "@/client/lib/date-utils";
 
 const THINKING_PHRASES = [
   "Analyzing your responses...",
@@ -61,18 +62,6 @@ export function OverallTab({
       defaultPrompt?.prompt ?? null,
     );
   }, [generateOverallReview, defaultPrompt]);
-
-  // Format the date for display
-  const formatDate = (dateString: string | undefined) => {
-    if (!dateString) return "";
-    const date = new Date(dateString);
-    return date.toLocaleDateString("en-US", {
-      month: "short",
-      day: "numeric",
-      hour: "numeric",
-      minute: "2-digit",
-    });
-  };
 
   if (isLoading) {
     return (
@@ -135,7 +124,7 @@ export function OverallTab({
           </h3>
           {overallReview?.updatedAt && !isGenerating ? (
             <p className="text-xs text-base-content/50">
-              Generated {formatDate(overallReview.updatedAt)}
+              Generated {formatDateTime(overallReview.updatedAt)}
             </p>
           ) : null}
         </div>

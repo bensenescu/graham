@@ -1,7 +1,8 @@
 import { useMemo } from "react";
-import type { usePractice } from "@/client/hooks/usePractice";
+import type { usePractice } from "@/client/hooks/practice";
 import type { PageBlock } from "@/types/schemas/pages";
 import type { PracticeCriterion } from "@/types/schemas/practice";
+import { formatDuration } from "@/client/lib/date-utils";
 
 export interface SummaryPhaseProps {
   session: ReturnType<typeof usePractice>["currentSession"];
@@ -59,9 +60,7 @@ export function SummaryPhase({
     const start = new Date(session.startedAt);
     const end = new Date(session.completedAt);
     const diffMs = end.getTime() - start.getTime();
-    const mins = Math.floor(diffMs / 60000);
-    const secs = Math.floor((diffMs % 60000) / 1000);
-    return `${mins}m ${secs}s`;
+    return formatDuration(diffMs);
   }, [session]);
 
   return (

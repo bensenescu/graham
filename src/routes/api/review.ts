@@ -49,19 +49,9 @@ export const Route = createFileRoute("/api/review")({
   server: {
     handlers: {
       POST: async ({ request }) => {
-        const startTime = Date.now();
-        const requestId = crypto.randomUUID().slice(0, 8);
-
-        console.log(`[Review ${requestId}] Starting review request`);
-
         try {
           // Authenticate the request
-          console.log(`[Review ${requestId}] Authenticating request...`);
-          const authStart = Date.now();
           const { response } = await requireApiAuth(request);
-          console.log(
-            `[Review ${requestId}] Authentication completed in ${Date.now() - authStart}ms`,
-          );
 
           if (response) {
             return response;
@@ -73,7 +63,6 @@ export const Route = createFileRoute("/api/review")({
             await reviewBlockRequestSchema.safeParseAsync(rawData);
 
           if (!validationResult.success) {
-            console.error("Validation errors:", validationResult.error.issues);
             const firstError = validationResult.error.issues[0];
             return new Response(
               JSON.stringify({
@@ -87,14 +76,11 @@ export const Route = createFileRoute("/api/review")({
             );
           }
 
-          const { blockId, question, answer, customInstructions } =
+          const { question, answer, customInstructions } =
             validationResult.data;
 
           // Skip review for empty answers
           if (!answer || answer.trim() === "") {
-            console.log(
-              `[Review ${requestId}] Skipping review for block ${blockId} - empty answer`,
-            );
             return new Response(
               JSON.stringify({
                 error: "Cannot review empty answer",
@@ -106,10 +92,6 @@ export const Route = createFileRoute("/api/review")({
               },
             );
           }
-
-          console.log(
-            `[Review ${requestId}] Processing block ${blockId}, question length: ${question.length}, answer length: ${answer.length}`,
-          );
 
           // Build the system prompt: base prompt + optional custom instructions
           let finalSystemPrompt = BASE_SYSTEM_PROMPT;
@@ -125,15 +107,8 @@ export const Route = createFileRoute("/api/review")({
           // Create abort controller for timeout
           const abortController = new AbortController();
           const timeoutId = setTimeout(() => {
-            console.log(
-              `[Review ${requestId}] Timeout reached after ${REVIEW_TIMEOUT_MS}ms, aborting...`,
-            );
             abortController.abort();
           }, REVIEW_TIMEOUT_MS);
-
-          console.log(
-            `[Review ${requestId}] Starting AI generation at ${Date.now() - startTime}ms...`,
-          );
 
           let result;
           try {
@@ -165,12 +140,7 @@ Return { "suggestion": null } if the answer is solid and you have nothing meanin
             clearTimeout(timeoutId);
           }
 
-          console.log(
-            `[Review ${requestId}] AI generation completed in ${Date.now() - startTime}ms, response length: ${result.text.length}`,
-          );
-
           // Parse the LLM response
-          console.log(`[Review ${requestId}] Parsing LLM response...`);
           let reviewData;
           try {
             // Try to extract JSON from the response
@@ -180,13 +150,8 @@ Return { "suggestion": null } if the answer is solid and you have nothing meanin
             }
             const parsed = JSON.parse(jsonMatch[0]);
             reviewData = reviewResponseSchema.parse(parsed);
-            console.log(`[Review ${requestId}] Response parsed successfully`);
           } catch (parseError) {
-            console.error(
-              `[Review ${requestId}] Failed to parse LLM response:`,
-              parseError,
-            );
-            console.error(`[Review ${requestId}] Raw response:`, result.text);
+            console.error("[Review] Failed to parse LLM response:", parseError);
             return new Response(
               JSON.stringify({
                 error: "Failed to parse review response",
@@ -202,12 +167,6 @@ Return { "suggestion": null } if the answer is solid and you have nothing meanin
             );
           }
 
-          // Return the review (without blockId - client already has it)
-          const totalTime = Date.now() - startTime;
-          console.log(
-            `[Review ${requestId}] Review completed successfully in ${totalTime}ms`,
-          );
-
           return new Response(
             JSON.stringify({
               suggestion: reviewData.suggestion,
@@ -218,13 +177,8 @@ Return { "suggestion": null } if the answer is solid and you have nothing meanin
             },
           );
         } catch (error) {
-          const totalTime = Date.now() - startTime;
-
           // Check if this was a timeout/abort error
           if (error instanceof Error && error.name === "AbortError") {
-            console.error(
-              `[Review ${requestId}] Request timed out after ${totalTime}ms`,
-            );
             return new Response(
               JSON.stringify({
                 error: "Review request timed out",
@@ -237,10 +191,7 @@ Return { "suggestion": null } if the answer is solid and you have nothing meanin
             );
           }
 
-          console.error(
-            `[Review ${requestId}] Review error after ${totalTime}ms:`,
-            error,
-          );
+          console.error("[Review] Error:", error);
           return new Response(
             JSON.stringify({
               error: "Failed to process review request",

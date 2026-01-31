@@ -7,8 +7,4 @@ export function getBlockItemId(blockId: string): string {
   return `block-item-${blockId}`;
 }
 
-export function getBlockQuestionId(blockId: string): string {
-  return `block-question-${blockId}`;
-}
-
 export const ADD_QUESTION_BUTTON_ID = "add-question-button";

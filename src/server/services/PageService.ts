@@ -3,7 +3,10 @@ import { PromptRepository } from "../repositories/PromptRepository";
 import { PageReviewSettingsRepository } from "../repositories/PageReviewSettingsRepository";
 import { PageOverallReviewSettingsRepository } from "../repositories/PageOverallReviewSettingsRepository";
 import { ensurePageAccess } from "./helpers/ensurePageAccess";
-import { DEFAULT_PAGE_REVIEW_MODEL } from "@/constants/defaults";
+import {
+  DEFAULT_PAGE_REVIEW_MODEL,
+  DEFAULT_PAGE_REVIEW_PROMPT,
+} from "@/constants/defaults";
 import type {
   CreatePageInput,
   UpdatePageInput,
@@ -35,7 +38,7 @@ async function create(userId: string, data: CreatePageInput) {
     id: promptId,
     userId,
     name: `${data.title} - Default`,
-    prompt: "",
+    prompt: DEFAULT_PAGE_REVIEW_PROMPT,
   });
 
   // Create page review settings with the default prompt
