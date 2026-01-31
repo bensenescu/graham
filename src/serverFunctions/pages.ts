@@ -12,7 +12,7 @@ import {
   deletePageBlockSchema,
   batchCreatePageBlocksSchema,
 } from "@/types/schemas/pages";
-import { z } from "zod";
+import { pageIdInputSchema } from "@/types/schemas/common";
 import { env } from "cloudflare:workers";
 
 export const getAllPages = createServerFn()
@@ -46,7 +46,9 @@ export const deletePage = createServerFn()
     try {
       const doId = env.PAGE_COLLAB_DO.idFromName(`page-${data.id}`);
       const doStub = env.PAGE_COLLAB_DO.get(doId);
-      await doStub.fetch(new Request("https://do/delete", { method: "DELETE" }));
+      await doStub.fetch(
+        new Request("https://do/delete", { method: "DELETE" }),
+      );
     } catch (error) {
       // Log but don't fail the deletion if collab cleanup fails
       console.error("Failed to clear collab state:", error);
@@ -65,9 +67,7 @@ export const getAllPageBlocks = createServerFn()
 
 export const getPageBlocks = createServerFn()
   .middleware([useSessionTokenClientMiddleware, ensureUserMiddleware])
-  .inputValidator((data: unknown) =>
-    z.object({ pageId: z.string().uuid() }).parse(data),
-  )
+  .inputValidator((data: unknown) => pageIdInputSchema.parse(data))
   .handler(async ({ data, context }) => {
     return PageBlockService.getAllByPageId(context.userId, data.pageId);
   });

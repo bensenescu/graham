@@ -12,6 +12,7 @@ import {
   updatePageReviewSettingsSchema,
   updatePageOverallReviewSettingsSchema,
 } from "@/types/schemas/prompts";
+import { pageIdInputSchema } from "@/types/schemas/common";
 import { z } from "zod";
 
 // === Prompt Server Functions ===
@@ -53,9 +54,7 @@ export const getAllPageReviewSettings = createServerFn()
 
 export const getPageReviewSettings = createServerFn()
   .middleware([useSessionTokenClientMiddleware, ensureUserMiddleware])
-  .inputValidator((data: unknown) =>
-    z.object({ pageId: z.string().uuid() }).parse(data),
-  )
+  .inputValidator((data: unknown) => pageIdInputSchema.parse(data))
   .handler(async ({ data, context }) => {
     return PageReviewSettingsService.getByPageId(context.userId, data.pageId);
   });
@@ -77,7 +76,7 @@ export const updatePageReviewSettings = createServerFn()
 export const initializePageReviewSettings = createServerFn()
   .middleware([useSessionTokenClientMiddleware, ensureUserMiddleware])
   .inputValidator((data: unknown) =>
-    z.object({ pageId: z.string().uuid(), pageTitle: z.string() }).parse(data),
+    pageIdInputSchema.extend({ pageTitle: z.string() }).parse(data),
   )
   .handler(async ({ data, context }) => {
     return PageReviewSettingsService.initializeForPage(
@@ -97,9 +96,7 @@ export const getAllPageOverallReviewSettings = createServerFn()
 
 export const getPageOverallReviewSettings = createServerFn()
   .middleware([useSessionTokenClientMiddleware, ensureUserMiddleware])
-  .inputValidator((data: unknown) =>
-    z.object({ pageId: z.string().uuid() }).parse(data),
-  )
+  .inputValidator((data: unknown) => pageIdInputSchema.parse(data))
   .handler(async ({ data, context }) => {
     return PageOverallReviewSettingsService.getByPageId(
       context.userId,

@@ -4,7 +4,7 @@ import { Plus, Menu } from "lucide-react";
 import { useHotkeys } from "react-hotkeys-hook";
 import { SidebarNav } from "./Sidebar";
 import { KeyboardShortcutsModal } from "./KeyboardShortcutsModal";
-import { pageCollection } from "@/client/tanstack-db";
+import { createBlankPage } from "@/client/actions/createPage";
 import { DrawerProvider, useDrawer } from "@/client/contexts/DrawerContext";
 import { SHORTCUT_SHOW_SHORTCUTS_HOTKEY } from "@/client/lib/keyboard-shortcuts";
 
@@ -20,15 +20,8 @@ function MobileNavbarRight() {
   // Pages: New Page button
   if (isOnPagesPage) {
     const handleNewPage = () => {
-      const id = crypto.randomUUID();
-      const now = new Date().toISOString();
-      pageCollection.insert({
-        id,
-        title: "Untitled",
-        createdAt: now,
-        updatedAt: now,
-      });
-      navigate({ to: "/page/$pageId", params: { pageId: id } });
+      const pageId = createBlankPage();
+      navigate({ to: "/page/$pageId", params: { pageId } });
     };
 
     return (

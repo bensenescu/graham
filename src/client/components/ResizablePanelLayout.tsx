@@ -52,12 +52,20 @@ export function ResizablePanelLayout({
   // Load initial width from localStorage or use default
   const [mainWidthPercent, setMainWidthPercent] = useState(() => {
     if (typeof window === "undefined") return defaultMainWidth;
-    const stored = localStorage.getItem(storageKey);
-    if (stored) {
-      const parsed = parseFloat(stored);
-      if (!isNaN(parsed) && parsed >= minMainWidth && parsed <= maxMainWidth) {
-        return parsed;
+    try {
+      const stored = localStorage.getItem(storageKey);
+      if (stored) {
+        const parsed = parseFloat(stored);
+        if (
+          !isNaN(parsed) &&
+          parsed >= minMainWidth &&
+          parsed <= maxMainWidth
+        ) {
+          return parsed;
+        }
       }
+    } catch {
+      // localStorage may be unavailable in private browsing mode
     }
     return defaultMainWidth;
   });
@@ -67,7 +75,11 @@ export function ResizablePanelLayout({
 
   // Persist width to localStorage
   useEffect(() => {
-    localStorage.setItem(storageKey, mainWidthPercent.toString());
+    try {
+      localStorage.setItem(storageKey, mainWidthPercent.toString());
+    } catch {
+      // localStorage may be unavailable in private browsing mode
+    }
   }, [mainWidthPercent, storageKey]);
 
   const handleMouseDown = useCallback((e: React.MouseEvent) => {

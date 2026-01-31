@@ -1,27 +1,6 @@
 import * as Y from "yjs";
 import { WebsocketProvider } from "y-websocket";
-
-const CURSOR_COLORS = [
-  "#E57373",
-  "#64B5F6",
-  "#81C784",
-  "#FFD54F",
-  "#BA68C8",
-  "#4DD0E1",
-  "#FF8A65",
-  "#A1887F",
-  "#90A4AE",
-  "#F06292",
-];
-
-function generateUserColor(userId: string): string {
-  let hash = 0;
-  for (let i = 0; i < userId.length; i++) {
-    hash = (hash << 5) - hash + userId.charCodeAt(i);
-    hash = hash & hash;
-  }
-  return CURSOR_COLORS[Math.abs(hash) % CURSOR_COLORS.length];
-}
+import { generateUserColor } from "./user-colors";
 
 export interface UserInfo {
   userId: string;
@@ -66,6 +45,7 @@ export interface GetConnectionOptions {
 }
 
 const DEFAULT_URL = "/api/page-collab";
+const PROVIDER_READY_TIMEOUT_MS = 30_000;
 
 /**
  * Singleton manager for collaboration connections.
@@ -370,6 +350,10 @@ class CollabManager {
   }
 
   private providerReadyListeners = new Map<string, Set<() => void>>();
+  private providerReadyTimeouts = new Map<
+    string,
+    Map<() => void, ReturnType<typeof setTimeout>>
+  >();
 
   /**
    * Subscribe to be notified when a provider becomes ready.
@@ -394,18 +378,55 @@ class CollabManager {
     }
     this.providerReadyListeners.get(key)!.add(listener);
 
+    if (!this.providerReadyTimeouts.has(key)) {
+      this.providerReadyTimeouts.set(key, new Map());
+    }
+
+    const timeoutId = setTimeout(() => {
+      this.providerReadyListeners.get(key)?.delete(listener);
+      const timeouts = this.providerReadyTimeouts.get(key);
+      timeouts?.delete(listener);
+
+      if (this.providerReadyListeners.get(key)?.size === 0) {
+        this.providerReadyListeners.delete(key);
+      }
+      if (timeouts?.size === 0) {
+        this.providerReadyTimeouts.delete(key);
+      }
+    }, PROVIDER_READY_TIMEOUT_MS);
+
+    this.providerReadyTimeouts.get(key)!.set(listener, timeoutId);
+
     return () => {
       this.providerReadyListeners.get(key)?.delete(listener);
+      const timeouts = this.providerReadyTimeouts.get(key);
+      const existingTimeout = timeouts?.get(listener);
+      if (existingTimeout) {
+        clearTimeout(existingTimeout);
+        timeouts?.delete(listener);
+      }
+      if (this.providerReadyListeners.get(key)?.size === 0) {
+        this.providerReadyListeners.delete(key);
+      }
+      if (timeouts?.size === 0) {
+        this.providerReadyTimeouts.delete(key);
+      }
     };
   }
 
   private notifyProviderReady(key: string): void {
     const listeners = this.providerReadyListeners.get(key);
+    const timeouts = this.providerReadyTimeouts.get(key);
     if (listeners) {
       for (const listener of listeners) {
+        const timeoutId = timeouts?.get(listener);
+        if (timeoutId) {
+          clearTimeout(timeoutId);
+        }
         listener();
       }
       this.providerReadyListeners.delete(key);
+      this.providerReadyTimeouts.delete(key);
     }
   }
 

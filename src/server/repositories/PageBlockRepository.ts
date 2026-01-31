@@ -1,6 +1,7 @@
 import { db } from "@/db";
-import { pageBlocks, pages, pageShares } from "@/db/schema";
-import { eq, inArray } from "drizzle-orm";
+import { pageBlocks } from "@/db/schema";
+import { eq, and, inArray } from "drizzle-orm";
+import { PageRepository } from "./PageRepository";
 
 // Types for repository operations
 type CreatePageBlock = {
@@ -22,21 +23,7 @@ type UpdatePageBlock = {
  * Find all blocks for all pages accessible by user (owned + shared).
  */
 async function findAllByUserId(userId: string) {
-  // Get all page IDs for the user (owned)
-  const userPages = await db.query.pages.findMany({
-    where: eq(pages.userId, userId),
-    columns: { id: true },
-  });
-
-  // Get all shared page IDs
-  const sharedPageRecords = await db.query.pageShares.findMany({
-    where: eq(pageShares.userId, userId),
-    columns: { pageId: true },
-  });
-
-  const ownedIds = userPages.map((p) => p.id);
-  const sharedIds = sharedPageRecords.map((s) => s.pageId);
-  const pageIds = [...new Set([...ownedIds, ...sharedIds])];
+  const pageIds = await PageRepository.getAccessiblePageIds(userId);
 
   if (pageIds.length === 0) {
     return [];
@@ -123,22 +110,26 @@ async function batchCreate(blocks: CreatePageBlock[]) {
 
 /**
  * Update a page block.
+ * Defense-in-depth: includes pageId in WHERE clause.
  */
-async function update(id: string, data: UpdatePageBlock) {
+async function update(id: string, pageId: string, data: UpdatePageBlock) {
   await db
     .update(pageBlocks)
     .set({
       ...data,
       updatedAt: new Date().toISOString(),
     })
-    .where(eq(pageBlocks.id, id));
+    .where(and(eq(pageBlocks.id, id), eq(pageBlocks.pageId, pageId)));
 }
 
 /**
  * Delete a page block.
+ * Defense-in-depth: includes pageId in WHERE clause.
  */
-async function deleteById(id: string) {
-  await db.delete(pageBlocks).where(eq(pageBlocks.id, id));
+async function deleteById(id: string, pageId: string) {
+  await db
+    .delete(pageBlocks)
+    .where(and(eq(pageBlocks.id, id), eq(pageBlocks.pageId, pageId)));
 }
 
 /**

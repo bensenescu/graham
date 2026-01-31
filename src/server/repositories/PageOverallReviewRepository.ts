@@ -1,6 +1,6 @@
 import { db } from "@/db";
 import { pageOverallReviews, pages } from "@/db/schema";
-import { eq, inArray } from "drizzle-orm";
+import { eq, and, inArray } from "drizzle-orm";
 
 type UpsertPageOverallReview = {
   id: string;
@@ -50,12 +50,13 @@ async function findByPageId(pageId: string) {
 
 /**
  * Upsert a page overall review (insert or update based on pageId).
+ * Defense-in-depth: update includes pageId in WHERE clause.
  */
 async function upsert(data: UpsertPageOverallReview) {
   const existing = await findByPageId(data.pageId);
 
   if (existing) {
-    // Update existing review
+    // Update existing review - defense-in-depth: include pageId in WHERE
     await db
       .update(pageOverallReviews)
       .set({
@@ -63,7 +64,12 @@ async function upsert(data: UpsertPageOverallReview) {
         summary: data.summary,
         updatedAt: new Date().toISOString(),
       })
-      .where(eq(pageOverallReviews.id, existing.id));
+      .where(
+        and(
+          eq(pageOverallReviews.id, existing.id),
+          eq(pageOverallReviews.pageId, data.pageId),
+        ),
+      );
 
     return { ...existing, ...data, updatedAt: new Date().toISOString() };
   } else {
@@ -84,9 +90,14 @@ async function upsert(data: UpsertPageOverallReview) {
 
 /**
  * Delete an overall review by ID.
+ * Defense-in-depth: includes pageId in WHERE clause.
  */
-async function deleteById(id: string) {
-  await db.delete(pageOverallReviews).where(eq(pageOverallReviews.id, id));
+async function deleteById(id: string, pageId: string) {
+  await db
+    .delete(pageOverallReviews)
+    .where(
+      and(eq(pageOverallReviews.id, id), eq(pageOverallReviews.pageId, pageId)),
+    );
 }
 
 /**

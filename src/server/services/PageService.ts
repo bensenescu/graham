@@ -2,6 +2,8 @@ import { PageRepository } from "../repositories/PageRepository";
 import { PromptRepository } from "../repositories/PromptRepository";
 import { PageReviewSettingsRepository } from "../repositories/PageReviewSettingsRepository";
 import { PageOverallReviewSettingsRepository } from "../repositories/PageOverallReviewSettingsRepository";
+import { ensurePageAccess } from "./helpers/ensurePageAccess";
+import { DEFAULT_PAGE_REVIEW_MODEL } from "@/constants/defaults";
 import type {
   CreatePageInput,
   UpdatePageInput,
@@ -41,7 +43,7 @@ async function create(userId: string, data: CreatePageInput) {
   await PageReviewSettingsRepository.create({
     id: settingsId,
     pageId: data.id,
-    model: "openai-gpt-5.2-high",
+    model: DEFAULT_PAGE_REVIEW_MODEL,
     defaultPromptId: promptId,
   });
 
@@ -61,11 +63,7 @@ async function create(userId: string, data: CreatePageInput) {
  * Validates ownership before updating.
  */
 async function update(userId: string, data: UpdatePageInput) {
-  const existingPage = await PageRepository.findByIdAndUserId(data.id, userId);
-
-  if (!existingPage) {
-    throw new Error("Page not found");
-  }
+  const existingPage = await ensurePageAccess(data.id, userId);
 
   // Prepare update data
   const updateData = {
@@ -81,11 +79,7 @@ async function update(userId: string, data: UpdatePageInput) {
  * Validates ownership before deleting.
  */
 async function deletePage(userId: string, data: DeletePageInput) {
-  const existingPage = await PageRepository.findByIdAndUserId(data.id, userId);
-
-  if (!existingPage) {
-    throw new Error("Page not found");
-  }
+  await ensurePageAccess(data.id, userId);
 
   await PageRepository.delete(data.id, userId);
   return { success: true };

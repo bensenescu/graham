@@ -4,6 +4,7 @@ import { useMutation } from "@tanstack/react-query";
 import type { BlockReview, ReviewSummary } from "@/types/schemas/reviews";
 import type { PageBlock } from "@/types/schemas/pages";
 import { authenticatedFetch } from "@every-app/sdk/core";
+import { AI_REVIEW_BATCH_SIZE } from "@/constants/defaults";
 import {
   blockReviewCollection,
   pageBlockCollection,
@@ -207,9 +208,8 @@ export function useAIReview({
     setIsReviewingAll(true);
 
     // Review blocks in batches for parallelism
-    const batchSize = 3;
-    for (let i = 0; i < blocks.length; i += batchSize) {
-      const batch = blocks.slice(i, i + batchSize);
+    for (let i = 0; i < blocks.length; i += AI_REVIEW_BATCH_SIZE) {
+      const batch = blocks.slice(i, i + AI_REVIEW_BATCH_SIZE);
       await Promise.all(
         batch.map(async (block) => {
           try {

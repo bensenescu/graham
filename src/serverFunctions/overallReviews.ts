@@ -1,9 +1,9 @@
 import { createServerFn } from "@tanstack/react-start";
 import { ensureUserMiddleware } from "@/middleware/ensureUser";
 import { useSessionTokenClientMiddleware } from "@every-app/sdk/tanstack";
-import { PageOverallReviewRepository } from "@/server/repositories/PageOverallReviewRepository";
+import { PageOverallReviewService } from "@/server/services/PageOverallReviewService";
 import { upsertPageOverallReviewSchema } from "@/types/schemas/reviews";
-import { z } from "zod";
+import { idInputSchema, pageIdInputSchema } from "@/types/schemas/common";
 
 /**
  * Get all overall reviews for the user's pages.
@@ -11,10 +11,7 @@ import { z } from "zod";
 export const getAllPageOverallReviews = createServerFn()
   .middleware([useSessionTokenClientMiddleware, ensureUserMiddleware])
   .handler(async ({ context }) => {
-    const reviews = await PageOverallReviewRepository.findAllByUserId(
-      context.userId,
-    );
-    return { reviews };
+    return PageOverallReviewService.getAll(context.userId);
   });
 
 /**
@@ -22,12 +19,9 @@ export const getAllPageOverallReviews = createServerFn()
  */
 export const getPageOverallReview = createServerFn()
   .middleware([useSessionTokenClientMiddleware, ensureUserMiddleware])
-  .inputValidator((data: unknown) =>
-    z.object({ pageId: z.string() }).parse(data),
-  )
-  .handler(async ({ data }) => {
-    const review = await PageOverallReviewRepository.findByPageId(data.pageId);
-    return { review: review ?? null };
+  .inputValidator((data: unknown) => pageIdInputSchema.parse(data))
+  .handler(async ({ data, context }) => {
+    return PageOverallReviewService.getByPageId(context.userId, data.pageId);
   });
 
 /**
@@ -36,14 +30,13 @@ export const getPageOverallReview = createServerFn()
 export const upsertPageOverallReview = createServerFn()
   .middleware([useSessionTokenClientMiddleware, ensureUserMiddleware])
   .inputValidator((data: unknown) => upsertPageOverallReviewSchema.parse(data))
-  .handler(async ({ data }) => {
-    const result = await PageOverallReviewRepository.upsert({
+  .handler(async ({ data, context }) => {
+    return PageOverallReviewService.upsert(context.userId, {
       id: data.id,
       pageId: data.pageId,
       promptId: data.promptId ?? null,
       summary: data.summary,
     });
-    return { review: result };
   });
 
 /**
@@ -51,8 +44,7 @@ export const upsertPageOverallReview = createServerFn()
  */
 export const deletePageOverallReview = createServerFn()
   .middleware([useSessionTokenClientMiddleware, ensureUserMiddleware])
-  .inputValidator((data: unknown) => z.object({ id: z.string() }).parse(data))
-  .handler(async ({ data }) => {
-    await PageOverallReviewRepository.delete(data.id);
-    return { success: true };
+  .inputValidator((data: unknown) => idInputSchema.parse(data))
+  .handler(async ({ data, context }) => {
+    return PageOverallReviewService.delete(context.userId, { id: data.id });
   });

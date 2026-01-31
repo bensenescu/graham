@@ -14,7 +14,7 @@ export type Prompt = z.infer<typeof promptSchema>;
 
 // === Create Prompt ===
 export const createPromptSchema = z.object({
-  id: z.string().length(36),
+  id: z.string().uuid("Invalid prompt ID"),
   name: z.string().min(1, "Name is required").max(255, "Name too long"),
   prompt: z.string(),
 });
@@ -51,7 +51,7 @@ export type PageReviewSettings = z.infer<typeof pageReviewSettingsSchema>;
 
 // === Create Page Review Settings ===
 export const createPageReviewSettingsSchema = z.object({
-  id: z.string().length(36),
+  id: z.string().uuid("Invalid settings ID"),
   pageId: z.string().uuid("Invalid page ID"),
   model: z.string().default("openai-gpt-5.2-high"),
   defaultPromptId: z.string().uuid().nullable().optional(),

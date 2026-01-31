@@ -116,6 +116,7 @@ async function findByIdWithAccess(id: string, userId: string) {
 
 /**
  * Update a page - allows both owners and collaborators.
+ * Defense-in-depth: uses the page's owner userId in WHERE clause.
  */
 async function updateWithAccess(id: string, userId: string, data: UpdatePage) {
   const { page, isOwner } = await findByIdWithAccess(id, userId);
@@ -124,14 +125,14 @@ async function updateWithAccess(id: string, userId: string, data: UpdatePage) {
     throw new Error("Page not found or access denied");
   }
 
-  // Update the page
+  // Update the page - defense-in-depth: use page's actual owner in WHERE
   await db
     .update(pages)
     .set({
       ...data,
       updatedAt: new Date().toISOString(),
     })
-    .where(eq(pages.id, id));
+    .where(and(eq(pages.id, id), eq(pages.userId, page.userId)));
 }
 
 /**

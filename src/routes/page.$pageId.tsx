@@ -17,6 +17,7 @@ import {
 import { PracticeModeModal } from "@/client/components/PracticeMode";
 import { useAIReview } from "@/client/hooks/useAIReview";
 import { usePageReviewSettings } from "@/client/hooks/usePageReviewSettings";
+import { sortBlocksBySortKey } from "@/client/lib/fractional-indexing";
 import type { PageBlock } from "@/types/schemas/pages";
 
 export const Route = createFileRoute("/page/$pageId")({
@@ -40,14 +41,23 @@ function PageEditor() {
   // Inline reviews visibility (persisted to localStorage)
   const [showInlineReviews, setShowInlineReviews] = useState(() => {
     if (typeof window === "undefined") return true;
-    const stored = localStorage.getItem("show-inline-reviews");
-    return stored === null ? true : stored === "true";
+    try {
+      const stored = localStorage.getItem("show-inline-reviews");
+      return stored === null ? true : stored === "true";
+    } catch {
+      // localStorage may be unavailable in private browsing mode
+      return true;
+    }
   });
 
   const handleToggleInlineReviews = useCallback(() => {
     setShowInlineReviews((prev) => {
       const next = !prev;
-      localStorage.setItem("show-inline-reviews", String(next));
+      try {
+        localStorage.setItem("show-inline-reviews", String(next));
+      } catch {
+        // localStorage may be unavailable in private browsing mode
+      }
       return next;
     });
   }, []);
@@ -80,9 +90,7 @@ function PageEditor() {
   const isOwner = !!ownedPage;
   const isLoadingPages = isLoadingOwnedPages || isLoadingSharedPages;
   const sortedBlocks = useMemo(() => {
-    return [...(blocks ?? [])].sort((a, b) =>
-      b.sortKey > a.sortKey ? 1 : b.sortKey < a.sortKey ? -1 : 0,
-    );
+    return sortBlocksBySortKey(blocks ?? []);
   }, [blocks]);
 
   // Get page review settings and prompts

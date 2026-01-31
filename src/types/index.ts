@@ -1,5 +1,1 @@
-type Todo = {
-  id: string;
-  title: string;
-  completed: boolean;
-};
+// Types for the Graham application

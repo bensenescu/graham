@@ -2,11 +2,12 @@ import { useRef, useEffect, useCallback, useState } from "react";
 import { GripVertical, Trash2, MoreVertical, Sparkles } from "lucide-react";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+import { toast } from "sonner";
 import type { PageBlock } from "@/types/schemas/pages";
 import type { BlockReview } from "@/types/schemas/reviews";
 import { InlineBlockReview } from "./InlineBlockReview";
 import { getBlockItemId } from "@/client/lib/element-ids";
-import { usePageCollabContext } from "./QADocumentEditor";
+import { usePageCollabContext } from "@/client/contexts/PageCollabContext";
 import { CollabTextEditor, getFragmentText } from "./CollabTextEditor";
 
 interface QADocumentBlockProps {
@@ -82,7 +83,9 @@ export function QADocumentBlock({
 
     const yjsContent = getFragmentText(fragment);
     if (yjsContent !== block.question) {
-      onQuestionChange(block.id, yjsContent);
+      Promise.resolve(onQuestionChange(block.id, yjsContent)).catch(() => {
+        toast("Failed to sync question");
+      });
     }
   }, [isCollabReady, collab, block.id, block.question, onQuestionChange]);
 
@@ -94,7 +97,9 @@ export function QADocumentBlock({
 
     const yjsContent = getFragmentText(fragment);
     if (yjsContent !== block.answer) {
-      onAnswerChange(block.id, yjsContent);
+      Promise.resolve(onAnswerChange(block.id, yjsContent)).catch(() => {
+        toast("Failed to sync answer");
+      });
     }
   }, [isCollabReady, collab, block.id, block.answer, onAnswerChange]);
 
