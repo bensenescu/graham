@@ -38,25 +38,17 @@ export function useSessionToken(
 
     const startTime = performance.now();
     const tryGetToken = async (): Promise<void> => {
-      const tokenStartTime = performance.now();
-      console.log("[useSessionToken] getSessionToken() starting...");
       try {
         const token = await getSessionToken();
-        const elapsed = performance.now() - tokenStartTime;
-        console.log(
-          `[useSessionToken] getSessionToken() completed: hasToken=${!!token}, elapsed=${elapsed.toFixed(0)}ms`,
-        );
         if (!isActive) return;
         setResolvedToken(token ?? null);
       } catch (error) {
-        const elapsedSinceStart = performance.now() - startTime;
         const message =
           error instanceof Error ? error.message : "Unknown error";
-        console.warn("[useSessionToken] getSessionToken() failed:", message);
         if (!isActive) return;
         if (
           message.includes("Session manager not available") &&
-          elapsedSinceStart < SESSION_MANAGER_MAX_WAIT_MS
+          performance.now() - startTime < SESSION_MANAGER_MAX_WAIT_MS
         ) {
           setTimeout(tryGetToken, SESSION_MANAGER_POLL_MS);
           return;

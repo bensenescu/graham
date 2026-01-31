@@ -56,20 +56,6 @@ export function useCollab({
   const [isSynced, setIsSynced] = useState(false);
   const [hasSyncedOnce, setHasSyncedOnce] = useState(false);
 
-  // DEBUG: Track hook mount time
-  const hookMountTimeRef = useRef(performance.now());
-  useEffect(() => {
-    console.log(
-      "[useCollab] mounted, roomName:",
-      roomName,
-      "enabled:",
-      enabled,
-    );
-    return () => {
-      console.log("[useCollab] unmounted, roomName:", roomName);
-    };
-  }, [roomName, enabled]);
-
   const { token, refreshSessionToken } = useSessionToken({
     sessionToken,
   });
@@ -141,18 +127,7 @@ export function useCollab({
 
   // Connect provider when token is available
   useEffect(() => {
-    if (!enabled || !token) {
-      console.log(
-        "[useCollab] connectWithToken blocked:",
-        `enabled=${enabled}, hasToken=${!!token}, roomName=${roomName}`,
-      );
-      return;
-    }
-
-    const elapsed = performance.now() - hookMountTimeRef.current;
-    console.log(
-      `[useCollab] connectWithToken starting: roomName=${roomName}, elapsedSinceMount=${elapsed.toFixed(0)}ms`,
-    );
+    if (!enabled || !token) return;
 
     const nextProvider = collabManager.connectWithToken({
       url,
@@ -184,10 +159,6 @@ export function useCollab({
     if (!provider) return;
 
     const handleSync = (synced: boolean) => {
-      const elapsed = performance.now() - hookMountTimeRef.current;
-      console.log(
-        `[useCollab] sync event: synced=${synced}, roomName=${roomName}, elapsedSinceMount=${elapsed.toFixed(0)}ms`,
-      );
       setIsSynced(synced);
       if (synced) {
         setHasSyncedOnce(true);
@@ -196,10 +167,6 @@ export function useCollab({
 
     provider.on("sync", handleSync);
     if (provider.synced) {
-      const elapsed = performance.now() - hookMountTimeRef.current;
-      console.log(
-        `[useCollab] provider already synced: roomName=${roomName}, elapsedSinceMount=${elapsed.toFixed(0)}ms`,
-      );
       setIsSynced(true);
       setHasSyncedOnce(true);
     }

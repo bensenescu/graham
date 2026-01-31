@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef } from "react";
+import { useCallback, useMemo, useRef } from "react";
 import { Link } from "@tanstack/react-router";
 import { ChevronLeft, Plus } from "lucide-react";
 import { DndContext, closestCenter } from "@dnd-kit/core";
@@ -71,15 +71,6 @@ export function QADocumentEditor({
 }: QADocumentEditorProps) {
   const containerRef = useRef<HTMLDivElement>(null);
 
-  // DEBUG: Track component mount time
-  const mountTimeRef = useRef(performance.now());
-  useEffect(() => {
-    console.log("[QADocumentEditor] mounted, pageId:", pageId);
-    return () => {
-      console.log("[QADocumentEditor] unmounted, pageId:", pageId);
-    };
-  }, [pageId]);
-
   // Block operations
   const {
     sortedBlocks,
@@ -125,14 +116,6 @@ export function QADocumentEditor({
   }
   const isReady = hasLoadedRef.current;
   const showSkeleton = !isReady;
-
-  // DEBUG: Log skeleton state changes
-  useEffect(() => {
-    const elapsed = performance.now() - mountTimeRef.current;
-    console.log(
-      `[QADocumentEditor] skeleton state: showSkeleton=${showSkeleton}, hasSyncedOnce=${hasSyncedOnce}, isReady=${isReady}, connectionState=${connectionState}, elapsedSinceMount=${elapsed.toFixed(0)}ms`,
-    );
-  }, [showSkeleton, hasSyncedOnce, isReady, connectionState]);
 
   // Sync title from Yjs to DB on blur
   const handleTitleBlur = useCallback(() => {
