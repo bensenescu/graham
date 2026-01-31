@@ -1,6 +1,7 @@
 import { db } from "@/db";
 import { pageShares, pages, users } from "@/db/schema";
 import { eq, and, inArray } from "drizzle-orm";
+import { getAccessiblePageIdsForUser } from "./helpers/access";
 
 type CreatePageShare = {
   id: string;
@@ -12,7 +13,13 @@ type CreatePageShare = {
 /**
  * Find all shares for a page (with user email info).
  */
-async function findAllByPageId(pageId: string) {
+async function findAllByPageId(pageId: string, userId: string) {
+  const pageIds = await getAccessiblePageIdsForUser(userId);
+
+  if (pageIds.length === 0) {
+    return [];
+  }
+
   const shares = await db
     .select({
       id: pageShares.id,
@@ -24,7 +31,9 @@ async function findAllByPageId(pageId: string) {
     })
     .from(pageShares)
     .innerJoin(users, eq(pageShares.userId, users.id))
-    .where(eq(pageShares.pageId, pageId));
+    .where(
+      and(eq(pageShares.pageId, pageId), inArray(pageShares.pageId, pageIds)),
+    );
 
   return shares;
 }
@@ -89,7 +98,13 @@ async function isOwner(pageId: string, userId: string) {
 /**
  * Create a page share.
  */
-async function create(data: CreatePageShare) {
+async function create(data: CreatePageShare, userId: string) {
+  const pageIds = await getAccessiblePageIdsForUser(userId);
+
+  if (!pageIds.includes(data.pageId)) {
+    return;
+  }
+
   await db.insert(pageShares).values({
     id: data.id,
     pageId: data.pageId,
@@ -101,26 +116,61 @@ async function create(data: CreatePageShare) {
 /**
  * Create multiple page shares at once.
  */
-async function createMany(shares: CreatePageShare[]) {
+async function createMany(shares: CreatePageShare[], userId: string) {
   if (shares.length === 0) return;
 
-  await db.insert(pageShares).values(shares);
+  const pageIds = await getAccessiblePageIdsForUser(userId);
+  const allowedShares = shares.filter((share: CreatePageShare) =>
+    pageIds.includes(share.pageId),
+  );
+
+  if (allowedShares.length === 0) {
+    return;
+  }
+
+  await db.insert(pageShares).values(allowedShares);
 }
 
 /**
  * Delete a page share by pageId and userId.
  */
-async function deleteByPageAndUser(pageId: string, userId: string) {
+async function deleteByPageAndUser(
+  pageId: string,
+  userId: string,
+  actorUserId: string,
+) {
+  const pageIds = await getAccessiblePageIdsForUser(actorUserId);
+
+  if (pageIds.length === 0) {
+    return;
+  }
+
   await db
     .delete(pageShares)
-    .where(and(eq(pageShares.pageId, pageId), eq(pageShares.userId, userId)));
+    .where(
+      and(
+        eq(pageShares.pageId, pageId),
+        eq(pageShares.userId, userId),
+        inArray(pageShares.pageId, pageIds),
+      ),
+    );
 }
 
 /**
  * Delete all shares for a page.
  */
-async function deleteAllByPageId(pageId: string) {
-  await db.delete(pageShares).where(eq(pageShares.pageId, pageId));
+async function deleteAllByPageId(pageId: string, userId: string) {
+  const pageIds = await getAccessiblePageIdsForUser(userId);
+
+  if (pageIds.length === 0) {
+    return;
+  }
+
+  await db
+    .delete(pageShares)
+    .where(
+      and(eq(pageShares.pageId, pageId), inArray(pageShares.pageId, pageIds)),
+    );
 }
 
 /**
@@ -143,7 +193,7 @@ async function getAllUsers() {
       id: true,
       email: true,
     },
-    orderBy: (users, { asc }) => [asc(users.email)],
+    orderBy: (fields, { asc }) => [asc(fields.email)],
   });
 }
 
