@@ -13,7 +13,7 @@ import type {
 async function getSharesForPage(userId: string, data: ListPageSharesInput) {
   await ensurePageAccessWithSharing(data.pageId, userId);
 
-  const shares = await PageShareRepository.findAllByPageId(data.pageId);
+  const shares = await PageShareRepository.findAllByPageId(data.pageId, userId);
   return { shares };
 }
 
@@ -25,7 +25,10 @@ async function addShares(userId: string, data: AddPageShareInput) {
   await ensurePageAccessWithSharing(data.pageId, userId);
 
   // Filter out any userIds that are already shared or are the owner
-  const existingShares = await PageShareRepository.findAllByPageId(data.pageId);
+  const existingShares = await PageShareRepository.findAllByPageId(
+    data.pageId,
+    userId,
+  );
   const existingUserIds = new Set(
     existingShares.map((s: { userId: string }) => s.userId),
   );
@@ -47,7 +50,7 @@ async function addShares(userId: string, data: AddPageShareInput) {
     sharedBy: userId,
   }));
 
-  await PageShareRepository.createMany(shares);
+  await PageShareRepository.createMany(shares, userId);
 
   return { success: true, added: shares.length };
 }
@@ -59,7 +62,11 @@ async function addShares(userId: string, data: AddPageShareInput) {
 async function removeShare(userId: string, data: RemovePageShareInput) {
   await ensurePageAccessWithSharing(data.pageId, userId);
 
-  await PageShareRepository.deleteByPageAndUser(data.pageId, data.userId);
+  await PageShareRepository.deleteByPageAndUser(
+    data.pageId,
+    data.userId,
+    userId,
+  );
 
   return { success: true };
 }

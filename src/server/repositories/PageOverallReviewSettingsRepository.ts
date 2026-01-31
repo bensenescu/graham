@@ -41,14 +41,10 @@ async function findAllByUserId(userId: string) {
   });
 
   // Transform to flatten the selected prompts
-  return settingsList.map(
-    (settings: { selectedPrompts: Array<{ prompt: unknown }> }) => ({
-      ...settings,
-      selectedPrompts: settings.selectedPrompts.map(
-        (sp: { prompt: unknown }) => sp.prompt,
-      ),
-    }),
-  );
+  return settingsList.map((settings) => ({
+    ...settings,
+    selectedPrompts: settings.selectedPrompts.map((sp) => sp.prompt),
+  }));
 }
 
 /**
@@ -73,9 +69,7 @@ async function findByPageId(pageId: string) {
   // Transform to flatten the selected prompts
   return {
     ...settings,
-    selectedPrompts: settings.selectedPrompts.map(
-      (sp: { prompt: unknown }) => sp.prompt,
-    ),
+    selectedPrompts: settings.selectedPrompts.map((sp) => sp.prompt),
   };
 }
 

@@ -73,10 +73,7 @@ export async function findSessionsByPageId(
       eq(practiceSessions.pageId, pageId),
       inArray(practiceSessions.pageId, pageIds),
     ),
-    orderBy: (
-      sessions: typeof practiceSessions,
-      { desc }: { desc: (value: unknown) => unknown },
-    ) => [desc(sessions.createdAt)],
+    orderBy: (fields, { desc }) => [desc(fields.createdAt)],
     limit,
     with: {
       answers: {
