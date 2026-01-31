@@ -4,7 +4,7 @@ export const OPENAI_TRANSCRIBE_URL =
 export const DEFAULT_PAGE_REVIEW_MODEL = "openai-gpt-5.2-high";
 
 export const DEFAULT_PAGE_REVIEW_PROMPT =
-  "Review this answer for a YC application. Evaluate clarity, specificity, and persuasiveness. Provide actionable feedback on how to improve the response.";
+  "Review this answer. Ask probing questions to help strengthen the response.";
 
 export const DEFAULT_PRACTICE_CRITERIA = [
   "Confidence",
