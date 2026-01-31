@@ -5,6 +5,7 @@ import { requireApiAuth } from "@/middleware/apiAuth";
 import { env } from "cloudflare:workers";
 import { z } from "zod";
 import { errorResponse, validationErrorResponse } from "./helpers/apiResponses";
+import { PageRepository } from "@/server/repositories/PageRepository";
 
 // Request schema for overall review
 const overallReviewRequestSchema = z.object({
@@ -38,11 +39,13 @@ export const Route = createFileRoute("/api/overall-review")({
       POST: async ({ request }) => {
         try {
           // Authenticate the request
-          const { response } = await requireApiAuth(request);
+          const { session, response } = await requireApiAuth(request);
 
           if (response) {
             return response;
           }
+
+          const userId = session!.sub;
 
           // Parse and validate request body
           const rawData = await request.json();
@@ -53,7 +56,20 @@ export const Route = createFileRoute("/api/overall-review")({
             return validationErrorResponse(validationResult.error);
           }
 
-          const { blocks, customInstructions } = validationResult.data;
+          const { pageId, blocks, customInstructions } = validationResult.data;
+
+          // Verify user has access to the page
+          const { page } = await PageRepository.findByIdWithAccess(
+            pageId,
+            userId,
+          );
+          if (!page) {
+            return errorResponse({
+              error: "Access denied",
+              details: "You do not have access to this page.",
+              status: 403,
+            });
+          }
 
           // Check if there are any answers to review
           const answeredBlocks = blocks.filter(

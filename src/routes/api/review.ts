@@ -9,6 +9,8 @@ import {
   jsonResponse,
   validationErrorResponse,
 } from "./helpers/apiResponses";
+import { PageRepository } from "@/server/repositories/PageRepository";
+import { PageBlockRepository } from "@/server/repositories/PageBlockRepository";
 
 // Request schema for reviewing a block
 const reviewBlockRequestSchema = z.object({
@@ -56,11 +58,13 @@ export const Route = createFileRoute("/api/review")({
       POST: async ({ request }) => {
         try {
           // Authenticate the request
-          const { response } = await requireApiAuth(request);
+          const { session, response } = await requireApiAuth(request);
 
           if (response) {
             return response;
           }
+
+          const userId = session!.sub;
 
           // Parse and validate request body
           const rawData = await request.json();
@@ -71,8 +75,29 @@ export const Route = createFileRoute("/api/review")({
             return validationErrorResponse(validationResult.error);
           }
 
-          const { question, answer, customInstructions } =
+          const { blockId, question, answer, customInstructions } =
             validationResult.data;
+
+          // Verify block exists and user has access to its page
+          const block = await PageBlockRepository.findById(blockId);
+          if (!block) {
+            return errorResponse({
+              error: "Block not found",
+              status: 404,
+            });
+          }
+
+          const { page } = await PageRepository.findByIdWithAccess(
+            block.pageId,
+            userId,
+          );
+          if (!page) {
+            return errorResponse({
+              error: "Access denied",
+              details: "You do not have access to this page.",
+              status: 403,
+            });
+          }
 
           // Skip review for empty answers
           if (!answer || answer.trim() === "") {
