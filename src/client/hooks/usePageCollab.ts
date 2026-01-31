@@ -3,10 +3,10 @@ import * as Y from "yjs";
 import { WebsocketProvider } from "y-websocket";
 import { useCollab } from "./useCollab";
 import type { ConnectionState } from "@/client/lib/PageCollabManager";
-import type { UserInfo } from "./useSessionReadyToken";
+import type { UserInfo } from "./collabTypes";
 
 // Re-export types for consumers
-export type { UserInfo } from "./useSessionReadyToken";
+export type { UserInfo } from "./collabTypes";
 export type { ConnectionState } from "@/client/lib/PageCollabManager";
 
 export interface UsePageCollabOptions {

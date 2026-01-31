@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useLiveQuery, eq } from "@tanstack/react-db";
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   pageCollection,
   pageBlockCollection,
@@ -30,6 +30,15 @@ function PageEditor() {
   const { pageId } = Route.useParams();
   const navigate = useNavigate();
   const titleDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // DEBUG: Track component mount time
+  const mountTimeRef = useRef(performance.now());
+  useEffect(() => {
+    console.log("[PageEditor] mounted, pageId:", pageId);
+    return () => {
+      console.log("[PageEditor] unmounted, pageId:", pageId);
+    };
+  }, [pageId]);
 
   // Panel state
   const [isPanelOpen, setIsPanelOpen] = useState(false);
@@ -82,6 +91,28 @@ function PageEditor() {
       .from({ block: pageBlockCollection })
       .where(({ block }) => eq(block.pageId, pageId)),
   );
+
+  // DEBUG: Log when queries complete
+  useEffect(() => {
+    const elapsed = performance.now() - mountTimeRef.current;
+    console.log(
+      `[PageEditor] ownedPages query: isLoading=${isLoadingOwnedPages}, count=${ownedPages?.length ?? 0}, elapsed=${elapsed.toFixed(0)}ms`,
+    );
+  }, [isLoadingOwnedPages, ownedPages]);
+
+  useEffect(() => {
+    const elapsed = performance.now() - mountTimeRef.current;
+    console.log(
+      `[PageEditor] sharedPages query: isLoading=${isLoadingSharedPages}, count=${sharedPages?.length ?? 0}, elapsed=${elapsed.toFixed(0)}ms`,
+    );
+  }, [isLoadingSharedPages, sharedPages]);
+
+  useEffect(() => {
+    const elapsed = performance.now() - mountTimeRef.current;
+    console.log(
+      `[PageEditor] blocks query: isLoading=${isLoadingBlocks}, count=${blocks?.length ?? 0}, elapsed=${elapsed.toFixed(0)}ms`,
+    );
+  }, [isLoadingBlocks, blocks]);
 
   // Determine if this is an owned or shared page
   const ownedPage = ownedPages?.[0];
