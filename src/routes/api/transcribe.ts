@@ -1,9 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
-import {
-  authenticateRequest,
-  getAuthConfig,
-} from "@every-app/sdk/tanstack/server";
+import { requireApiAuth } from "@/middleware/apiAuth";
 import { env } from "cloudflare:workers";
+import { OPENAI_TRANSCRIBE_URL } from "@/constants/defaults";
 
 // Timeout for transcription requests (2 minutes for longer recordings)
 const TRANSCRIBE_TIMEOUT_MS = 120_000;
@@ -23,17 +21,14 @@ export const Route = createFileRoute("/api/transcribe")({
         try {
           // Authenticate the request
           console.log(`[Transcribe ${requestId}] Authenticating request...`);
-          const authConfig = getAuthConfig();
-          const session = await authenticateRequest(authConfig, request);
+          const authStart = Date.now();
+          const { response } = await requireApiAuth(request);
           console.log(
-            `[Transcribe ${requestId}] Authentication completed in ${Date.now() - startTime}ms`,
+            `[Transcribe ${requestId}] Authentication completed in ${Date.now() - authStart}ms`,
           );
 
-          if (!session || !session.sub) {
-            return new Response(JSON.stringify({ error: "Unauthorized" }), {
-              status: 401,
-              headers: { "Content-Type": "application/json" },
-            });
+          if (response) {
+            return response;
           }
 
           // Parse multipart form data
@@ -89,17 +84,14 @@ export const Route = createFileRoute("/api/transcribe")({
             whisperFormData.append("language", "en"); // Optimize for English
 
             // Call OpenAI Whisper API
-            const whisperResponse = await fetch(
-              "https://api.openai.com/v1/audio/transcriptions",
-              {
-                method: "POST",
-                headers: {
-                  Authorization: `Bearer ${env.OPENAI_API_KEY}`,
-                },
-                body: whisperFormData,
-                signal: abortController.signal,
+            const whisperResponse = await fetch(OPENAI_TRANSCRIBE_URL, {
+              method: "POST",
+              headers: {
+                Authorization: `Bearer ${env.OPENAI_API_KEY}`,
               },
-            );
+              body: whisperFormData,
+              signal: abortController.signal,
+            });
 
             clearTimeout(timeoutId);
 

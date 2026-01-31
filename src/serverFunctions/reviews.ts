@@ -1,9 +1,10 @@
 import { createServerFn } from "@tanstack/react-start";
 import { ensureUserMiddleware } from "@/middleware/ensureUser";
 import { useSessionTokenClientMiddleware } from "@every-app/sdk/tanstack";
-import { BlockReviewRepository } from "@/server/repositories/BlockReviewRepository";
+import { BlockReviewService } from "@/server/services/BlockReviewService";
+import { ensurePageAccessWithSharing } from "@/server/services/helpers/ensurePageAccess";
 import { upsertBlockReviewSchema } from "@/types/schemas/reviews";
-import { z } from "zod";
+import { idInputSchema, pageIdInputSchema } from "@/types/schemas/common";
 
 /**
  * Get all block reviews for the user's pages.
@@ -11,8 +12,7 @@ import { z } from "zod";
 export const getAllBlockReviews = createServerFn()
   .middleware([useSessionTokenClientMiddleware, ensureUserMiddleware])
   .handler(async ({ context }) => {
-    const reviews = await BlockReviewRepository.findAllByUserId(context.userId);
-    return { reviews };
+    return BlockReviewService.getAll(context.userId);
   });
 
 /**
@@ -20,12 +20,10 @@ export const getAllBlockReviews = createServerFn()
  */
 export const getBlockReviewsForPage = createServerFn()
   .middleware([useSessionTokenClientMiddleware, ensureUserMiddleware])
-  .inputValidator((data: unknown) =>
-    z.object({ pageId: z.string() }).parse(data),
-  )
-  .handler(async ({ data }) => {
-    const reviews = await BlockReviewRepository.findByPageId(data.pageId);
-    return { reviews };
+  .inputValidator((data: unknown) => pageIdInputSchema.parse(data))
+  .handler(async ({ data, context }) => {
+    await ensurePageAccessWithSharing(data.pageId, context.userId);
+    return BlockReviewService.getByPageId(context.userId, data.pageId);
   });
 
 /**
@@ -34,15 +32,14 @@ export const getBlockReviewsForPage = createServerFn()
 export const upsertBlockReview = createServerFn()
   .middleware([useSessionTokenClientMiddleware, ensureUserMiddleware])
   .inputValidator((data: unknown) => upsertBlockReviewSchema.parse(data))
-  .handler(async ({ data }) => {
-    const result = await BlockReviewRepository.upsert({
+  .handler(async ({ data, context }) => {
+    return BlockReviewService.upsert(context.userId, {
       id: data.id,
       blockId: data.blockId,
       promptId: data.promptId,
       suggestion: data.suggestion ?? null,
       answerSnapshot: data.answerSnapshot ?? null,
     });
-    return { review: result };
   });
 
 /**
@@ -50,8 +47,7 @@ export const upsertBlockReview = createServerFn()
  */
 export const deleteBlockReview = createServerFn()
   .middleware([useSessionTokenClientMiddleware, ensureUserMiddleware])
-  .inputValidator((data: unknown) => z.object({ id: z.string() }).parse(data))
-  .handler(async ({ data }) => {
-    await BlockReviewRepository.delete(data.id);
-    return { success: true };
+  .inputValidator((data: unknown) => idInputSchema.parse(data))
+  .handler(async ({ data, context }) => {
+    return BlockReviewService.delete(context.userId, { id: data.id });
   });

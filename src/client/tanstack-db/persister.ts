@@ -1,6 +1,6 @@
 import { createSyncStoragePersister } from "@tanstack/query-sync-storage-persister";
 
-const QUERY_CACHE_KEY = "simple-todo-react-query-cache";
+const QUERY_CACHE_KEY = "graham-query-cache";
 
 export const persister = createSyncStoragePersister({
   storage: typeof window !== "undefined" ? window.localStorage : undefined,

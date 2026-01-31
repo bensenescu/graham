@@ -1,6 +1,7 @@
 import { db } from "@/db";
-import { blockReviews, pageBlocks, pages, pageShares } from "@/db/schema";
+import { blockReviews, pageBlocks } from "@/db/schema";
 import { eq, and, inArray } from "drizzle-orm";
+import { PageRepository } from "./PageRepository";
 
 type UpsertBlockReview = {
   id: string;
@@ -14,21 +15,7 @@ type UpsertBlockReview = {
  * Find all reviews for blocks belonging to a user's accessible pages (owned + shared).
  */
 async function findAllByUserId(userId: string) {
-  // Get all page IDs for pages the user owns
-  const userPages = await db.query.pages.findMany({
-    where: eq(pages.userId, userId),
-    columns: { id: true },
-  });
-
-  // Get all page IDs for pages shared with the user
-  const sharedPageRecords = await db.query.pageShares.findMany({
-    where: eq(pageShares.userId, userId),
-    columns: { pageId: true },
-  });
-
-  const ownedIds = userPages.map((p) => p.id);
-  const sharedIds = sharedPageRecords.map((s) => s.pageId);
-  const pageIds = [...new Set([...ownedIds, ...sharedIds])];
+  const pageIds = await PageRepository.getAccessiblePageIds(userId);
 
   if (pageIds.length === 0) {
     return [];
@@ -106,12 +93,13 @@ async function findByPageId(pageId: string) {
 
 /**
  * Upsert a block review (insert or update based on blockId + promptId).
+ * Defense-in-depth: update includes blockId in WHERE clause.
  */
 async function upsert(data: UpsertBlockReview) {
   const existing = await findByBlockAndPrompt(data.blockId, data.promptId);
 
   if (existing) {
-    // Update existing review
+    // Update existing review - defense-in-depth: include blockId in WHERE
     await db
       .update(blockReviews)
       .set({
@@ -119,7 +107,12 @@ async function upsert(data: UpsertBlockReview) {
         answerSnapshot: data.answerSnapshot,
         updatedAt: new Date().toISOString(),
       })
-      .where(eq(blockReviews.id, existing.id));
+      .where(
+        and(
+          eq(blockReviews.id, existing.id),
+          eq(blockReviews.blockId, data.blockId),
+        ),
+      );
 
     return { ...existing, ...data, updatedAt: new Date().toISOString() };
   } else {
@@ -141,9 +134,12 @@ async function upsert(data: UpsertBlockReview) {
 
 /**
  * Delete a review by ID.
+ * Defense-in-depth: includes blockId in WHERE clause.
  */
-async function deleteById(id: string) {
-  await db.delete(blockReviews).where(eq(blockReviews.id, id));
+async function deleteById(id: string, blockId: string) {
+  await db
+    .delete(blockReviews)
+    .where(and(eq(blockReviews.id, id), eq(blockReviews.blockId, blockId)));
 }
 
 /**

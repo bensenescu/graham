@@ -1,12 +1,4 @@
-import {
-  useCallback,
-  useMemo,
-  useRef,
-  useState,
-  useEffect,
-  createContext,
-  useContext,
-} from "react";
+import { useCallback, useMemo, useRef, useState, useEffect } from "react";
 import { Plus } from "lucide-react";
 import {
   DndContext,
@@ -31,6 +23,7 @@ import type { BlockReview } from "@/types/schemas/reviews";
 import {
   generateDefaultSortKey,
   generateSortKeyBetween,
+  sortBlocksBySortKey,
 } from "@/client/lib/fractional-indexing";
 import { useKeyboardNavigation } from "@/client/hooks/useKeyboardNavigation";
 import {
@@ -41,21 +34,13 @@ import {
   usePageCollab,
   type UsePageCollabReturn,
 } from "@/client/hooks/usePageCollab";
+import {
+  PageCollabContext,
+  type PageCollabContextValue,
+} from "@/client/contexts/PageCollabContext";
 
 // Context for passing collab state to child blocks
-export interface PageCollabContextValue {
-  collab: UsePageCollabReturn | null;
-  isCollabReady: boolean;
-}
-
-export const PageCollabContext = createContext<PageCollabContextValue>({
-  collab: null,
-  isCollabReady: false,
-});
-
-export function usePageCollabContext() {
-  return useContext(PageCollabContext);
-}
+export type { PageCollabContextValue } from "@/client/contexts/PageCollabContext";
 
 interface QADocumentEditorProps {
   pageId: string;
@@ -141,13 +126,11 @@ export function QADocumentEditor({
     if (localJson !== blocksJson) {
       setLocalBlocks(blocks);
     }
-  }, [blocks]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [blocks, localBlocks]);
 
   // Sort blocks by sortKey
   const sortedBlocks = useMemo(() => {
-    return [...localBlocks].sort((a, b) =>
-      b.sortKey > a.sortKey ? 1 : b.sortKey < a.sortKey ? -1 : 0,
-    );
+    return sortBlocksBySortKey(localBlocks);
   }, [localBlocks]);
 
   // Direct update to parent (called on blur from block component)
@@ -174,9 +157,7 @@ export function QADocumentEditor({
   );
 
   const handleAddBlock = useCallback(() => {
-    const sorted = [...localBlocks].sort((a, b) =>
-      b.sortKey > a.sortKey ? 1 : b.sortKey < a.sortKey ? -1 : 0,
-    );
+    const sorted = sortBlocksBySortKey(localBlocks);
     const lowestSortKey = sorted[sorted.length - 1]?.sortKey;
     const newSortKey = lowestSortKey
       ? "!" + lowestSortKey
@@ -197,9 +178,7 @@ export function QADocumentEditor({
 
   const handleAddAfter = useCallback(
     (afterId: string) => {
-      const sorted = [...localBlocks].sort((a, b) =>
-        b.sortKey > a.sortKey ? 1 : b.sortKey < a.sortKey ? -1 : 0,
-      );
+      const sorted = sortBlocksBySortKey(localBlocks);
       const blockIndex = sorted.findIndex((b) => b.id === afterId);
       if (blockIndex === -1) return;
 
@@ -286,9 +265,7 @@ export function QADocumentEditor({
 
       if (!over || active.id === over.id) return;
 
-      const sorted = [...localBlocks].sort((a, b) =>
-        b.sortKey > a.sortKey ? 1 : b.sortKey < a.sortKey ? -1 : 0,
-      );
+      const sorted = sortBlocksBySortKey(localBlocks);
 
       const draggedIndex = sorted.findIndex((block) => block.id === active.id);
       const targetIndex = sorted.findIndex((block) => block.id === over.id);

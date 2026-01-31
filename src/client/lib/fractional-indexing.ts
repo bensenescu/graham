@@ -132,3 +132,15 @@ export function generateSortKeyAtIndex(
   // Pad position to ensure consistent ordering
   return base + position.toString().padStart(6, "0");
 }
+
+/**
+ * Sort blocks by sortKey in descending order (higher keys appear first).
+ * Creates a new array without mutating the input.
+ */
+export function sortBlocksBySortKey<T extends { sortKey: string }>(
+  blocks: T[],
+): T[] {
+  return [...blocks].sort((a, b) =>
+    b.sortKey > a.sortKey ? 1 : b.sortKey < a.sortKey ? -1 : 0,
+  );
+}

@@ -1,6 +1,9 @@
 import { PageOverallReviewSettingsRepository } from "../repositories/PageOverallReviewSettingsRepository";
 import { PromptRepository } from "../repositories/PromptRepository";
-import { PageRepository } from "../repositories/PageRepository";
+import {
+  ensurePageAccess,
+  ensurePageAccessWithSharing,
+} from "./helpers/ensurePageAccess";
 import type { UpdatePageOverallReviewSettingsInput } from "@/types/schemas/prompts";
 
 /**
@@ -18,10 +21,7 @@ async function getAll(userId: string) {
  */
 async function getByPageId(userId: string, pageId: string) {
   // Verify user has access to the page (owner or collaborator)
-  const { page } = await PageRepository.findByIdWithAccess(pageId, userId);
-  if (!page) {
-    throw new Error("Page not found");
-  }
+  await ensurePageAccessWithSharing(pageId, userId);
 
   const settings =
     await PageOverallReviewSettingsRepository.findByPageId(pageId);
@@ -41,10 +41,7 @@ async function update(
   data: UpdatePageOverallReviewSettingsInput,
 ) {
   // Verify user owns the page
-  const page = await PageRepository.findByIdAndUserId(data.pageId, userId);
-  if (!page) {
-    throw new Error("Page not found");
-  }
+  await ensurePageAccess(data.pageId, userId);
 
   // Verify all selected prompts belong to user if provided
   if (data.selectedPromptIds && data.selectedPromptIds.length > 0) {

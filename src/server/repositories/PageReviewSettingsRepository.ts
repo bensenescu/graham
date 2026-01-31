@@ -1,6 +1,7 @@
 import { db } from "@/db";
-import { pageReviewSettings, pages, pageShares } from "@/db/schema";
+import { pageReviewSettings } from "@/db/schema";
 import { eq, inArray } from "drizzle-orm";
+import { PageRepository } from "./PageRepository";
 
 type CreatePageReviewSettings = {
   id: string;
@@ -19,21 +20,7 @@ type UpdatePageReviewSettings = {
  * Find all review settings for pages accessible by a user (owned + shared).
  */
 async function findAllByUserId(userId: string) {
-  // Get all page IDs for pages the user owns
-  const userPages = await db.query.pages.findMany({
-    where: eq(pages.userId, userId),
-    columns: { id: true },
-  });
-
-  // Get all page IDs for pages shared with the user
-  const sharedPageRecords = await db.query.pageShares.findMany({
-    where: eq(pageShares.userId, userId),
-    columns: { pageId: true },
-  });
-
-  const ownedIds = userPages.map((p) => p.id);
-  const sharedIds = sharedPageRecords.map((s) => s.pageId);
-  const pageIds = [...new Set([...ownedIds, ...sharedIds])];
+  const pageIds = await PageRepository.getAccessiblePageIds(userId);
 
   if (pageIds.length === 0) {
     return [];

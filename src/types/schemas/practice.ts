@@ -96,7 +96,7 @@ export type PracticeAnswerRating = z.infer<typeof practiceAnswerRatingSchema>;
 
 // Create Practice Criterion
 export const createPracticeCriterionSchema = z.object({
-  id: z.string().length(36),
+  id: z.string().uuid("Invalid criterion ID"),
   name: z.string().min(1, "Name is required").max(100, "Name too long"),
   sortOrder: z.string(),
 });
@@ -138,7 +138,7 @@ export type UpdatePracticePoolSettingsInput = z.infer<
 
 // Create Practice Session
 export const createPracticeSessionSchema = z.object({
-  id: z.string().length(36),
+  id: z.string().uuid("Invalid session ID"),
   pageId: z.string().uuid("Invalid page ID"),
 });
 
@@ -159,7 +159,7 @@ export type UpdatePracticeSessionInput = z.infer<
 
 // Create Practice Answer
 export const createPracticeAnswerSchema = z.object({
-  id: z.string().length(36),
+  id: z.string().uuid("Invalid answer ID"),
   sessionId: z.string().uuid("Invalid session ID"),
   blockId: z.string().uuid("Invalid block ID"),
   durationSeconds: z.number().int().positive(),
@@ -191,7 +191,7 @@ export type DeletePracticeAnswerInput = z.infer<
 
 // Create Practice Answer Rating
 export const createPracticeAnswerRatingSchema = z.object({
-  id: z.string().length(36),
+  id: z.string().uuid("Invalid rating ID"),
   answerId: z.string().uuid("Invalid answer ID"),
   criterionId: z.string().uuid("Invalid criterion ID"),
   rating: ratingValueSchema,
@@ -206,7 +206,7 @@ export const batchCreatePracticeAnswerRatingsSchema = z.object({
   answerId: z.string().uuid("Invalid answer ID"),
   ratings: z.array(
     z.object({
-      id: z.string().length(36),
+      id: z.string().uuid("Invalid rating ID"),
       criterionId: z.string().uuid("Invalid criterion ID"),
       rating: ratingValueSchema,
     }),

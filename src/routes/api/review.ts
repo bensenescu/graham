@@ -1,10 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { generateText } from "ai";
 import { createOpenAI } from "@ai-sdk/openai";
-import {
-  authenticateRequest,
-  getAuthConfig,
-} from "@every-app/sdk/tanstack/server";
+import { requireApiAuth } from "@/middleware/apiAuth";
 import { env } from "cloudflare:workers";
 import { z } from "zod";
 
@@ -60,17 +57,14 @@ export const Route = createFileRoute("/api/review")({
         try {
           // Authenticate the request
           console.log(`[Review ${requestId}] Authenticating request...`);
-          const authConfig = getAuthConfig();
-          const session = await authenticateRequest(authConfig, request);
+          const authStart = Date.now();
+          const { response } = await requireApiAuth(request);
           console.log(
-            `[Review ${requestId}] Authentication completed in ${Date.now() - startTime}ms`,
+            `[Review ${requestId}] Authentication completed in ${Date.now() - authStart}ms`,
           );
 
-          if (!session || !session.sub) {
-            return new Response(JSON.stringify({ error: "Unauthorized" }), {
-              status: 401,
-              headers: { "Content-Type": "application/json" },
-            });
+          if (response) {
+            return response;
           }
 
           // Parse and validate request body

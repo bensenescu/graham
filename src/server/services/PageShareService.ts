@@ -1,4 +1,5 @@
 import { PageShareRepository } from "../repositories/PageShareRepository";
+import { ensurePageAccess } from "./helpers/ensurePageAccess";
 import type {
   AddPageShareInput,
   RemovePageShareInput,
@@ -10,11 +11,7 @@ import type {
  * Only the page owner can list shares.
  */
 async function getSharesForPage(userId: string, data: ListPageSharesInput) {
-  // Verify user is the owner
-  const isOwner = await PageShareRepository.isOwner(data.pageId, userId);
-  if (!isOwner) {
-    throw new Error("Only the page owner can view shares");
-  }
+  await ensurePageAccess(data.pageId, userId);
 
   const shares = await PageShareRepository.findAllByPageId(data.pageId);
   return { shares };
@@ -25,11 +22,7 @@ async function getSharesForPage(userId: string, data: ListPageSharesInput) {
  * Only the page owner can add collaborators.
  */
 async function addShares(userId: string, data: AddPageShareInput) {
-  // Verify user is the owner
-  const isOwner = await PageShareRepository.isOwner(data.pageId, userId);
-  if (!isOwner) {
-    throw new Error("Only the page owner can share pages");
-  }
+  await ensurePageAccess(data.pageId, userId);
 
   // Filter out any userIds that are already shared or are the owner
   const existingShares = await PageShareRepository.findAllByPageId(data.pageId);
@@ -60,11 +53,7 @@ async function addShares(userId: string, data: AddPageShareInput) {
  * Only the page owner can remove collaborators.
  */
 async function removeShare(userId: string, data: RemovePageShareInput) {
-  // Verify user is the owner
-  const isOwner = await PageShareRepository.isOwner(data.pageId, userId);
-  if (!isOwner) {
-    throw new Error("Only the page owner can remove shares");
-  }
+  await ensurePageAccess(data.pageId, userId);
 
   await PageShareRepository.deleteByPageAndUser(data.pageId, data.userId);
 

@@ -6,9 +6,9 @@ import {
   createPageFromTemplate,
   createPageFromTemplateParams,
 } from "@/client/actions/createPageFromTemplate";
+import { createBlankPage } from "@/client/actions/createPage";
 import { TemplatePreviewModal } from "@/client/components/TemplatePreviewModal";
 import { TemplateCard } from "@/client/components/TemplateCard";
-import { pageCollection } from "@/client/tanstack-db";
 
 /**
  * Shared component for creating a new page - either from a template or blank.
@@ -28,15 +28,8 @@ export function NewPageOptions() {
   };
 
   const handleNewBlankPage = () => {
-    const id = crypto.randomUUID();
-    const now = new Date().toISOString();
-    pageCollection.insert({
-      id,
-      title: "Untitled",
-      createdAt: now,
-      updatedAt: now,
-    });
-    navigate({ to: "/page/$pageId", params: { pageId: id } });
+    const pageId = createBlankPage();
+    navigate({ to: "/page/$pageId", params: { pageId } });
   };
 
   return (

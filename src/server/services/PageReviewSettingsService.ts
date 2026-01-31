@@ -1,6 +1,13 @@
 import { PageReviewSettingsRepository } from "../repositories/PageReviewSettingsRepository";
 import { PromptRepository } from "../repositories/PromptRepository";
-import { PageRepository } from "../repositories/PageRepository";
+import {
+  ensurePageAccess,
+  ensurePageAccessWithSharing,
+} from "./helpers/ensurePageAccess";
+import {
+  DEFAULT_PAGE_REVIEW_MODEL,
+  DEFAULT_PAGE_REVIEW_PROMPT,
+} from "@/constants/defaults";
 import type {
   CreatePageReviewSettingsInput,
   UpdatePageReviewSettingsInput,
@@ -19,10 +26,7 @@ async function getAll(userId: string) {
  */
 async function getByPageId(userId: string, pageId: string) {
   // Verify user has access to the page (owner or collaborator)
-  const { page } = await PageRepository.findByIdWithAccess(pageId, userId);
-  if (!page) {
-    throw new Error("Page not found");
-  }
+  await ensurePageAccessWithSharing(pageId, userId);
 
   const settings = await PageReviewSettingsRepository.findByPageId(pageId);
 
@@ -38,10 +42,7 @@ async function getByPageId(userId: string, pageId: string) {
  */
 async function upsert(userId: string, data: CreatePageReviewSettingsInput) {
   // Verify user owns the page
-  const page = await PageRepository.findByIdAndUserId(data.pageId, userId);
-  if (!page) {
-    throw new Error("Page not found");
-  }
+  await ensurePageAccess(data.pageId, userId);
 
   // Verify defaultPromptId belongs to user if provided
   if (data.defaultPromptId) {
@@ -57,7 +58,7 @@ async function upsert(userId: string, data: CreatePageReviewSettingsInput) {
   await PageReviewSettingsRepository.upsert({
     id: data.id,
     pageId: data.pageId,
-    model: data.model ?? "openai-gpt-5.2-high",
+    model: data.model ?? DEFAULT_PAGE_REVIEW_MODEL,
     defaultPromptId: data.defaultPromptId ?? null,
   });
 
@@ -69,10 +70,7 @@ async function upsert(userId: string, data: CreatePageReviewSettingsInput) {
  */
 async function update(userId: string, data: UpdatePageReviewSettingsInput) {
   // Verify user owns the page
-  const page = await PageRepository.findByIdAndUserId(data.pageId, userId);
-  if (!page) {
-    throw new Error("Page not found");
-  }
+  await ensurePageAccess(data.pageId, userId);
 
   // Verify defaultPromptId belongs to user if provided
   if (data.defaultPromptId) {
@@ -108,8 +106,7 @@ async function initializeForPage(
     id: promptId,
     userId,
     name: `${pageTitle} - Default`,
-    prompt:
-      "Review this answer for a YC application. Evaluate clarity, specificity, and persuasiveness. Provide actionable feedback on how to improve the response.",
+    prompt: DEFAULT_PAGE_REVIEW_PROMPT,
   });
 
   // Create the page review settings
@@ -117,7 +114,7 @@ async function initializeForPage(
   await PageReviewSettingsRepository.create({
     id: settingsId,
     pageId,
-    model: "openai-gpt-5.2-high",
+    model: DEFAULT_PAGE_REVIEW_MODEL,
     defaultPromptId: promptId,
   });
 

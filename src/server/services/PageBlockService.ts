@@ -1,5 +1,6 @@
 import { PageBlockRepository } from "../repositories/PageBlockRepository";
 import { PageRepository } from "../repositories/PageRepository";
+import { ensurePageAccessWithSharing } from "./helpers/ensurePageAccess";
 import type {
   CreatePageBlockInput,
   UpdatePageBlockInput,
@@ -20,11 +21,7 @@ async function getAll(userId: string) {
  * Validates page access (owner or collaborator) before returning blocks.
  */
 async function getAllByPageId(userId: string, pageId: string) {
-  // Verify user has access to the page
-  const { page } = await PageRepository.findByIdWithAccess(pageId, userId);
-  if (!page) {
-    throw new Error("Page not found");
-  }
+  await ensurePageAccessWithSharing(pageId, userId);
 
   const blocks = await PageBlockRepository.findAllByPageId(pageId);
   return { blocks };
@@ -35,11 +32,7 @@ async function getAllByPageId(userId: string, pageId: string) {
  * Validates page access (owner or collaborator) before creating.
  */
 async function create(userId: string, data: CreatePageBlockInput) {
-  // Verify user has access to the page
-  const { page } = await PageRepository.findByIdWithAccess(data.pageId, userId);
-  if (!page) {
-    throw new Error("Page not found");
-  }
+  await ensurePageAccessWithSharing(data.pageId, userId);
 
   await PageBlockRepository.create({
     id: data.id,
@@ -60,11 +53,7 @@ async function create(userId: string, data: CreatePageBlockInput) {
  * Used when creating a page from a template.
  */
 async function batchCreate(userId: string, data: BatchCreatePageBlocksInput) {
-  // Verify user has access to the page
-  const { page } = await PageRepository.findByIdWithAccess(data.pageId, userId);
-  if (!page) {
-    throw new Error("Page not found");
-  }
+  await ensurePageAccessWithSharing(data.pageId, userId);
 
   const blocksToCreate = data.blocks.map((block) => ({
     id: block.id,
@@ -92,16 +81,9 @@ async function update(userId: string, data: UpdatePageBlockInput) {
     throw new Error("Block not found");
   }
 
-  // Verify user has access to the page
-  const { page } = await PageRepository.findByIdWithAccess(
-    block.pageId,
-    userId,
-  );
-  if (!page) {
-    throw new Error("Page not found");
-  }
+  await ensurePageAccessWithSharing(block.pageId, userId);
 
-  await PageBlockRepository.update(data.id, {
+  await PageBlockRepository.update(data.id, block.pageId, {
     question: data.question,
     answer: data.answer,
     sortKey: data.sortKey,
@@ -123,16 +105,9 @@ async function deleteBlock(userId: string, data: DeletePageBlockInput) {
     throw new Error("Block not found");
   }
 
-  // Verify user has access to the page
-  const { page } = await PageRepository.findByIdWithAccess(
-    block.pageId,
-    userId,
-  );
-  if (!page) {
-    throw new Error("Page not found");
-  }
+  await ensurePageAccessWithSharing(block.pageId, userId);
 
-  await PageBlockRepository.delete(data.id);
+  await PageBlockRepository.delete(data.id, block.pageId);
 
   // Update page's updatedAt
   await PageRepository.updateWithAccess(block.pageId, userId, {});

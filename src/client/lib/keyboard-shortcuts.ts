@@ -95,7 +95,12 @@ export const KEYBOARD_SHORTCUTS: ShortcutCategory[] = [
   },
   {
     category: "Actions",
-    items: [SHORTCUT_ADD_QUESTION],
+    items: [
+      SHORTCUT_ADD_QUESTION,
+      SHORTCUT_EDIT_QUESTION,
+      SHORTCUT_DELETE_QUESTION,
+      SHORTCUT_REVIEW_QUESTION,
+    ],
   },
   {
     category: "General",
