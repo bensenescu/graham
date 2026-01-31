@@ -57,13 +57,16 @@ async function upsert(userId: string, data: UpsertBlockReviewInput) {
     throw new Error("Page not found");
   }
 
-  const result = await BlockReviewRepository.upsert({
-    id: data.id,
-    blockId: data.blockId,
-    promptId: data.promptId,
-    suggestion: data.suggestion,
-    answerSnapshot: data.answerSnapshot,
-  });
+  const result = await BlockReviewRepository.upsert(
+    {
+      id: data.id,
+      blockId: data.blockId,
+      promptId: data.promptId,
+      suggestion: data.suggestion,
+      answerSnapshot: data.answerSnapshot,
+    },
+    userId,
+  );
 
   return { review: result };
 }
@@ -94,7 +97,7 @@ async function deleteReview(userId: string, data: DeleteBlockReviewInput) {
     throw new Error("Page not found");
   }
 
-  await BlockReviewRepository.delete(data.id, review.blockId);
+  await BlockReviewRepository.delete(data.id, review.blockId, userId);
   return { success: true };
 }
 

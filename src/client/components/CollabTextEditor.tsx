@@ -1,4 +1,10 @@
-import { useEffect, useMemo, useRef } from "react";
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useImperativeHandle,
+  forwardRef,
+} from "react";
 import { useEditor, EditorContent } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Collaboration from "@tiptap/extension-collaboration";
@@ -6,6 +12,10 @@ import CollaborationCaret from "@tiptap/extension-collaboration-caret";
 import Placeholder from "@tiptap/extension-placeholder";
 import * as Y from "yjs";
 import type { WebsocketProvider } from "y-websocket";
+
+export interface CollabTextEditorHandle {
+  focus: () => void;
+}
 
 export interface CollabTextEditorProps {
   /** Y.XmlFragment to sync with */
@@ -32,6 +42,10 @@ export interface CollabTextEditorProps {
   fragmentName: string;
   /** Whether this is a single-line editor (no line breaks allowed) */
   singleLine?: boolean;
+  /** Whether to auto-focus the editor when it mounts */
+  autoFocus?: boolean;
+  /** Called after auto-focus is complete */
+  onAutoFocusDone?: () => void;
 }
 
 /**
@@ -40,20 +54,28 @@ export interface CollabTextEditorProps {
  * Renders a TipTap editor connected to a Y.XmlFragment for
  * real-time collaborative editing with cursor awareness.
  */
-export function CollabTextEditor({
-  fragment,
-  provider,
-  userId,
-  userName,
-  userColor,
-  placeholder = "",
-  className = "",
-  onBlur,
-  onFocus,
-  initialContent,
-  fragmentName,
-  singleLine = false,
-}: CollabTextEditorProps) {
+export const CollabTextEditor = forwardRef<
+  CollabTextEditorHandle,
+  CollabTextEditorProps
+>(function CollabTextEditor(
+  {
+    fragment,
+    provider,
+    userId,
+    userName,
+    userColor,
+    placeholder = "",
+    className = "",
+    onBlur,
+    onFocus,
+    initialContent,
+    fragmentName,
+    singleLine = false,
+    autoFocus = false,
+    onAutoFocusDone,
+  },
+  ref,
+) {
   // Track if we've already seeded this fragment to prevent duplicates
   const hasSeededRef = useRef(false);
   const fragmentIdRef = useRef<string | null>(null);
@@ -168,6 +190,8 @@ export function CollabTextEditor({
     singleLine,
   ]);
 
+  const hasAutoFocusedRef = useRef(false);
+
   const editor = useEditor({
     extensions,
     editorProps: {
@@ -193,7 +217,28 @@ export function CollabTextEditor({
     onFocus: () => {
       onFocus?.();
     },
+    onCreate: ({ editor }) => {
+      if (autoFocus && !hasAutoFocusedRef.current) {
+        hasAutoFocusedRef.current = true;
+        // Small delay to ensure DOM is ready
+        requestAnimationFrame(() => {
+          editor.commands.focus();
+          onAutoFocusDone?.();
+        });
+      }
+    },
   });
+
+  // Expose focus method via ref
+  useImperativeHandle(
+    ref,
+    () => ({
+      focus: () => {
+        editor?.commands.focus();
+      },
+    }),
+    [editor],
+  );
 
   // Cleanup editor on unmount
   useEffect(() => {
@@ -203,7 +248,7 @@ export function CollabTextEditor({
   }, [editor]);
 
   return <EditorContent editor={editor} />;
-}
+});
 
 /**
  * Get plain text content from a Y.XmlFragment

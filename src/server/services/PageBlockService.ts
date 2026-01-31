@@ -55,13 +55,20 @@ async function create(userId: string, data: CreatePageBlockInput) {
 async function batchCreate(userId: string, data: BatchCreatePageBlocksInput) {
   await ensurePageAccessWithSharing(data.pageId, userId);
 
-  const blocksToCreate = data.blocks.map((block) => ({
-    id: block.id,
-    pageId: data.pageId,
-    question: block.question,
-    answer: block.answer ?? "",
-    sortKey: block.sortKey,
-  }));
+  const blocksToCreate = data.blocks.map(
+    (block: {
+      id: string;
+      question: string;
+      answer?: string;
+      sortKey: string;
+    }) => ({
+      id: block.id,
+      pageId: data.pageId,
+      question: block.question,
+      answer: block.answer ?? "",
+      sortKey: block.sortKey,
+    }),
+  );
 
   await PageBlockRepository.batchCreate(blocksToCreate);
 
@@ -83,7 +90,7 @@ async function update(userId: string, data: UpdatePageBlockInput) {
 
   await ensurePageAccessWithSharing(block.pageId, userId);
 
-  await PageBlockRepository.update(data.id, block.pageId, {
+  await PageBlockRepository.update(data.id, block.pageId, userId, {
     question: data.question,
     answer: data.answer,
     sortKey: data.sortKey,
@@ -107,7 +114,7 @@ async function deleteBlock(userId: string, data: DeletePageBlockInput) {
 
   await ensurePageAccessWithSharing(block.pageId, userId);
 
-  await PageBlockRepository.delete(data.id, block.pageId);
+  await PageBlockRepository.delete(data.id, block.pageId, userId);
 
   // Update page's updatedAt
   await PageRepository.updateWithAccess(block.pageId, userId, {});

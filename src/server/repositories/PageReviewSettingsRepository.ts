@@ -1,7 +1,7 @@
 import { db } from "@/db";
 import { pageReviewSettings } from "@/db/schema";
-import { eq, inArray } from "drizzle-orm";
-import { PageRepository } from "./PageRepository";
+import { eq, inArray, and } from "drizzle-orm";
+import { getAccessiblePageIdsForUser } from "./helpers/access";
 
 type CreatePageReviewSettings = {
   id: string;
@@ -20,7 +20,7 @@ type UpdatePageReviewSettings = {
  * Find all review settings for pages accessible by a user (owned + shared).
  */
 async function findAllByUserId(userId: string) {
-  const pageIds = await PageRepository.getAccessiblePageIds(userId);
+  const pageIds = await getAccessiblePageIdsForUser(userId);
 
   if (pageIds.length === 0) {
     return [];
@@ -58,7 +58,17 @@ async function create(data: CreatePageReviewSettings) {
 /**
  * Update page review settings.
  */
-async function update(pageId: string, data: UpdatePageReviewSettings) {
+async function update(
+  pageId: string,
+  userId: string,
+  data: UpdatePageReviewSettings,
+) {
+  const accessiblePageIds = await getAccessiblePageIdsForUser(userId);
+
+  if (accessiblePageIds.length === 0) {
+    return;
+  }
+
   const updateData: Record<string, unknown> = {
     updatedAt: new Date().toISOString(),
   };
@@ -73,16 +83,21 @@ async function update(pageId: string, data: UpdatePageReviewSettings) {
   await db
     .update(pageReviewSettings)
     .set(updateData)
-    .where(eq(pageReviewSettings.pageId, pageId));
+    .where(
+      and(
+        eq(pageReviewSettings.pageId, pageId),
+        inArray(pageReviewSettings.pageId, accessiblePageIds),
+      ),
+    );
 }
 
 /**
  * Upsert page review settings (create if not exists, update if exists).
  */
-async function upsert(data: CreatePageReviewSettings) {
+async function upsert(data: CreatePageReviewSettings, userId: string) {
   const existing = await findByPageId(data.pageId);
   if (existing) {
-    await update(data.pageId, {
+    await update(data.pageId, userId, {
       model: data.model,
       defaultPromptId: data.defaultPromptId,
     });
@@ -94,10 +109,21 @@ async function upsert(data: CreatePageReviewSettings) {
 /**
  * Delete page review settings.
  */
-async function deleteByPageId(pageId: string) {
+async function deleteByPageId(pageId: string, userId: string) {
+  const accessiblePageIds = await getAccessiblePageIdsForUser(userId);
+
+  if (accessiblePageIds.length === 0) {
+    return;
+  }
+
   await db
     .delete(pageReviewSettings)
-    .where(eq(pageReviewSettings.pageId, pageId));
+    .where(
+      and(
+        eq(pageReviewSettings.pageId, pageId),
+        inArray(pageReviewSettings.pageId, accessiblePageIds),
+      ),
+    );
 }
 
 export const PageReviewSettingsRepository = {

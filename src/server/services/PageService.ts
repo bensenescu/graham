@@ -2,7 +2,10 @@ import { PageRepository } from "../repositories/PageRepository";
 import { PromptRepository } from "../repositories/PromptRepository";
 import { PageReviewSettingsRepository } from "../repositories/PageReviewSettingsRepository";
 import { PageOverallReviewSettingsRepository } from "../repositories/PageOverallReviewSettingsRepository";
-import { ensurePageAccess } from "./helpers/ensurePageAccess";
+import {
+  ensurePageAccess,
+  ensurePageAccessWithSharing,
+} from "./helpers/ensurePageAccess";
 import {
   DEFAULT_PAGE_REVIEW_MODEL,
   DEFAULT_PAGE_REVIEW_PROMPT,
@@ -63,17 +66,20 @@ async function create(userId: string, data: CreatePageInput) {
 
 /**
  * Update a page.
- * Validates ownership before updating.
+ * Validates access (owner or collaborator) before updating.
  */
 async function update(userId: string, data: UpdatePageInput) {
-  const existingPage = await ensurePageAccess(data.id, userId);
+  const { page: existingPage } = await ensurePageAccessWithSharing(
+    data.id,
+    userId,
+  );
 
   // Prepare update data
   const updateData = {
     title: data.title ?? existingPage.title,
   };
 
-  await PageRepository.update(data.id, userId, updateData);
+  await PageRepository.updateWithAccess(data.id, userId, updateData);
   return { success: true };
 }
 

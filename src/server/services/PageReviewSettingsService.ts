@@ -1,9 +1,6 @@
 import { PageReviewSettingsRepository } from "../repositories/PageReviewSettingsRepository";
 import { PromptRepository } from "../repositories/PromptRepository";
-import {
-  ensurePageAccess,
-  ensurePageAccessWithSharing,
-} from "./helpers/ensurePageAccess";
+import { ensurePageAccessWithSharing } from "./helpers/ensurePageAccess";
 import { DEFAULT_PAGE_REVIEW_MODEL } from "@/constants/defaults";
 import type {
   CreatePageReviewSettingsInput,
@@ -38,8 +35,8 @@ async function getByPageId(userId: string, pageId: string) {
  * Create or update review settings for a page.
  */
 async function upsert(userId: string, data: CreatePageReviewSettingsInput) {
-  // Verify user owns the page
-  await ensurePageAccess(data.pageId, userId);
+  // Verify user has access to the page
+  const { page } = await ensurePageAccessWithSharing(data.pageId, userId);
 
   // Verify defaultPromptId belongs to user if provided
   if (data.defaultPromptId) {
@@ -47,17 +44,28 @@ async function upsert(userId: string, data: CreatePageReviewSettingsInput) {
       data.defaultPromptId,
       userId,
     );
-    if (!prompt) {
+    if (!prompt && page.userId !== userId) {
+      const ownerPrompt = await PromptRepository.findByIdAndUserId(
+        data.defaultPromptId,
+        page.userId,
+      );
+      if (!ownerPrompt) {
+        throw new Error("Default prompt not found");
+      }
+    } else if (!prompt) {
       throw new Error("Default prompt not found");
     }
   }
 
-  await PageReviewSettingsRepository.upsert({
-    id: data.id,
-    pageId: data.pageId,
-    model: data.model ?? DEFAULT_PAGE_REVIEW_MODEL,
-    defaultPromptId: data.defaultPromptId ?? null,
-  });
+  await PageReviewSettingsRepository.upsert(
+    {
+      id: data.id,
+      pageId: data.pageId,
+      model: data.model ?? DEFAULT_PAGE_REVIEW_MODEL,
+      defaultPromptId: data.defaultPromptId ?? null,
+    },
+    userId,
+  );
 
   return { success: true };
 }
@@ -66,8 +74,8 @@ async function upsert(userId: string, data: CreatePageReviewSettingsInput) {
  * Update review settings for a page.
  */
 async function update(userId: string, data: UpdatePageReviewSettingsInput) {
-  // Verify user owns the page
-  await ensurePageAccess(data.pageId, userId);
+  // Verify user has access to the page
+  const { page } = await ensurePageAccessWithSharing(data.pageId, userId);
 
   // Verify defaultPromptId belongs to user if provided
   if (data.defaultPromptId) {
@@ -75,12 +83,20 @@ async function update(userId: string, data: UpdatePageReviewSettingsInput) {
       data.defaultPromptId,
       userId,
     );
-    if (!prompt) {
+    if (!prompt && page.userId !== userId) {
+      const ownerPrompt = await PromptRepository.findByIdAndUserId(
+        data.defaultPromptId,
+        page.userId,
+      );
+      if (!ownerPrompt) {
+        throw new Error("Default prompt not found");
+      }
+    } else if (!prompt) {
       throw new Error("Default prompt not found");
     }
   }
 
-  await PageReviewSettingsRepository.update(data.pageId, {
+  await PageReviewSettingsRepository.update(data.pageId, userId, {
     model: data.model,
     defaultPromptId: data.defaultPromptId,
   });

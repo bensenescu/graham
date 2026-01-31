@@ -1,11 +1,25 @@
 import { db } from "@/db";
 import { practiceSessions } from "@/db/schema";
-import { eq, and, or } from "drizzle-orm";
+import { eq, and, or, inArray } from "drizzle-orm";
+import {
+  getAccessiblePageIdsForUser,
+  getAccessibleSessionIdsForUser,
+} from "./helpers/access";
 
-export async function findIncompleteSessionByPageId(pageId: string) {
+export async function findIncompleteSessionByPageId(
+  pageId: string,
+  userId: string,
+) {
+  const pageIds = await getAccessiblePageIdsForUser(userId);
+
+  if (pageIds.length === 0) {
+    return null;
+  }
+
   return db.query.practiceSessions.findFirst({
     where: and(
       eq(practiceSessions.pageId, pageId),
+      inArray(practiceSessions.pageId, pageIds),
       or(
         eq(practiceSessions.status, "active"),
         eq(practiceSessions.status, "reviewing"),
@@ -21,9 +35,18 @@ export async function findIncompleteSessionByPageId(pageId: string) {
   });
 }
 
-export async function findSessionById(id: string) {
+export async function findSessionById(id: string, userId: string) {
+  const sessionIds = await getAccessibleSessionIdsForUser(userId);
+
+  if (sessionIds.length === 0) {
+    return null;
+  }
+
   return db.query.practiceSessions.findFirst({
-    where: eq(practiceSessions.id, id),
+    where: and(
+      eq(practiceSessions.id, id),
+      inArray(practiceSessions.id, sessionIds),
+    ),
     with: {
       answers: {
         with: {
@@ -34,10 +57,26 @@ export async function findSessionById(id: string) {
   });
 }
 
-export async function findSessionsByPageId(pageId: string, limit = 50) {
+export async function findSessionsByPageId(
+  pageId: string,
+  userId: string,
+  limit = 50,
+) {
+  const pageIds = await getAccessiblePageIdsForUser(userId);
+
+  if (pageIds.length === 0) {
+    return [];
+  }
+
   return db.query.practiceSessions.findMany({
-    where: eq(practiceSessions.pageId, pageId),
-    orderBy: (sessions, { desc }) => [desc(sessions.createdAt)],
+    where: and(
+      eq(practiceSessions.pageId, pageId),
+      inArray(practiceSessions.pageId, pageIds),
+    ),
+    orderBy: (
+      sessions: typeof practiceSessions,
+      { desc }: { desc: (value: unknown) => unknown },
+    ) => [desc(sessions.createdAt)],
     limit,
     with: {
       answers: {
@@ -62,19 +101,44 @@ export async function createSession(data: { id: string; pageId: string }) {
 
 export async function updateSession(
   id: string,
+  userId: string,
   data: { status?: string; completedAt?: string | null },
 ) {
+  const sessionIds = await getAccessibleSessionIdsForUser(userId);
+
+  if (sessionIds.length === 0) {
+    return;
+  }
+
   await db
     .update(practiceSessions)
     .set({
       ...data,
       updatedAt: new Date().toISOString(),
     })
-    .where(eq(practiceSessions.id, id));
+    .where(
+      and(
+        eq(practiceSessions.id, id),
+        inArray(practiceSessions.id, sessionIds),
+      ),
+    );
 }
 
-export async function deleteSession(id: string) {
-  await db.delete(practiceSessions).where(eq(practiceSessions.id, id));
+export async function deleteSession(id: string, userId: string) {
+  const sessionIds = await getAccessibleSessionIdsForUser(userId);
+
+  if (sessionIds.length === 0) {
+    return;
+  }
+
+  await db
+    .delete(practiceSessions)
+    .where(
+      and(
+        eq(practiceSessions.id, id),
+        inArray(practiceSessions.id, sessionIds),
+      ),
+    );
 }
 
 export const PracticeSessionRepository = {

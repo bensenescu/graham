@@ -46,12 +46,15 @@ async function upsert(userId: string, data: UpsertPageOverallReviewInput) {
     throw new Error("Page not found");
   }
 
-  const result = await PageOverallReviewRepository.upsert({
-    id: data.id,
-    pageId: data.pageId,
-    promptId: data.promptId,
-    summary: data.summary,
-  });
+  const result = await PageOverallReviewRepository.upsert(
+    {
+      id: data.id,
+      pageId: data.pageId,
+      promptId: data.promptId,
+      summary: data.summary,
+    },
+    userId,
+  );
 
   return { review: result };
 }
@@ -79,7 +82,7 @@ async function deleteReview(
     throw new Error("Page not found");
   }
 
-  await PageOverallReviewRepository.delete(data.id, review.pageId);
+  await PageOverallReviewRepository.delete(data.id, review.pageId, userId);
   return { success: true };
 }
 

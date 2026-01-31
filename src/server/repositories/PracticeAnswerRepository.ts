@@ -1,19 +1,44 @@
 import { db } from "@/db";
 import { practiceAnswers } from "@/db/schema";
-import { eq, and } from "drizzle-orm";
+import { eq, and, inArray } from "drizzle-orm";
+import {
+  getAccessibleAnswerIdsForUser,
+  getAccessibleSessionIdsForUser,
+} from "./helpers/access";
 
-export async function findAnswerById(id: string) {
+export async function findAnswerById(id: string, userId: string) {
+  const answerIds = await getAccessibleAnswerIdsForUser(userId);
+
+  if (answerIds.length === 0) {
+    return null;
+  }
+
   return db.query.practiceAnswers.findFirst({
-    where: eq(practiceAnswers.id, id),
+    where: and(
+      eq(practiceAnswers.id, id),
+      inArray(practiceAnswers.id, answerIds),
+    ),
     with: {
       ratings: true,
     },
   });
 }
 
-export async function findAnswersBySessionId(sessionId: string) {
+export async function findAnswersBySessionId(
+  sessionId: string,
+  userId: string,
+) {
+  const sessionIds = await getAccessibleSessionIdsForUser(userId);
+
+  if (sessionIds.length === 0) {
+    return [];
+  }
+
   return db.query.practiceAnswers.findMany({
-    where: eq(practiceAnswers.sessionId, sessionId),
+    where: and(
+      eq(practiceAnswers.sessionId, sessionId),
+      inArray(practiceAnswers.sessionId, sessionIds),
+    ),
     with: {
       ratings: true,
     },
@@ -37,31 +62,58 @@ export async function createAnswer(data: {
 
 export async function updateAnswer(
   id: string,
+  userId: string,
   data: { transcription?: string | null; transcriptionStatus?: string },
 ) {
+  const answerIds = await getAccessibleAnswerIdsForUser(userId);
+
+  if (answerIds.length === 0) {
+    return;
+  }
+
   await db
     .update(practiceAnswers)
     .set({
       ...data,
       updatedAt: new Date().toISOString(),
     })
-    .where(eq(practiceAnswers.id, id));
+    .where(
+      and(eq(practiceAnswers.id, id), inArray(practiceAnswers.id, answerIds)),
+    );
 }
 
-export async function deleteAnswer(id: string) {
-  await db.delete(practiceAnswers).where(eq(practiceAnswers.id, id));
+export async function deleteAnswer(id: string, userId: string) {
+  const answerIds = await getAccessibleAnswerIdsForUser(userId);
+
+  if (answerIds.length === 0) {
+    return;
+  }
+
+  await db
+    .delete(practiceAnswers)
+    .where(
+      and(eq(practiceAnswers.id, id), inArray(practiceAnswers.id, answerIds)),
+    );
 }
 
 export async function deleteAnswerBySessionAndBlock(
   sessionId: string,
   blockId: string,
+  userId: string,
 ) {
+  const sessionIds = await getAccessibleSessionIdsForUser(userId);
+
+  if (sessionIds.length === 0) {
+    return;
+  }
+
   await db
     .delete(practiceAnswers)
     .where(
       and(
         eq(practiceAnswers.sessionId, sessionId),
         eq(practiceAnswers.blockId, blockId),
+        inArray(practiceAnswers.sessionId, sessionIds),
       ),
     );
 }
