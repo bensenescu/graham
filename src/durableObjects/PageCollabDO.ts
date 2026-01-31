@@ -105,20 +105,12 @@ export class PageCollabDO implements DurableObject {
   }
 
   private async handleWebSocket(request: Request): Promise<Response> {
-    const startTime = Date.now();
     const url = new URL(request.url);
     const userInfo: UserInfo = {
       userId: url.searchParams.get("userId") || "anonymous",
       userName: url.searchParams.get("userName") || "Anonymous",
       userColor: url.searchParams.get("userColor") || "#808080",
     };
-
-    console.log(
-      "[PageCollabDO] handleWebSocket: new connection, userId:",
-      userInfo.userId,
-      "existingConnections:",
-      this.connections.size,
-    );
 
     const pair = new WebSocketPair();
     const [client, server] = [pair[0], pair[1]];
@@ -130,27 +122,11 @@ export class PageCollabDO implements DurableObject {
     this.state.acceptWebSocket(server);
 
     if (this.connections.size === 0) {
-      console.log("[PageCollabDO] first connection, loading from storage...");
-      const loadStart = Date.now();
       await this.loadFromStorage();
-      console.log(
-        "[PageCollabDO] loadFromStorage completed:",
-        Date.now() - loadStart,
-        "ms",
-      );
     }
 
     this.connections.add(ws);
-    console.log("[PageCollabDO] sending initial sync...");
     this.sendInitialSync(ws);
-
-    const totalTime = Date.now() - startTime;
-    console.log(
-      "[PageCollabDO] handleWebSocket completed:",
-      totalTime,
-      "ms, totalConnections:",
-      this.connections.size,
-    );
 
     return new Response(null, {
       status: 101,
@@ -160,13 +136,6 @@ export class PageCollabDO implements DurableObject {
 
   private async loadFromStorage(): Promise<void> {
     const storedState = await this.state.storage.get<Uint8Array>("yjs-state");
-    console.log(
-      "[PageCollabDO] loadFromStorage: hasState:",
-      !!storedState,
-      "size:",
-      storedState?.length ?? 0,
-      "bytes",
-    );
     if (storedState) {
       Y.applyUpdate(this.doc, new Uint8Array(storedState));
     }
