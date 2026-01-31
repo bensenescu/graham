@@ -183,7 +183,10 @@ select {
 .collab-caret-label {
   border-radius: 4px 4px 4px 0;
   color: #fff;
-  font-family: system-ui, -apple-system, sans-serif;
+  font-family:
+    system-ui,
+    -apple-system,
+    sans-serif;
   font-size: 11px;
   font-weight: 500;
   left: -2px;

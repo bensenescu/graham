@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Eye, EyeOff } from "lucide-react";
-import type { usePractice } from "@/client/hooks/usePractice";
+import type { usePractice } from "@/client/hooks/practice";
 import type { PageBlock } from "@/types/schemas/pages";
 import type { RatingValue, PracticeCriterion } from "@/types/schemas/practice";
 

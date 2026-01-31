@@ -14,6 +14,8 @@ interface WebsocketProxyOptions {
   roomName: string;
   logTag: string;
   logContext?: Record<string, unknown>;
+  /** Optional authorization check. If provided, must not throw to allow access. */
+  checkAccess?: (userId: string) => Promise<void>;
 }
 
 export async function proxyWebsocketRequest({
@@ -22,16 +24,9 @@ export async function proxyWebsocketRequest({
   roomName,
   logTag,
   logContext = {},
+  checkAccess,
 }: WebsocketProxyOptions) {
   const upgradeHeader = request.headers.get("Upgrade");
-  const requestUrl = new URL(request.url);
-  const tokenParam = requestUrl.searchParams.get("token");
-
-  console.debug(`${logTag} incoming`, {
-    ...logContext,
-    upgradeHeader,
-    hasTokenParam: !!tokenParam,
-  });
 
   if (upgradeHeader !== "websocket") {
     return new Response("Expected WebSocket upgrade", { status: 426 });
@@ -47,22 +42,9 @@ export async function proxyWebsocketRequest({
       url.searchParams.delete("token");
     }
 
-    console.debug(`${logTag} auth header set`, {
-      ...logContext,
-      hasToken: !!token,
-    });
-
     const { session, response } = await requireApiAuth(request);
 
-    console.debug(`${logTag} auth result`, {
-      ...logContext,
-      hasSession: !!session,
-      userId: session?.sub ?? null,
-      email: session?.email ?? null,
-    });
-
     if (response || !session || !session.sub) {
-      console.debug(`${logTag} unauthorized`, { ...logContext });
       return (
         response ??
         new Response(JSON.stringify({ error: "Unauthorized" }), {
@@ -70,6 +52,23 @@ export async function proxyWebsocketRequest({
           headers: { "Content-Type": "application/json" },
         })
       );
+    }
+
+    // Optional authorization check (e.g., page access)
+    if (checkAccess) {
+      try {
+        await checkAccess(session.sub);
+      } catch (error) {
+        console.warn(`${logTag} access denied`, {
+          ...logContext,
+          userId: session.sub,
+          error: error instanceof Error ? error.message : "Unknown",
+        });
+        return new Response(JSON.stringify({ error: "Access denied" }), {
+          status: 403,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
     }
 
     const userName =
@@ -85,10 +84,6 @@ export async function proxyWebsocketRequest({
     doUrl.searchParams.set("userColor", userColor);
 
     const doRequest = new Request(doUrl.toString(), request);
-    console.debug(`${logTag} proxy to DO`, {
-      ...logContext,
-      hasUserId: !!session.sub,
-    });
     return doStub.fetch(doRequest);
   } catch (error) {
     console.error(`${logTag} connection error:`, error);

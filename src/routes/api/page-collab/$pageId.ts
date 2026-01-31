@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { env } from "cloudflare:workers";
 import { proxyWebsocketRequest } from "@/routes/api/helpers/-websocketProxy";
+import { ensurePageAccessWithSharing } from "@/server/services/helpers/ensurePageAccess";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export const Route = createFileRoute("/api/page-collab/$pageId" as any)({
@@ -20,6 +21,10 @@ export const Route = createFileRoute("/api/page-collab/$pageId" as any)({
           roomName: `page-${pageId}`,
           logTag: "[api/page-collab]",
           logContext: { pageId },
+          checkAccess: async (userId: string) => {
+            // Throws if user doesn't have access (owner or collaborator)
+            await ensurePageAccessWithSharing(pageId, userId);
+          },
         });
       },
     },

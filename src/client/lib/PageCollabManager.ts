@@ -20,9 +20,6 @@ export interface CollabConnection {
   userInfo: UserInfo;
 }
 
-// Backwards compatibility alias
-export type PageConnection = CollabConnection;
-
 interface ManagedConnection {
   doc: Y.Doc;
   provider: WebsocketProvider | null;
@@ -35,7 +32,7 @@ interface ManagedConnection {
   token: string | null;
 }
 
-export interface GetConnectionOptions {
+interface GetConnectionOptions {
   /** Room name (e.g., pageId) */
   roomName: string;
   /** User info for awareness */
@@ -82,13 +79,6 @@ class CollabManager {
     if (existing) {
       existing.refCount++;
       existing.userInfo = options.userInfo;
-      console.debug("[CollabManager] reuse connection", {
-        roomName: options.roomName,
-        url,
-        refCount: existing.refCount,
-        state: existing.state,
-        hasProvider: !!existing.provider,
-      });
       return {
         doc: existing.doc,
         provider: existing.provider,
@@ -97,10 +87,6 @@ class CollabManager {
     }
 
     // Create new connection synchronously (doc available immediately)
-    console.debug("[CollabManager] create connection", {
-      roomName: options.roomName,
-      url,
-    });
     return this.createConnection(url, options.roomName, options.userInfo);
   }
 
@@ -152,10 +138,6 @@ class CollabManager {
 
     if (conn.refCount <= 0) {
       // Destroy provider and clean up
-      console.debug("[CollabManager] destroy connection", {
-        roomName,
-        url,
-      });
       conn.provider?.destroy();
       conn.listeners.clear();
       this.connections.delete(key);
@@ -292,11 +274,6 @@ class CollabManager {
         },
       );
 
-      console.debug("[CollabManager] websocket provider created", {
-        roomName: conn.roomName,
-        wsUrl: wsUrl.origin + wsUrl.pathname,
-      });
-
       conn.token = token;
 
       provider.awareness.setLocalStateField("user", {
@@ -306,12 +283,6 @@ class CollabManager {
       });
 
       provider.on("status", ({ status }: { status: string }) => {
-        console.debug("[CollabManager] provider status", {
-          roomName: conn.roomName,
-          status,
-          wsconnected: provider.wsconnected,
-          wsconnecting: provider.wsconnecting,
-        });
         if (status === "connected") {
           this.updateState(key, "connected");
         } else if (status === "disconnected") {
@@ -322,11 +293,7 @@ class CollabManager {
         }
       });
 
-      provider.on("connection-error", (event: unknown) => {
-        console.debug("[CollabManager] connection error", {
-          roomName: conn.roomName,
-          event,
-        });
+      provider.on("connection-error", () => {
         this.updateState(key, "error");
       });
 
@@ -441,14 +408,5 @@ class CollabManager {
   }
 }
 
-// Backwards compatibility alias
-const PageCollabManager = CollabManager;
-
 // Export singleton instance
 export const collabManager = new CollabManager();
-
-// Backwards compatibility alias
-export const pageCollabManager = collabManager;
-
-// Export classes for testing
-export { CollabManager, PageCollabManager };

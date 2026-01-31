@@ -16,16 +16,9 @@ export const Route = createFileRoute("/api/transcribe")({
         const startTime = Date.now();
         const requestId = crypto.randomUUID().slice(0, 8);
 
-        console.log(`[Transcribe ${requestId}] Starting transcription request`);
-
         try {
           // Authenticate the request
-          console.log(`[Transcribe ${requestId}] Authenticating request...`);
-          const authStart = Date.now();
           const { response } = await requireApiAuth(request);
-          console.log(
-            `[Transcribe ${requestId}] Authentication completed in ${Date.now() - authStart}ms`,
-          );
 
           if (response) {
             return response;
@@ -59,22 +52,11 @@ export const Route = createFileRoute("/api/transcribe")({
             );
           }
 
-          console.log(
-            `[Transcribe ${requestId}] Processing audio file: ${audioFile.name}, size: ${audioFile.size}, type: ${audioFile.type}`,
-          );
-
           // Create abort controller for timeout
           const abortController = new AbortController();
           const timeoutId = setTimeout(() => {
-            console.log(
-              `[Transcribe ${requestId}] Timeout reached after ${TRANSCRIBE_TIMEOUT_MS}ms, aborting...`,
-            );
             abortController.abort();
           }, TRANSCRIBE_TIMEOUT_MS);
-
-          console.log(
-            `[Transcribe ${requestId}] Starting Whisper API call at ${Date.now() - startTime}ms...`,
-          );
 
           try {
             // Prepare form data for OpenAI Whisper API
@@ -114,11 +96,6 @@ export const Route = createFileRoute("/api/transcribe")({
             }
 
             const result = (await whisperResponse.json()) as { text: string };
-
-            const totalTime = Date.now() - startTime;
-            console.log(
-              `[Transcribe ${requestId}] Transcription completed in ${totalTime}ms, text length: ${result.text.length}`,
-            );
 
             return new Response(
               JSON.stringify({

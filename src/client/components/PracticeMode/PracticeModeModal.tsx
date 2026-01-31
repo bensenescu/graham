@@ -1,6 +1,6 @@
 import { useEffect, useCallback } from "react";
 import { X } from "lucide-react";
-import { usePractice } from "@/client/hooks/usePractice";
+import { usePractice } from "@/client/hooks/practice";
 import type { PageBlock } from "@/types/schemas/pages";
 import { WelcomePhase } from "./WelcomePhase";
 import { PracticingPhase } from "./PracticingPhase";

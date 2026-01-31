@@ -13,7 +13,6 @@ import {
   updatePageOverallReviewSettingsSchema,
 } from "@/types/schemas/prompts";
 import { pageIdInputSchema } from "@/types/schemas/common";
-import { z } from "zod";
 
 // === Prompt Server Functions ===
 
@@ -71,19 +70,6 @@ export const updatePageReviewSettings = createServerFn()
   .inputValidator((data: unknown) => updatePageReviewSettingsSchema.parse(data))
   .handler(async ({ data, context }) => {
     return PageReviewSettingsService.update(context.userId, data);
-  });
-
-export const initializePageReviewSettings = createServerFn()
-  .middleware([useSessionTokenClientMiddleware, ensureUserMiddleware])
-  .inputValidator((data: unknown) =>
-    pageIdInputSchema.extend({ pageTitle: z.string() }).parse(data),
-  )
-  .handler(async ({ data, context }) => {
-    return PageReviewSettingsService.initializeForPage(
-      context.userId,
-      data.pageId,
-      data.pageTitle,
-    );
   });
 
 // === Page Overall Review Settings Server Functions ===

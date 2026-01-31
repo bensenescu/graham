@@ -5,6 +5,12 @@
     // Detect Tanstack Start Routes
     "src/router.tsx",
     "src/routes/**/*.tsx",
+    // Cloudflare Workers entry point (exports Durable Objects)
+    "src/server.ts",
+    // TanStack Start server functions (consumed via RPC, not direct imports)
+    "src/serverFunctions/**/*.ts",
+    // Schema types are exported for API consumers
+    "src/types/schemas/**/*.ts",
     // Drizzle config (plugin disabled due to cloudflare:workers import issues)
     "drizzle.config.ts",
     // DB index re-exports schema for convenience
@@ -12,6 +18,8 @@
   ],
   "project": ["**/*.{js,ts,tsx}", "!src/routeTree.gen.ts"],
   "ignore": ["src/routeTree.gen.ts", "drizzle-prod.config.ts"],
+  // Ignore exports that are used within the same file (e.g., repository functions used in namespace objects)
+  "ignoreExportsUsedInFile": true,
   // Disable Drizzle plugin - it tries to load drizzle.config.ts which imports cloudflare:workers
   "drizzle": false,
   "ignoreDependencies": [

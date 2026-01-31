@@ -35,21 +35,9 @@ export const Route = createFileRoute("/api/overall-review")({
   server: {
     handlers: {
       POST: async ({ request }) => {
-        const startTime = Date.now();
-        const requestId = crypto.randomUUID().slice(0, 8);
-
-        console.log(
-          `[OverallReview ${requestId}] Starting overall review request`,
-        );
-
         try {
           // Authenticate the request
-          console.log(`[OverallReview ${requestId}] Authenticating request...`);
-          const authStart = Date.now();
           const { response } = await requireApiAuth(request);
-          console.log(
-            `[OverallReview ${requestId}] Authentication completed in ${Date.now() - authStart}ms`,
-          );
 
           if (response) {
             return response;
@@ -61,7 +49,6 @@ export const Route = createFileRoute("/api/overall-review")({
             await overallReviewRequestSchema.safeParseAsync(rawData);
 
           if (!validationResult.success) {
-            console.error("Validation errors:", validationResult.error.issues);
             const firstError = validationResult.error.issues[0];
             return new Response(
               JSON.stringify({
@@ -75,7 +62,7 @@ export const Route = createFileRoute("/api/overall-review")({
             );
           }
 
-          const { pageId, blocks, customInstructions } = validationResult.data;
+          const { blocks, customInstructions } = validationResult.data;
 
           // Check if there are any answers to review
           const answeredBlocks = blocks.filter(
@@ -83,9 +70,6 @@ export const Route = createFileRoute("/api/overall-review")({
           );
 
           if (answeredBlocks.length === 0) {
-            console.log(
-              `[OverallReview ${requestId}] No answers to review for page ${pageId}`,
-            );
             return new Response(
               JSON.stringify({
                 error: "No answers to review",
@@ -98,10 +82,6 @@ export const Route = createFileRoute("/api/overall-review")({
               },
             );
           }
-
-          console.log(
-            `[OverallReview ${requestId}] Processing page ${pageId}, ${answeredBlocks.length} answered questions`,
-          );
 
           // Build the system prompt: base prompt + optional custom instructions
           let finalSystemPrompt = BASE_SYSTEM_PROMPT;
@@ -122,10 +102,6 @@ export const Route = createFileRoute("/api/overall-review")({
             apiKey: env.OPENAI_API_KEY,
           });
 
-          console.log(
-            `[OverallReview ${requestId}] Starting AI stream at ${Date.now() - startTime}ms...`,
-          );
-
           // Stream the overall review using GPT-5.2 with reasoning summaries
           const result = streamText({
             model: openaiProvider.responses("gpt-5.2"),
@@ -145,10 +121,6 @@ ${qaContent}`,
               },
             },
           });
-
-          console.log(
-            `[OverallReview ${requestId}] Returning streaming response with reasoning`,
-          );
 
           // Create a custom stream that sends reasoning and text parts separately
           // Format: JSON lines with { type: "reasoning" | "text", content: string }
@@ -175,10 +147,7 @@ ${qaContent}`,
                 }
                 controller.close();
               } catch (error) {
-                console.error(
-                  `[OverallReview ${requestId}] Stream error:`,
-                  error,
-                );
+                console.error("[OverallReview] Stream error:", error);
                 controller.error(error);
               }
             },
@@ -191,12 +160,7 @@ ${qaContent}`,
             },
           });
         } catch (error) {
-          const totalTime = Date.now() - startTime;
-
-          console.error(
-            `[OverallReview ${requestId}] Overall review error after ${totalTime}ms:`,
-            error,
-          );
+          console.error("[OverallReview] Error:", error);
           return new Response(
             JSON.stringify({
               error: "Failed to process overall review request",

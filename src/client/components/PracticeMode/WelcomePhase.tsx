@@ -1,5 +1,6 @@
 import { useState } from "react";
-import type { usePractice } from "@/client/hooks/usePractice";
+import type { usePractice } from "@/client/hooks/practice";
+import { formatRelativeDate } from "@/client/lib/date-utils";
 
 export interface WelcomePhaseProps {
   poolSize: number;
@@ -30,20 +31,6 @@ export function WelcomePhase({
     setIsStarting(false);
   };
 
-  const formatDate = (dateStr: string) => {
-    const date = new Date(dateStr);
-    const now = new Date();
-    const diffMs = now.getTime() - date.getTime();
-    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
-    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-
-    if (diffHours < 1) return "just now";
-    if (diffHours < 24)
-      return `${diffHours} hour${diffHours > 1 ? "s" : ""} ago`;
-    if (diffDays < 7) return `${diffDays} day${diffDays > 1 ? "s" : ""} ago`;
-    return date.toLocaleDateString();
-  };
-
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-full">
@@ -65,7 +52,7 @@ export function WelcomePhase({
           You have an unfinished session
         </h2>
         <p className="text-base-content/70 mb-2">
-          from {formatDate(incompleteSession.startedAt)}
+          from {formatRelativeDate(incompleteSession.startedAt)}
         </p>
         <ul className="text-sm text-base-content/60 mb-6">
           <li>
@@ -104,7 +91,7 @@ export function WelcomePhase({
       </p>
       {lastPracticeDate && (
         <p className="text-sm text-base-content/50 mb-6">
-          Last practiced: {formatDate(lastPracticeDate)}
+          Last practiced: {formatRelativeDate(lastPracticeDate)}
         </p>
       )}
 

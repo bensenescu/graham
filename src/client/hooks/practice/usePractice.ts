@@ -1,92 +1,24 @@
-import { useState, useCallback, useEffect } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import {
-  getPracticeCriteria,
-  getPracticePool,
-  getIncompleteSession,
-  createPracticeSession,
-  updatePracticeSession,
-  deletePracticeSession,
-  createPracticeAnswer,
-  updatePracticeAnswer,
-  savePracticeAnswerRatings,
-  getLastPracticeDate,
-  getPracticeBlockStats,
-} from "@/serverFunctions/practice";
+import { useState, useCallback } from "react";
+import { shuffle } from "remeda";
+import { usePracticeQueries } from "./usePracticeQueries";
+import { usePracticeMutations } from "./usePracticeMutations";
+import type { RatingValue } from "@/types/schemas/practice";
 import type {
-  PracticeCriterion,
-  PracticeSession,
-  PracticeAnswer,
-  PracticeAnswerRating,
-  RatingValue,
-} from "@/types/schemas/practice";
-
-// Types for session state
-export type PracticePhase =
-  | "welcome"
-  | "practicing"
-  | "reviewing"
-  | "summary"
-  | "pool-settings";
-
-export interface PracticeAnswerWithRatings extends PracticeAnswer {
-  ratings: PracticeAnswerRating[];
-}
-
-export interface PracticeSessionWithAnswers extends PracticeSession {
-  answers: PracticeAnswerWithRatings[];
-}
+  PracticePhase,
+  PracticeSessionWithAnswers,
+  PracticeAnswerWithRatings,
+  UsePracticeReturn,
+} from "./types";
 
 interface UsePracticeOptions {
   pageId: string;
 }
 
-interface UsePracticeReturn {
-  // State
-  isOpen: boolean;
-  phase: PracticePhase;
-  criteria: PracticeCriterion[];
-  poolSize: number;
-  lastPracticeDate: string | null;
-  incompleteSession: PracticeSessionWithAnswers | null;
-  currentSession: PracticeSessionWithAnswers | null;
-  currentQuestionIndex: number;
-  currentReviewIndex: number;
-  practiceQueue: string[]; // blockIds to practice
-  isLoading: boolean;
-
-  // Actions
-  open: () => void;
-  close: () => void;
-  setPhase: (phase: PracticePhase) => void;
-  startNewSession: () => Promise<void>;
-  resumeSession: () => void;
-  discardSession: () => Promise<void>;
-  recordAnswer: (blockId: string, durationSeconds: number) => Promise<string>; // returns answerId
-  updateTranscription: (
-    answerId: string,
-    transcription: string | null,
-    status: "completed" | "failed",
-  ) => Promise<void>;
-  nextQuestion: () => void;
-  skipQuestion: () => void;
-  goToReview: () => void;
-  saveRatings: (
-    answerId: string,
-    ratings: Array<{ criterionId: string; rating: RatingValue }>,
-  ) => Promise<void>;
-  nextReview: () => void;
-  completeSession: () => Promise<void>;
-  refetchCriteria: () => void;
-  refetchPool: () => void;
-}
-
 /**
  * Hook for managing practice mode state and operations.
+ * Composes smaller hooks for queries and mutations.
  */
 export function usePractice({ pageId }: UsePracticeOptions): UsePracticeReturn {
-  const queryClient = useQueryClient();
-
   // UI State
   const [isOpen, setIsOpen] = useState(false);
   const [phase, setPhase] = useState<PracticePhase>("welcome");
@@ -96,97 +28,29 @@ export function usePractice({ pageId }: UsePracticeOptions): UsePracticeReturn {
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [currentReviewIndex, setCurrentReviewIndex] = useState(0);
 
-  // Fetch criteria
-  const { data: criteriaData, refetch: refetchCriteria } = useQuery({
-    queryKey: ["practice-criteria"],
-    queryFn: () => getPracticeCriteria(),
-  });
-
-  // Fetch practice pool
-  const { data: poolData, refetch: refetchPool } = useQuery({
-    queryKey: ["practice-pool", pageId],
-    queryFn: () => getPracticePool({ data: { pageId } }),
-    enabled: !!pageId,
-  });
-
-  // Fetch incomplete session
-  const { data: incompleteData, isLoading: isLoadingIncomplete } = useQuery({
-    queryKey: ["practice-incomplete-session", pageId],
-    queryFn: () => getIncompleteSession({ data: { pageId } }),
-    enabled: !!pageId && isOpen,
-  });
-
-  // Fetch last practice date
-  const { data: lastPracticeDateData } = useQuery({
-    queryKey: ["practice-last-date", pageId],
-    queryFn: () => getLastPracticeDate({ data: { pageId } }),
-    enabled: !!pageId,
-  });
-
-  // Fetch block stats
-  const { data: statsData } = useQuery({
-    queryKey: ["practice-block-stats", pageId],
-    queryFn: () => getPracticeBlockStats({ data: { pageId } }),
-    enabled: !!pageId,
-  });
+  // Queries
+  const queries = usePracticeQueries({ pageId, isOpen });
+  const {
+    criteria,
+    poolBlockIds,
+    lastPracticeDate,
+    incompleteSession,
+    isLoading,
+    refetchCriteria,
+    refetchPool,
+  } = queries;
 
   // Mutations
-  const createSessionMutation = useMutation({
-    mutationFn: createPracticeSession,
-    onSuccess: () => {
-      queryClient.invalidateQueries({
-        queryKey: ["practice-incomplete-session", pageId],
-      });
-    },
-  });
-
-  const updateSessionMutation = useMutation({
-    mutationFn: updatePracticeSession,
-    onSuccess: () => {
-      queryClient.invalidateQueries({
-        queryKey: ["practice-incomplete-session", pageId],
-      });
-    },
-  });
-
-  const deleteSessionMutation = useMutation({
-    mutationFn: deletePracticeSession,
-    onSuccess: () => {
-      queryClient.invalidateQueries({
-        queryKey: ["practice-incomplete-session", pageId],
-      });
-    },
-  });
-
-  const createAnswerMutation = useMutation({
-    mutationFn: createPracticeAnswer,
-  });
-
-  const updateAnswerMutation = useMutation({
-    mutationFn: updatePracticeAnswer,
-  });
-
-  const saveRatingsMutation = useMutation({
-    mutationFn: savePracticeAnswerRatings,
-  });
-
-  // Derived state
-  const criteria = criteriaData?.criteria ?? [];
-  const poolSize = poolData?.blockIds.length ?? 0;
-  const lastPracticeDate = lastPracticeDateData?.lastPracticeDate ?? null;
-  const incompleteSession =
-    (incompleteData?.session as PracticeSessionWithAnswers | null) ?? null;
-  const isLoading = isLoadingIncomplete;
-
-  // Shuffle array helper
-  const shuffleArray = <T>(array: T[]): T[] => {
-    const shuffled = [...array];
-    for (let i = shuffled.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
-    }
-    return shuffled;
-  };
+  const mutations = usePracticeMutations({ pageId });
+  const {
+    createSessionMutation,
+    updateSessionMutation,
+    deleteSessionMutation,
+    createAnswerMutation,
+    updateAnswerMutation,
+    saveRatingsMutation,
+    invalidateOnComplete,
+  } = mutations;
 
   // Actions
   const open = useCallback(() => {
@@ -210,7 +74,7 @@ export function usePractice({ pageId }: UsePracticeOptions): UsePracticeReturn {
     });
 
     // Shuffle the pool for random order
-    const shuffledQueue = shuffleArray(poolData?.blockIds ?? []);
+    const shuffledQueue = shuffle(poolBlockIds);
     setPracticeQueue(shuffledQueue);
     setCurrentQuestionIndex(0);
     setCurrentReviewIndex(0);
@@ -223,7 +87,7 @@ export function usePractice({ pageId }: UsePracticeOptions): UsePracticeReturn {
       answers: [],
     });
     setPhase("practicing");
-  }, [createSessionMutation, pageId, poolData?.blockIds]);
+  }, [createSessionMutation, pageId, poolBlockIds]);
 
   const resumeSession = useCallback(() => {
     if (!incompleteSession) return;
@@ -234,10 +98,10 @@ export function usePractice({ pageId }: UsePracticeOptions): UsePracticeReturn {
     );
 
     // Build queue: unanswered blocks, shuffled
-    const remainingBlocks = (poolData?.blockIds ?? []).filter(
+    const remainingBlocks = poolBlockIds.filter(
       (id) => !answeredBlockIds.has(id),
     );
-    const shuffledRemaining = shuffleArray(remainingBlocks);
+    const shuffledRemaining = shuffle(remainingBlocks);
     setPracticeQueue(shuffledRemaining);
     setCurrentQuestionIndex(0);
     setCurrentReviewIndex(0);
@@ -254,7 +118,7 @@ export function usePractice({ pageId }: UsePracticeOptions): UsePracticeReturn {
     } else {
       setPhase("practicing");
     }
-  }, [incompleteSession, poolData?.blockIds]);
+  }, [incompleteSession, poolBlockIds]);
 
   const discardSession = useCallback(async () => {
     if (incompleteSession) {
@@ -299,7 +163,7 @@ export function usePractice({ pageId }: UsePracticeOptions): UsePracticeReturn {
               transcriptionStatus: "pending",
               durationSeconds: String(durationSeconds),
               ratings: [],
-            },
+            } as PracticeAnswerWithRatings,
           ],
         };
       });
@@ -432,21 +296,15 @@ export function usePractice({ pageId }: UsePracticeOptions): UsePracticeReturn {
     setPhase("summary");
 
     // Invalidate queries
-    queryClient.invalidateQueries({
-      queryKey: ["practice-incomplete-session", pageId],
-    });
-    queryClient.invalidateQueries({ queryKey: ["practice-last-date", pageId] });
-    queryClient.invalidateQueries({
-      queryKey: ["practice-block-stats", pageId],
-    });
-  }, [currentSession, updateSessionMutation, queryClient, pageId]);
+    invalidateOnComplete();
+  }, [currentSession, updateSessionMutation, invalidateOnComplete]);
 
   return {
     // State
     isOpen,
     phase,
     criteria,
-    poolSize,
+    poolSize: poolBlockIds.length,
     lastPracticeDate,
     incompleteSession,
     currentSession,

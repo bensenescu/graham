@@ -1,6 +1,7 @@
 import { db } from "@/db";
-import { pageOverallReviews, pages } from "@/db/schema";
+import { pageOverallReviews } from "@/db/schema";
 import { eq, and, inArray } from "drizzle-orm";
+import { PageRepository } from "./PageRepository";
 
 type UpsertPageOverallReview = {
   id: string;
@@ -10,20 +11,15 @@ type UpsertPageOverallReview = {
 };
 
 /**
- * Find all overall reviews for a user's pages.
+ * Find all overall reviews for pages accessible by user (owned + shared).
  */
 async function findAllByUserId(userId: string) {
-  // Get all page IDs for the user
-  const userPages = await db.query.pages.findMany({
-    where: eq(pages.userId, userId),
-    columns: { id: true },
-  });
+  // Get all page IDs accessible by the user (owned + shared)
+  const pageIds = await PageRepository.getAccessiblePageIds(userId);
 
-  if (userPages.length === 0) {
+  if (pageIds.length === 0) {
     return [];
   }
-
-  const pageIds = userPages.map((p) => p.id);
 
   return db.query.pageOverallReviews.findMany({
     where: inArray(pageOverallReviews.pageId, pageIds),

@@ -113,11 +113,6 @@ export const ycApplicationTemplate: Template = {
 // All available templates
 export const templates: Template[] = [ycApplicationTemplate];
 
-// Get a template by ID
-export function getTemplateById(id: string): Template | undefined {
-  return templates.find((t) => t.id === id);
-}
-
 // Convert template questions to page blocks format
 export function templateToBlocks(template: Template) {
   return template.questions.map((q, index) => ({

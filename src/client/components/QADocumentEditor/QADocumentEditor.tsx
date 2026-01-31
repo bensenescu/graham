@@ -1,46 +1,33 @@
-import { useCallback, useMemo, useRef, useState, useEffect } from "react";
-import { Plus } from "lucide-react";
-import {
-  DndContext,
-  closestCenter,
-  KeyboardSensor,
-  MouseSensor,
-  TouchSensor,
-  useSensor,
-  useSensors,
-  DragEndEvent,
-  Modifier,
-} from "@dnd-kit/core";
+import { useCallback, useMemo, useRef } from "react";
+import { Link } from "@tanstack/react-router";
+import { ChevronLeft, Plus } from "lucide-react";
+import { DndContext, closestCenter } from "@dnd-kit/core";
 import {
   SortableContext,
-  sortableKeyboardCoordinates,
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
-import { QADocumentBlock } from "./QADocumentBlock";
-import { CollabTextEditor, getFragmentText } from "./CollabTextEditor";
+import { QADocumentBlock } from "../QADocumentBlock";
+import { CollabTextEditor, getFragmentText } from "../CollabTextEditor";
+import { DocumentSkeleton } from "./DocumentSkeleton";
+import { ConnectionStatus } from "./ConnectionStatus";
 import type { PageBlock } from "@/types/schemas/pages";
 import type { BlockReview } from "@/types/schemas/reviews";
+import { useBlockOperations } from "@/client/hooks/useBlockOperations";
 import {
-  generateDefaultSortKey,
-  generateSortKeyBetween,
-  sortBlocksBySortKey,
-} from "@/client/lib/fractional-indexing";
+  useDraggableSensors,
+  useDragEndHandler,
+  restrictToVerticalAxis,
+} from "@/client/hooks/useDragAndDrop";
 import { useKeyboardNavigation } from "@/client/hooks/useKeyboardNavigation";
 import {
   getBlockItemId,
   ADD_QUESTION_BUTTON_ID,
 } from "@/client/lib/element-ids";
-import {
-  usePageCollab,
-  type UsePageCollabReturn,
-} from "@/client/hooks/usePageCollab";
+import { usePageCollab } from "@/client/hooks/usePageCollab";
 import {
   PageCollabContext,
   type PageCollabContextValue,
 } from "@/client/contexts/PageCollabContext";
-
-// Context for passing collab state to child blocks
-export type { PageCollabContextValue } from "@/client/contexts/PageCollabContext";
 
 interface QADocumentEditorProps {
   pageId: string;
@@ -82,11 +69,34 @@ export function QADocumentEditor({
   onReviewRequest,
   onTitleChange,
 }: QADocumentEditorProps) {
-  // Local state for block management (drag/drop, add/remove)
-  const [localBlocks, setLocalBlocks] = useState<PageBlock[]>(blocks);
-  const [focusBlockId, setFocusBlockId] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+
+  // Block operations
+  const {
+    sortedBlocks,
+    focusBlockId,
+    handleQuestionChange,
+    handleAnswerChange,
+    handleDelete,
+    handleAddBlock,
+    handleAddAfter,
+    handleSortKeyUpdate,
+    clearFocusBlockId,
+    localBlocks,
+  } = useBlockOperations({
+    pageId,
+    blocks,
+    onBlockCreate,
+    onBlockUpdate,
+    onBlockDelete,
+  });
+
+  // Drag and drop
   const sensors = useDraggableSensors();
+  const handleDragEnd = useDragEndHandler({
+    blocks: localBlocks,
+    onSortKeyUpdate: handleSortKeyUpdate,
+  });
 
   // Collaborative editing via Yjs
   const collab = usePageCollab({ pageId });
@@ -105,7 +115,6 @@ export function QADocumentEditor({
     hasLoadedRef.current = true;
   }
   const isReady = hasLoadedRef.current;
-  // Show skeleton only on initial load, not on reconnection
   const showSkeleton = !isReady;
 
   // Sync title from Yjs to DB on blur
@@ -118,92 +127,6 @@ export function QADocumentEditor({
       onTitleChange?.(yjsTitle);
     }
   }, [getTitleFragment, pageTitle, onTitleChange]);
-
-  // Sync local state when blocks change from parent
-  useEffect(() => {
-    const localJson = JSON.stringify(localBlocks);
-    const blocksJson = JSON.stringify(blocks);
-    if (localJson !== blocksJson) {
-      setLocalBlocks(blocks);
-    }
-  }, [blocks, localBlocks]);
-
-  // Sort blocks by sortKey
-  const sortedBlocks = useMemo(() => {
-    return sortBlocksBySortKey(localBlocks);
-  }, [localBlocks]);
-
-  // Direct update to parent (called on blur from block component)
-  const handleQuestionChange = useCallback(
-    (id: string, question: string) => {
-      onBlockUpdate(id, { question });
-    },
-    [onBlockUpdate],
-  );
-
-  const handleAnswerChange = useCallback(
-    (id: string, answer: string) => {
-      onBlockUpdate(id, { answer });
-    },
-    [onBlockUpdate],
-  );
-
-  const handleDelete = useCallback(
-    (id: string) => {
-      setLocalBlocks((prev) => prev.filter((block) => block.id !== id));
-      onBlockDelete(id);
-    },
-    [onBlockDelete],
-  );
-
-  const handleAddBlock = useCallback(() => {
-    const sorted = sortBlocksBySortKey(localBlocks);
-    const lowestSortKey = sorted[sorted.length - 1]?.sortKey;
-    const newSortKey = lowestSortKey
-      ? "!" + lowestSortKey
-      : generateDefaultSortKey();
-
-    const newBlock: PageBlock = {
-      id: crypto.randomUUID(),
-      pageId,
-      question: "",
-      answer: "",
-      sortKey: newSortKey,
-    };
-
-    setLocalBlocks((prev) => [...prev, newBlock]);
-    setFocusBlockId(newBlock.id);
-    onBlockCreate(newBlock);
-  }, [localBlocks, pageId, onBlockCreate]);
-
-  const handleAddAfter = useCallback(
-    (afterId: string) => {
-      const sorted = sortBlocksBySortKey(localBlocks);
-      const blockIndex = sorted.findIndex((b) => b.id === afterId);
-      if (blockIndex === -1) return;
-
-      const afterBlock = sorted[blockIndex];
-      const belowBlock = sorted[blockIndex + 1];
-
-      const newSortKey = generateSortKeyBetween(
-        belowBlock?.sortKey,
-        afterBlock.sortKey,
-      );
-
-      const newBlock: PageBlock = {
-        id: crypto.randomUUID(),
-        pageId,
-        question: "",
-        answer: "",
-        sortKey: newSortKey,
-      };
-
-      setLocalBlocks((prev) => [...prev, newBlock]);
-      setFocusBlockId(newBlock.id);
-      onBlockCreate(newBlock);
-    },
-    [localBlocks, pageId, onBlockCreate],
-  );
 
   // Keyboard navigation for blocks (include add button at the end)
   const navItemIds = useMemo(
@@ -259,40 +182,6 @@ export function QADocumentEditor({
     onReview: onReviewRequest,
   });
 
-  const handleDragEnd = useCallback(
-    (event: DragEndEvent) => {
-      const { active, over } = event;
-
-      if (!over || active.id === over.id) return;
-
-      const sorted = sortBlocksBySortKey(localBlocks);
-
-      const draggedIndex = sorted.findIndex((block) => block.id === active.id);
-      const targetIndex = sorted.findIndex((block) => block.id === over.id);
-
-      if (draggedIndex === -1 || targetIndex === -1) return;
-
-      const { beforeBlock, afterBlock } = calculateNewPosition(
-        sorted,
-        draggedIndex,
-        targetIndex,
-      );
-
-      const newSortKey = generateSortKeyBetween(
-        afterBlock?.sortKey,
-        beforeBlock?.sortKey,
-      );
-
-      setLocalBlocks((prev) =>
-        prev.map((block) =>
-          block.id === active.id ? { ...block, sortKey: newSortKey } : block,
-        ),
-      );
-      onBlockUpdate(active.id as string, { sortKey: newSortKey });
-    },
-    [localBlocks, onBlockUpdate],
-  );
-
   // Collab context value for child blocks
   const collabContextValue = useMemo<PageCollabContextValue>(
     () => ({
@@ -305,56 +194,26 @@ export function QADocumentEditor({
   return (
     <PageCollabContext.Provider value={collabContextValue}>
       <div ref={containerRef} className="pt-6 pb-6 px-6 min-h-screen">
+        <div className="max-w-3xl mx-auto">
+          <div className="pb-2">
+            <Link
+              to="/"
+              className="inline-flex items-center gap-1 text-sm text-base-content/60 hover:text-base-content transition-colors"
+            >
+              <ChevronLeft className="h-4 w-4" />
+              Back to Pages
+            </Link>
+          </div>
+        </div>
         <div className="max-w-3xl mx-auto bg-base-100 rounded-lg px-4 py-2 border border-base-300 min-h-[calc(100vh-6rem)]">
-          {/* Loading state - skeleton loader only on initial load */}
           {showSkeleton ? (
-            <div className="animate-pulse pt-4">
-              {/* Title skeleton */}
-              <div className="h-8 bg-base-300 rounded w-1/3 mb-6" />
-              {/* Block skeletons */}
-              <div className="space-y-8">
-                <div className="space-y-3">
-                  <div className="h-5 bg-base-300 rounded w-2/3" />
-                  <div className="h-4 bg-base-300/60 rounded w-full" />
-                  <div className="h-4 bg-base-300/60 rounded w-4/5" />
-                </div>
-                <div className="space-y-3">
-                  <div className="h-5 bg-base-300 rounded w-1/2" />
-                  <div className="h-4 bg-base-300/60 rounded w-full" />
-                  <div className="h-4 bg-base-300/60 rounded w-3/4" />
-                </div>
-              </div>
-            </div>
+            <DocumentSkeleton />
           ) : (
             <>
-              {/* Connection status indicator - simple dot */}
-              <div className="flex items-center gap-2 text-xs text-base-content/60 pt-2 h-6">
-                {connectionState === "connected" ? (
-                  <span
-                    className="w-2 h-2 rounded-full bg-success"
-                    title="Online"
-                  />
-                ) : connectionState === "connecting" ? (
-                  <>
-                    <span className="loading loading-spinner loading-xs" />
-                    <span>Syncing...</span>
-                  </>
-                ) : (
-                  <>
-                    <span
-                      className="w-2 h-2 rounded-full bg-warning"
-                      title="Offline"
-                    />
-                    <span>Offline</span>
-                    <button
-                      onClick={reconnect}
-                      className="underline hover:text-base-content"
-                    >
-                      Reconnect
-                    </button>
-                  </>
-                )}
-              </div>
+              <ConnectionStatus
+                connectionState={connectionState}
+                onReconnect={reconnect}
+              />
 
               {/* Page title */}
               <div className="pt-2 pb-2">
@@ -416,7 +275,7 @@ export function QADocumentEditor({
                           onFocus={onBlockFocus}
                           isOnly={sortedBlocks.length === 1}
                           autoFocusQuestion={block.id === focusBlockId}
-                          onAutoFocusDone={() => setFocusBlockId(null)}
+                          onAutoFocusDone={clearFocusBlockId}
                         />
                       ))}
                     </div>
@@ -448,48 +307,3 @@ export function QADocumentEditor({
     </PageCollabContext.Provider>
   );
 }
-
-function calculateNewPosition(
-  blocks: PageBlock[],
-  draggedIndex: number,
-  targetIndex: number,
-): { beforeBlock?: PageBlock; afterBlock?: PageBlock } {
-  const isMovingDown = draggedIndex < targetIndex;
-
-  if (isMovingDown) {
-    return {
-      beforeBlock: blocks[targetIndex],
-      afterBlock: blocks[targetIndex + 1],
-    };
-  } else {
-    return {
-      beforeBlock: blocks[targetIndex - 1],
-      afterBlock: blocks[targetIndex],
-    };
-  }
-}
-
-function useDraggableSensors() {
-  const sensors = useSensors(
-    useSensor(MouseSensor, {
-      activationConstraint: {
-        distance: 8,
-      },
-    }),
-    useSensor(TouchSensor, {
-      activationConstraint: {
-        delay: 150,
-        tolerance: 5,
-      },
-    }),
-    useSensor(KeyboardSensor, {
-      coordinateGetter: sortableKeyboardCoordinates,
-    }),
-  );
-  return sensors;
-}
-
-const restrictToVerticalAxis: Modifier = ({ transform }) => ({
-  ...transform,
-  x: 0,
-});

@@ -1,4 +1,4 @@
-export const CURSOR_COLORS = [
+const CURSOR_COLORS = [
   "#E57373",
   "#64B5F6",
   "#81C784",
