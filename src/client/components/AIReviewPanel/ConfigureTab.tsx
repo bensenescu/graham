@@ -5,6 +5,7 @@ import { usePageReviewSettings } from "@/client/hooks/usePageReviewSettings";
 import { usePageSharing } from "@/client/hooks/usePageSharing";
 import { ShareSettings } from "../ShareSettings";
 import { AutoResizeTextarea } from "./AutoResizeTextarea";
+import { LoadingSpinner } from "@/client/components/LoadingSpinner";
 
 /**
  * Configure tab - Review settings, prompts, and model selection
@@ -31,7 +32,7 @@ export function ConfigureTab({
   if (isLoading) {
     return (
       <div className="p-4 flex items-center justify-center">
-        <span className="loading loading-spinner loading-sm" />
+        <LoadingSpinner size="sm" />
       </div>
     );
   }

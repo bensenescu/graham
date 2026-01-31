@@ -220,6 +220,7 @@ export function QADocumentEditor({
                 {isReady && provider ? (
                   <CollabTextEditor
                     fragment={getTitleFragment()!}
+                    fragmentName="title"
                     provider={provider}
                     userId={userInfo.userId}
                     userName={userInfo.userName}

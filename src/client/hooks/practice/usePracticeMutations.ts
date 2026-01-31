@@ -77,3 +77,7 @@ export function usePracticeMutations({ pageId }: UsePracticeMutationsOptions) {
     invalidateOnComplete,
   };
 }
+
+export type UsePracticeMutationsReturn = ReturnType<
+  typeof usePracticeMutations
+>;

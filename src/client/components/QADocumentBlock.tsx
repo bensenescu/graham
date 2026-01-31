@@ -9,6 +9,7 @@ import { InlineBlockReview } from "./InlineBlockReview";
 import { getBlockItemId } from "@/client/lib/element-ids";
 import { usePageCollabContext } from "@/client/contexts/PageCollabContext";
 import { CollabTextEditor, getFragmentText } from "./CollabTextEditor";
+import { LoadingSpinner } from "@/client/components/LoadingSpinner";
 
 interface QADocumentBlockProps {
   block: PageBlock;
@@ -181,6 +182,7 @@ export function QADocumentBlock({
             {isCollabReady && collab?.provider ? (
               <CollabTextEditor
                 fragment={collab.getBlockQuestionFragment(block.id)!}
+                fragmentName={`block:${block.id}:question`}
                 provider={collab.provider}
                 userId={collab.userInfo.userId}
                 userName={collab.userInfo.userName}
@@ -203,6 +205,7 @@ export function QADocumentBlock({
             {isCollabReady && collab?.provider ? (
               <CollabTextEditor
                 fragment={collab.getBlockAnswerFragment(block.id)!}
+                fragmentName={`block:${block.id}:answer`}
                 provider={collab.provider}
                 userId={collab.userInfo.userId}
                 userName={collab.userInfo.userName}
@@ -248,7 +251,7 @@ export function QADocumentBlock({
                 >
                   {isReviewLoading ? (
                     <>
-                      <span className="loading loading-spinner loading-xs" />
+                      <LoadingSpinner size="xs" />
                       Reviewing...
                     </>
                   ) : (

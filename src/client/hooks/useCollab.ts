@@ -6,7 +6,7 @@ import {
   type ConnectionState,
   type CollabConnection,
 } from "@/client/lib/PageCollabManager";
-import { useCurrentUser } from "@/client/every-app";
+import { useCurrentUser } from "@every-app/sdk/tanstack";
 import { generateUserColor } from "@/client/lib/user-colors";
 import { useCollabAwareness } from "./useCollabAwareness";
 import { useSessionToken } from "./useSessionToken";

@@ -1,6 +1,7 @@
 import { MessageSquare } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import type { BlockReview } from "@/types/schemas/reviews";
+import { LoadingSpinner } from "@/client/components/LoadingSpinner";
 
 interface InlineBlockReviewProps {
   review: BlockReview | undefined;
@@ -20,7 +21,7 @@ export function InlineBlockReview({
     return (
       <div className="mt-3 p-3 rounded-lg bg-base-200/50 border border-base-300/50">
         <div className="flex items-center gap-2 text-sm text-base-content/60">
-          <span className="loading loading-spinner loading-xs" />
+          <LoadingSpinner size="xs" />
           <span>Reviewing answer...</span>
         </div>
       </div>

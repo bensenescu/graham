@@ -1,6 +1,7 @@
 import { useState } from "react";
 import type { usePractice } from "@/client/hooks/practice";
 import { formatRelativeDate } from "@/client/lib/date-utils";
+import { LoadingSpinner } from "@/client/components/LoadingSpinner";
 
 export interface WelcomePhaseProps {
   poolSize: number;
@@ -34,7 +35,7 @@ export function WelcomePhase({
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-full">
-        <span className="loading loading-spinner loading-lg" />
+        <LoadingSpinner size="lg" />
       </div>
     );
   }
@@ -111,11 +112,7 @@ export function WelcomePhase({
             disabled={isStarting}
             className="btn btn-primary"
           >
-            {isStarting ? (
-              <span className="loading loading-spinner loading-sm" />
-            ) : (
-              "Start Practicing"
-            )}
+            {isStarting ? <LoadingSpinner size="sm" /> : "Start Practicing"}
           </button>
           <button onClick={onManagePool} className="btn btn-outline">
             Manage Pool
