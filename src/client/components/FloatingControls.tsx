@@ -1,5 +1,13 @@
 import { useState, useEffect } from "react";
-import { Eye, EyeOff, Sparkles, Settings2, FileText, Mic } from "lucide-react";
+import {
+  Eye,
+  EyeOff,
+  Sparkles,
+  Settings2,
+  FileText,
+  Mic,
+  MoreVertical,
+} from "lucide-react";
 import { LoadingSpinner } from "@/client/components/LoadingSpinner";
 
 interface FloatingControlsProps {
@@ -45,6 +53,8 @@ export function FloatingControls({
   // Track visibility state with delay for entrance animation
   // This waits for the AIReviewPanel close animation (300ms) to finish before showing
   const [isVisible, setIsVisible] = useState(!isPanelOpen);
+  // Mobile menu open state
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   useEffect(() => {
     if (isPanelOpen) {
@@ -79,11 +89,97 @@ export function FloatingControls({
     onReviewAll();
   };
 
+  const handleMobileMenuToggle = () => {
+    setIsMobileMenuOpen((prev) => !prev);
+  };
+
+  const handleMobileAction = (action: () => void) => {
+    setIsMobileMenuOpen(false);
+    action();
+  };
+
+  // Menu items shared between desktop and mobile
+  const menuItems = (
+    <>
+      {/* Toggle inline reviews */}
+      <button
+        onClick={() => handleMobileAction(onToggleInlineReviews)}
+        className={`
+          btn btn-sm btn-ghost justify-start gap-2 text-left w-full
+          ${showInlineReviews ? "text-base-content" : "text-base-content/50"}
+        `}
+        title={showInlineReviews ? "Hide AI reviews" : "Show AI reviews"}
+      >
+        {showInlineReviews ? (
+          <>
+            <EyeOff className="h-4 w-4" />
+            <span className="text-xs">Hide Reviews</span>
+          </>
+        ) : (
+          <>
+            <Eye className="h-4 w-4" />
+            <span className="text-xs">Show Reviews</span>
+          </>
+        )}
+      </button>
+
+      {/* Overall Review button */}
+      <button
+        onClick={() => handleMobileAction(onOpenOverallTab)}
+        className="btn btn-sm btn-ghost justify-start gap-2 text-left w-full"
+      >
+        <FileText className="h-4 w-4" />
+        <span className="text-xs">Overall Review</span>
+      </button>
+
+      {/* Practice Mode button */}
+      <button
+        onClick={() => handleMobileAction(onOpenPracticeMode)}
+        disabled={!hasBlocks}
+        className="btn btn-sm btn-ghost justify-start gap-2 text-left w-full"
+      >
+        <Mic className="h-4 w-4 text-secondary" />
+        <span className="text-xs">Practice Mode</span>
+      </button>
+
+      {/* Review All / Re-review All button */}
+      <button
+        onClick={() => handleMobileAction(handleReviewAllClick)}
+        disabled={isReviewingAll || !hasBlocks}
+        className="btn btn-sm btn-ghost justify-start gap-2 text-left w-full"
+      >
+        {isReviewingAll ? (
+          <>
+            <LoadingSpinner size="xs" />
+            <span className="text-xs">Reviewing...</span>
+          </>
+        ) : (
+          <>
+            <Sparkles className="h-4 w-4 text-primary" />
+            <span className="text-xs">
+              {hasReviews ? "Re-review All" : "Review All"}
+            </span>
+          </>
+        )}
+      </button>
+
+      {/* Open Settings Panel */}
+      <button
+        onClick={() => handleMobileAction(onOpenPanel)}
+        className="btn btn-sm btn-ghost justify-start gap-2 text-left w-full"
+      >
+        <Settings2 className="h-4 w-4" />
+        <span className="text-xs">Settings</span>
+      </button>
+    </>
+  );
+
   return (
     <>
+      {/* Desktop: Fixed panel at top right */}
       <div
         className={`
-          fixed top-20 right-6 z-30
+          hidden md:block fixed top-20 right-6 z-30
           transition-all duration-200 ease-out
           ${isVisible ? "opacity-100 translate-x-0" : "opacity-0 translate-x-4"}
         `}
@@ -91,77 +187,48 @@ export function FloatingControls({
         inert={!isVisible ? true : undefined}
       >
         <div className="flex flex-col gap-1 p-1.5 rounded-xl bg-base-100 border border-base-300 shadow-lg min-w-[150px]">
-          {/* Toggle inline reviews */}
-          <button
-            onClick={onToggleInlineReviews}
-            className={`
-              btn btn-sm btn-ghost justify-start gap-2 text-left
-              ${showInlineReviews ? "text-base-content" : "text-base-content/50"}
-            `}
-            title={showInlineReviews ? "Hide AI reviews" : "Show AI reviews"}
-          >
-            {showInlineReviews ? (
-              <>
-                <EyeOff className="h-4 w-4" />
-                <span className="text-xs">Hide Reviews</span>
-              </>
-            ) : (
-              <>
-                <Eye className="h-4 w-4" />
-                <span className="text-xs">Show Reviews</span>
-              </>
-            )}
-          </button>
-
-          {/* Overall Review button */}
-          <button
-            onClick={onOpenOverallTab}
-            className="btn btn-sm btn-ghost justify-start gap-2 text-left"
-          >
-            <FileText className="h-4 w-4" />
-            <span className="text-xs">Overall Review</span>
-          </button>
-
-          {/* Practice Mode button */}
-          <button
-            onClick={onOpenPracticeMode}
-            disabled={!hasBlocks}
-            className="btn btn-sm btn-ghost justify-start gap-2 text-left"
-          >
-            <Mic className="h-4 w-4 text-secondary" />
-            <span className="text-xs">Practice Mode</span>
-          </button>
-
-          {/* Review All / Re-review All button */}
-          <button
-            onClick={handleReviewAllClick}
-            disabled={isReviewingAll || !hasBlocks}
-            className="btn btn-sm btn-ghost justify-start gap-2 text-left"
-          >
-            {isReviewingAll ? (
-              <>
-                <LoadingSpinner size="xs" />
-                <span className="text-xs">Reviewing...</span>
-              </>
-            ) : (
-              <>
-                <Sparkles className="h-4 w-4 text-primary" />
-                <span className="text-xs">
-                  {hasReviews ? "Re-review All" : "Review All"}
-                </span>
-              </>
-            )}
-          </button>
-
-          {/* Open Settings Panel */}
-          <button
-            onClick={onOpenPanel}
-            className="btn btn-sm btn-ghost justify-start gap-2 text-left"
-          >
-            <Settings2 className="h-4 w-4" />
-            <span className="text-xs">Settings</span>
-          </button>
+          {menuItems}
         </div>
+      </div>
+
+      {/* Mobile: FAB with popup menu */}
+      <div
+        className={`
+          md:hidden fixed bottom-6 right-6 z-30
+          transition-all duration-200 ease-out
+          ${isVisible ? "opacity-100 scale-100" : "opacity-0 scale-90"}
+        `}
+        inert={!isVisible ? true : undefined}
+      >
+        {/* Backdrop when menu is open */}
+        {isMobileMenuOpen && (
+          <div
+            className="fixed inset-0 bg-black/20"
+            onClick={() => setIsMobileMenuOpen(false)}
+          />
+        )}
+
+        {/* Popup menu */}
+        <div
+          className={`
+            absolute bottom-16 right-0
+            flex flex-col gap-1 p-1.5 rounded-xl bg-base-100 border border-base-300 shadow-lg min-w-[150px]
+            transition-all duration-200 ease-out origin-bottom-right
+            ${isMobileMenuOpen ? "opacity-100 scale-100" : "opacity-0 scale-90 pointer-events-none"}
+          `}
+        >
+          {menuItems}
+        </div>
+
+        {/* FAB button */}
+        <button
+          onClick={handleMobileMenuToggle}
+          className="btn btn-circle btn-primary shadow-lg h-14 w-14"
+          aria-label="Open review menu"
+          aria-expanded={isMobileMenuOpen}
+        >
+          <MoreVertical className="h-6 w-6" />
+        </button>
       </div>
 
       {/* Confirmation Modal for Re-review */}

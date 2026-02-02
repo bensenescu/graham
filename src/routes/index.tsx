@@ -85,7 +85,7 @@ function Home() {
 
   return (
     <div className="h-full overflow-auto">
-      <div className="px-4 pb-24 md:pt-4 md:pb-4 max-w-4xl mx-auto">
+      <div className="px-4 pt-4 pb-24 md:pb-4 max-w-4xl mx-auto">
         {/* Header - desktop only */}
         <div className="hidden md:flex items-center justify-between py-4">
           <h1 className="text-2xl font-bold text-base-content">Pages</h1>
