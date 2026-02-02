@@ -138,9 +138,9 @@ export function ResizablePanelLayout({
 
   return (
     <div ref={containerRef} className="h-full flex flex-col overflow-hidden">
-      {/* Header row - only renders when main header is provided */}
+      {/* Header row - only renders when main header is provided (desktop only) */}
       {mainHeader && (
-        <div className="flex-shrink-0 flex">
+        <div className="hidden md:flex flex-shrink-0">
           {/* Main header - animates width */}
           <div
             className="flex-shrink-0 transition-[width] duration-300 ease-out overflow-hidden"
@@ -166,8 +166,8 @@ export function ResizablePanelLayout({
         </div>
       )}
 
-      {/* Content area - each panel scrolls independently */}
-      <div className="flex-1 flex overflow-hidden">
+      {/* Desktop: Content area - each panel scrolls independently */}
+      <div className="hidden md:flex flex-1 overflow-hidden">
         {/* Main content - scrolls independently */}
         <div
           className="flex-shrink-0 overflow-y-auto transition-[width] duration-300 ease-out"
@@ -237,6 +237,29 @@ export function ResizablePanelLayout({
             {sidePanel}
           </div>
         </div>
+      </div>
+
+      {/* Mobile: Full-screen panel overlay or main content */}
+      <div className="md:hidden flex-1 flex flex-col overflow-hidden">
+        {isPanelOpen ? (
+          /* Full-screen panel on mobile */
+          <div
+            className="flex-1 flex flex-col bg-base-100"
+            inert={!isPanelOpen ? true : undefined}
+          >
+            {/* Panel header */}
+            {sidePanelHeader && (
+              <div className="flex-shrink-0 border-b border-base-300">
+                {sidePanelHeader}
+              </div>
+            )}
+            {/* Panel content */}
+            <div className="flex-1 overflow-y-auto">{sidePanel}</div>
+          </div>
+        ) : (
+          /* Main content on mobile */
+          <div className="flex-1 overflow-y-auto">{children}</div>
+        )}
       </div>
     </div>
   );

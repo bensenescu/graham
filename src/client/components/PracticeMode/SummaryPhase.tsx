@@ -214,12 +214,12 @@ export function SummaryPhase({
       {/* Sticky footer */}
       <div className="sticky bottom-0 p-4 border-t border-base-300 bg-base-100">
         <div className="max-w-lg mx-auto flex gap-3">
-          <button onClick={onDone} className="btn btn-outline flex-1">
+          <button onClick={onDone} className="btn btn-primary flex-1">
             Done
           </button>
           <button
             onClick={onPracticeMore}
-            className="btn btn-primary flex-1 gap-2"
+            className="btn btn-outline flex-1 gap-2"
           >
             <RotateCcw className="w-4 h-4" />
             Practice More

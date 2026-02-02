@@ -46,6 +46,7 @@ export function PracticingPhase({
   const [answeredIndexes, setAnsweredIndexes] = useState<number[]>([]);
   const [ratings, setRatings] = useState<Record<string, RatingValue>>({});
   const [isSavingRatings, setIsSavingRatings] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const prevIndexRef = useRef(currentIndex);
 
   const recorder = useAudioRecorder({
@@ -116,21 +117,8 @@ export function PracticingPhase({
     if (!currentAnswerId || !allRated) return;
 
     setIsSavingRatings(true);
-    await onSaveRatings(
-      currentAnswerId,
-      Object.entries(ratings).map(([criterionId, rating]) => ({
-        criterionId,
-        rating,
-      })),
-    );
-    setIsSavingRatings(false);
-    onNext();
-  };
-
-  const handleFinish = async () => {
-    // Save ratings if we have an answer and ratings
-    if (currentAnswerId && allRated) {
-      setIsSavingRatings(true);
+    setSaveError(null);
+    try {
       await onSaveRatings(
         currentAnswerId,
         Object.entries(ratings).map(([criterionId, rating]) => ({
@@ -138,6 +126,34 @@ export function PracticingPhase({
           rating,
         })),
       );
+      onNext();
+    } catch (error) {
+      console.error("Failed to save ratings", error);
+      setSaveError("Failed to save ratings. Please try again.");
+    } finally {
+      setIsSavingRatings(false);
+    }
+  };
+
+  const handleFinish = async () => {
+    // Save ratings if we have an answer and ratings
+    if (currentAnswerId && allRated) {
+      setIsSavingRatings(true);
+      setSaveError(null);
+      try {
+        await onSaveRatings(
+          currentAnswerId,
+          Object.entries(ratings).map(([criterionId, rating]) => ({
+            criterionId,
+            rating,
+          })),
+        );
+      } catch (error) {
+        console.error("Failed to save ratings", error);
+        setSaveError("Failed to save ratings. Please try again.");
+        setIsSavingRatings(false);
+        return;
+      }
       setIsSavingRatings(false);
     }
     await onFinish();
@@ -332,6 +348,14 @@ export function PracticingPhase({
             </div>
           </div>
         )}
+
+        {saveError && (
+          <div className="max-w-2xl mx-auto w-full mt-4">
+            <div className="bg-error/10 border border-error/20 rounded-lg p-4 text-error text-sm">
+              {saveError}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Sticky footer with actions */}
@@ -346,49 +370,49 @@ export function PracticingPhase({
               Stop Recording
             </button>
           ) : !hasRecorded ? (
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex flex-row gap-3 items-center">
               <button
-                onClick={handleStartRecording}
-                className="btn btn-primary btn-lg gap-2 flex-1 sm:flex-none"
+                onClick={onSkip}
+                className="btn btn-outline btn-lg md:btn-md flex-1 gap-2"
               >
-                <Mic className="w-5 h-5" />
-                Start Recording
+                <SkipForward className="w-4 h-4" />
+                Skip
               </button>
 
               <button
-                onClick={onSkip}
-                className="btn btn-ghost gap-1 text-base-content/50"
+                onClick={handleStartRecording}
+                className="btn btn-primary btn-lg md:btn-md flex-1 gap-2"
               >
-                <SkipForward className="w-4 h-4" />
-                Skip Question
+                <Mic className="w-5 h-5" />
+                Start
               </button>
             </div>
           ) : (
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+            <div className="flex flex-row gap-3 items-center">
+              {answersCount > 0 && !isLastQuestion && (
+                <button
+                  onClick={handleFinish}
+                  disabled={!allRated || isSavingRatings}
+                  className="btn btn-outline btn-lg md:btn-md flex-1"
+                >
+                  Finish Early
+                </button>
+              )}
+
               <button
                 onClick={handleNext}
                 disabled={!allRated || isSavingRatings}
-                className="btn btn-primary flex-1 gap-2"
+                className="btn btn-primary btn-lg md:btn-md flex-1 gap-2"
               >
                 {isSavingRatings ? (
                   <LoadingSpinner size="sm" />
                 ) : (
                   <>
-                    {isLastQuestion ? "Finish" : "Next Question"}
+                    {isLastQuestion ? "Finish" : "Next"}
                     <ArrowRight className="w-4 h-4" />
                   </>
                 )}
               </button>
-
-              {answersCount > 0 && !isLastQuestion && (
-                <button
-                  onClick={handleFinish}
-                  disabled={isSavingRatings}
-                  className="btn btn-outline flex-1 sm:flex-none"
-                >
-                  Finish Early
-                </button>
-              )}
             </div>
           )}
         </div>
