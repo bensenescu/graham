@@ -21,12 +21,10 @@ export function usePractice({ pageId }: UsePracticeOptions): UsePracticeReturn {
     currentSession,
     practiceQueue,
     currentQuestionIndex,
-    currentReviewIndex,
     setPhase,
     setCurrentSession,
     setPracticeQueue,
     setCurrentQuestionIndex,
-    setCurrentReviewIndex,
     open,
     close,
   } = usePracticeState();
@@ -46,24 +44,18 @@ export function usePractice({ pageId }: UsePracticeOptions): UsePracticeReturn {
   // Mutations
   const mutations = usePracticeMutations({ pageId });
 
-  const {
-    startNewSession,
-    resumeSession,
-    discardSession,
-    goToReview,
-    completeSession,
-  } = usePracticeSessionActions({
-    pageId,
-    poolBlockIds,
-    incompleteSession,
-    currentSession,
-    setPhase,
-    setCurrentSession,
-    setPracticeQueue,
-    setCurrentQuestionIndex,
-    setCurrentReviewIndex,
-    mutations,
-  });
+  const { startNewSession, resumeSession, discardSession, completeSession } =
+    usePracticeSessionActions({
+      pageId,
+      poolBlockIds,
+      incompleteSession,
+      currentSession,
+      setPhase,
+      setCurrentSession,
+      setPracticeQueue,
+      setCurrentQuestionIndex,
+      mutations,
+    });
 
   const { recordAnswer, updateTranscription, saveRatings } =
     usePracticeAnswerActions({
@@ -72,9 +64,8 @@ export function usePractice({ pageId }: UsePracticeOptions): UsePracticeReturn {
       mutations,
     });
 
-  const { nextQuestion, skipQuestion, nextReview } = usePracticeNavigation({
+  const { nextQuestion, skipQuestion } = usePracticeNavigation({
     setCurrentQuestionIndex,
-    setCurrentReviewIndex,
   });
 
   return {
@@ -87,7 +78,6 @@ export function usePractice({ pageId }: UsePracticeOptions): UsePracticeReturn {
     incompleteSession,
     currentSession,
     currentQuestionIndex,
-    currentReviewIndex,
     practiceQueue,
     isLoading,
 
@@ -102,9 +92,7 @@ export function usePractice({ pageId }: UsePracticeOptions): UsePracticeReturn {
     updateTranscription,
     nextQuestion,
     skipQuestion,
-    goToReview,
     saveRatings,
-    nextReview,
     completeSession,
     refetchCriteria,
     refetchPool,

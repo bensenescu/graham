@@ -58,6 +58,7 @@ export const createPageFromTemplate =
         data: {
           id: pageId,
           title: template.name,
+          defaultPrompt: template.defaultPrompt,
         },
       });
 

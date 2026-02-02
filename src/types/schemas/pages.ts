@@ -17,6 +17,7 @@ export type PageBlock = z.infer<typeof pageBlockSchema>;
 export const createPageSchema = z.object({
   id: z.string().uuid("Invalid page ID"),
   title: z.string().min(1, "Title is required").max(255, "Title too long"),
+  defaultPrompt: z.string().optional(),
 });
 
 export type CreatePageInput = z.infer<typeof createPageSchema>;

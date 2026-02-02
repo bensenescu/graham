@@ -12,7 +12,6 @@ import type {
 export type PracticePhase =
   | "welcome"
   | "practicing"
-  | "reviewing"
   | "summary"
   | "pool-settings";
 
@@ -43,7 +42,6 @@ export interface UsePracticeReturn {
   incompleteSession: PracticeSessionWithAnswers | null;
   currentSession: PracticeSessionWithAnswers | null;
   currentQuestionIndex: number;
-  currentReviewIndex: number;
   practiceQueue: string[]; // blockIds to practice
   isLoading: boolean;
 
@@ -62,12 +60,10 @@ export interface UsePracticeReturn {
   ) => Promise<void>;
   nextQuestion: () => void;
   skipQuestion: () => void;
-  goToReview: () => void;
   saveRatings: (
     answerId: string,
     ratings: Array<{ criterionId: string; rating: RatingValue }>,
   ) => Promise<void>;
-  nextReview: () => void;
   completeSession: () => Promise<void>;
   refetchCriteria: () => void;
   refetchPool: () => void;

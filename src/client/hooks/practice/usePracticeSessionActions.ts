@@ -15,7 +15,6 @@ interface UsePracticeSessionActionsOptions {
   >;
   setPracticeQueue: Dispatch<SetStateAction<string[]>>;
   setCurrentQuestionIndex: Dispatch<SetStateAction<number>>;
-  setCurrentReviewIndex: Dispatch<SetStateAction<number>>;
   mutations: UsePracticeMutationsReturn;
 }
 
@@ -28,7 +27,6 @@ export function usePracticeSessionActions({
   setCurrentSession,
   setPracticeQueue,
   setCurrentQuestionIndex,
-  setCurrentReviewIndex,
   mutations,
 }: UsePracticeSessionActionsOptions) {
   const {
@@ -47,7 +45,6 @@ export function usePracticeSessionActions({
     const shuffledQueue = shuffle(poolBlockIds);
     setPracticeQueue(shuffledQueue);
     setCurrentQuestionIndex(0);
-    setCurrentReviewIndex(0);
     setCurrentSession({
       id: sessionId,
       pageId,
@@ -63,7 +60,6 @@ export function usePracticeSessionActions({
     poolBlockIds,
     setPracticeQueue,
     setCurrentQuestionIndex,
-    setCurrentReviewIndex,
     setCurrentSession,
     setPhase,
   ]);
@@ -80,24 +76,13 @@ export function usePracticeSessionActions({
     const shuffledRemaining = shuffle(remainingBlocks);
     setPracticeQueue(shuffledRemaining);
     setCurrentQuestionIndex(0);
-    setCurrentReviewIndex(0);
     setCurrentSession(incompleteSession);
-
-    if (incompleteSession.status === "reviewing") {
-      const firstUnrated = incompleteSession.answers.findIndex(
-        (a) => a.ratings.length === 0,
-      );
-      setCurrentReviewIndex(firstUnrated >= 0 ? firstUnrated : 0);
-      setPhase("reviewing");
-    } else {
-      setPhase("practicing");
-    }
+    setPhase("practicing");
   }, [
     incompleteSession,
     poolBlockIds,
     setPracticeQueue,
     setCurrentQuestionIndex,
-    setCurrentReviewIndex,
     setCurrentSession,
     setPhase,
   ]);
@@ -111,29 +96,6 @@ export function usePracticeSessionActions({
     setCurrentSession(null);
     setPhase("welcome");
   }, [incompleteSession, deleteSessionMutation, setCurrentSession, setPhase]);
-
-  const goToReview = useCallback(async () => {
-    if (!currentSession) return;
-
-    await updateSessionMutation.mutateAsync({
-      data: {
-        id: currentSession.id,
-        status: "reviewing",
-      },
-    });
-
-    setCurrentSession((prev) =>
-      prev ? { ...prev, status: "reviewing" } : prev,
-    );
-    setCurrentReviewIndex(0);
-    setPhase("reviewing");
-  }, [
-    currentSession,
-    updateSessionMutation,
-    setCurrentSession,
-    setCurrentReviewIndex,
-    setPhase,
-  ]);
 
   const completeSession = useCallback(async () => {
     if (!currentSession) return;
@@ -171,7 +133,6 @@ export function usePracticeSessionActions({
     startNewSession,
     resumeSession,
     discardSession,
-    goToReview,
     completeSession,
   };
 }

@@ -5,15 +5,8 @@ import { KeyboardShortcutsModal } from "./KeyboardShortcutsModal";
 import { SHORTCUT_SHOW_SHORTCUTS_HOTKEY } from "@/client/lib/keyboard-shortcuts";
 
 /**
- * Mobile navbar right-side actions (route-specific)
- */
-function MobileNavbarRight() {
-  return null;
-}
-
-/**
  * AppShell provides the main layout structure for the app:
- * - Mobile navbar with page title and route-specific actions
+ * - Header with app name and Every App link
  * - Main content area
  */
 function AppShellContent() {
@@ -33,10 +26,17 @@ function AppShellContent() {
         {/* Navbar */}
         <div className="navbar bg-base-100 border-b border-base-300 px-4 min-h-14 flex-shrink-0">
           <div className="flex-1">
-            <span className="font-semibold">Graham</span>
-          </div>
-          <div className="flex-none">
-            <MobileNavbarRight />
+            <div className="flex items-center gap-2">
+              <span className="font-semibold text-base-content">Graham</span>
+              <span className="text-base-content/40">-</span>
+              <a
+                href={import.meta.env.VITE_GATEWAY_URL}
+                target="_top"
+                className="text-base-content/60 hover:text-primary transition-colors text-sm"
+              >
+                Every App
+              </a>
+            </div>
           </div>
         </div>
 
@@ -57,7 +57,7 @@ function AppShellContent() {
 
 /**
  * AppShell provides the main layout structure for the app:
- * - Mobile navbar with page title and route-specific actions
+ * - Header with app name and Every App link
  * - Main content area
  */
 export function AppShell() {

@@ -1,14 +1,22 @@
+import { useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useLiveQuery } from "@tanstack/react-db";
 import { Plus, Trash2, Users } from "lucide-react";
 import { pageCollection, sharedPageCollection } from "@/client/tanstack-db";
 import { NewPageOptions } from "@/client/components/NewPageOptions";
+import { DeleteConfirmationModal } from "@/client/components/DeleteConfirmationModal";
 
 export const Route = createFileRoute("/")({
   component: Home,
 });
 
 function Home() {
+  const [deleteModal, setDeleteModal] = useState<{
+    isOpen: boolean;
+    pageId: string | null;
+    pageTitle: string;
+  }>({ isOpen: false, pageId: null, pageTitle: "" });
+
   // Live query for owned pages (sorted by updatedAt desc)
   const {
     data: ownedPages,
@@ -42,10 +50,25 @@ function Home() {
   // Track which pages are shared (not owned by user)
   const sharedPageIds = new Set(sharedPages?.map((p) => p.id) ?? []);
 
-  const handleDeletePage = (e: React.MouseEvent, pageId: string) => {
+  const handleDeleteClick = (
+    e: React.MouseEvent,
+    pageId: string,
+    pageTitle: string,
+  ) => {
     e.preventDefault();
     e.stopPropagation();
-    pageCollection.delete(pageId);
+    setDeleteModal({ isOpen: true, pageId, pageTitle });
+  };
+
+  const handleConfirmDelete = () => {
+    if (deleteModal.pageId) {
+      pageCollection.delete(deleteModal.pageId);
+    }
+    setDeleteModal({ isOpen: false, pageId: null, pageTitle: "" });
+  };
+
+  const handleCloseModal = () => {
+    setDeleteModal({ isOpen: false, pageId: null, pageTitle: "" });
   };
 
   if (isLoading) {
@@ -122,7 +145,13 @@ function Home() {
                     </div>
                     {!isShared && (
                       <button
-                        onClick={(e) => handleDeletePage(e, page.id)}
+                        onClick={(e) =>
+                          handleDeleteClick(
+                            e,
+                            page.id,
+                            page.title || "Untitled",
+                          )
+                        }
                         className="btn btn-ghost btn-sm btn-square opacity-0 group-hover:opacity-100 transition-opacity text-error"
                         aria-label="Delete page"
                       >
@@ -145,6 +174,16 @@ function Home() {
       >
         <Plus className="w-6 h-6" />
       </Link>
+
+      {/* Delete confirmation modal */}
+      <DeleteConfirmationModal
+        isOpen={deleteModal.isOpen}
+        onClose={handleCloseModal}
+        onConfirm={handleConfirmDelete}
+        title="Delete Page"
+        description={`Are you sure you want to delete "${deleteModal.pageTitle}"? This action cannot be undone.`}
+        confirmText="Delete Page"
+      />
     </div>
   );
 }
