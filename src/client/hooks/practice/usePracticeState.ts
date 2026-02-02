@@ -8,13 +8,11 @@ export function usePracticeState() {
     useState<PracticeSessionWithAnswers | null>(null);
   const [practiceQueue, setPracticeQueue] = useState<string[]>([]);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
-  const [currentReviewIndex, setCurrentReviewIndex] = useState(0);
 
   const resetSessionState = useCallback(() => {
     setCurrentSession(null);
     setPracticeQueue([]);
     setCurrentQuestionIndex(0);
-    setCurrentReviewIndex(0);
   }, []);
 
   const open = useCallback(() => {
@@ -34,12 +32,10 @@ export function usePracticeState() {
     currentSession,
     practiceQueue,
     currentQuestionIndex,
-    currentReviewIndex,
     setPhase,
     setCurrentSession,
     setPracticeQueue,
     setCurrentQuestionIndex,
-    setCurrentReviewIndex,
     open,
     close,
     resetSessionState,

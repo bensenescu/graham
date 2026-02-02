@@ -35,13 +35,13 @@ async function create(userId: string, data: CreatePageInput) {
     title: data.title,
   });
 
-  // Create default prompt for this page
+  // Create default prompt for this page (use custom prompt if provided)
   const promptId = crypto.randomUUID();
   await PromptRepository.create({
     id: promptId,
     userId,
     name: `${data.title} - Default`,
-    prompt: DEFAULT_PAGE_REVIEW_PROMPT,
+    prompt: data.defaultPrompt ?? DEFAULT_PAGE_REVIEW_PROMPT,
   });
 
   // Create page review settings with the default prompt

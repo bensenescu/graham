@@ -12,6 +12,7 @@ export interface Template {
   id: string;
   name: string;
   description: string;
+  defaultPrompt: string;
   questions: TemplateQuestion[];
 }
 
@@ -21,6 +22,7 @@ export const ycApplicationTemplate: Template = {
   id: "yc-application",
   name: "YC Application",
   description: "Y Combinator startup application questions",
+  defaultPrompt: `Imagine that you are a YC partner reviewing the answers to these questions. Do not explicitly "review" them. Instead your goal should be to ask thought provoking questions to challenge the founder to explain their answers more clearly or persuasively. Brevity is encouraged and answers do not need to be extremely detailed. Ask 1 question typically, at most 2.`,
   questions: [
     // Founders
     {
@@ -110,8 +112,57 @@ export const ycApplicationTemplate: Template = {
   ],
 };
 
+// Pitch Practice Template - Common investor pitch questions
+export const pitchPracticeTemplate: Template = {
+  id: "pitch-practice",
+  name: "Pitch Practice",
+  description: "Common questions about your business",
+  defaultPrompt: `Imagine that you are a YC partner reviewing the answers to these questions. Do not explicitly "review" them. Instead your goal should be to ask thought provoking questions to challenge the founder to explain their answers more clearly or persuasively. Brevity is encouraged and answers do not need to be extremely detailed. Ask 1 question typically, at most 2.`,
+  questions: [
+    {
+      question: "30 Second Elevator Pitch",
+      section: "Introduction",
+    },
+    {
+      question: "What problem are you solving?",
+      section: "Problem",
+    },
+    {
+      question: "Why your team?",
+      section: "Team",
+    },
+    {
+      question: "Who are your competitors?",
+      section: "Competition",
+    },
+    {
+      question: "How will you get customers?",
+      section: "Go-to-Market",
+    },
+    {
+      question: "Do you have any traction? How have you validated your idea?",
+      section: "Traction",
+    },
+    {
+      question: "How big is the market?",
+      section: "Market",
+    },
+    {
+      question: "How do you make money?",
+      section: "Business Model",
+    },
+    {
+      question: "What will the company look like in 5 years?",
+      section: "Vision",
+    },
+  ],
+};
+
 // All available templates
-export const templates: Template[] = [ycApplicationTemplate];
+export const templates: Template[] = [
+  ycApplicationTemplate,
+  pitchPracticeTemplate,
+];
 
 // Convert template questions to page blocks format
 export function templateToBlocks(template: Template) {

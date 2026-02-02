@@ -6,6 +6,7 @@ import { usePageSharing } from "@/client/hooks/usePageSharing";
 import { ShareSettings } from "../ShareSettings";
 import { AutoResizeTextarea } from "./AutoResizeTextarea";
 import { LoadingSpinner } from "@/client/components/LoadingSpinner";
+import { DeleteConfirmationModal } from "@/client/components/DeleteConfirmationModal";
 
 /**
  * Configure tab - Review settings, prompts, and model selection
@@ -17,17 +18,12 @@ export function ConfigureTab({
   pageId: string;
   onDeletePage?: () => void;
 }) {
-  const {
-    settings,
-    defaultPrompt,
-    aiModels,
-    isLoading,
-    updateModel,
-    updatePrompt,
-  } = usePageReviewSettings(pageId);
+  const { defaultPrompt, isLoading, updatePrompt } =
+    usePageReviewSettings(pageId);
   const { isOwner } = usePageSharing(pageId);
   const [isEditingDefaultPrompt, setIsEditingDefaultPrompt] = useState(false);
   const [editedDefaultPromptText, setEditedDefaultPromptText] = useState("");
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
 
   if (isLoading) {
     return (
@@ -37,27 +33,25 @@ export function ConfigureTab({
     );
   }
 
+  const handleDeleteClick = () => {
+    setShowDeleteModal(true);
+  };
+
+  const handleConfirmDelete = () => {
+    setShowDeleteModal(false);
+    onDeletePage?.();
+  };
+
   return (
     <div className="p-4 space-y-6">
-      {/* Model Selection */}
+      {/* AI Model indicator */}
       <div>
         <label className="text-sm font-medium text-base-content mb-2 block">
           AI Model
         </label>
-        <select
-          value={settings?.model ?? "openai-gpt-5.2-high"}
-          onChange={(e) => updateModel(e.target.value)}
-          className="select select-bordered select-sm w-full"
-        >
-          {aiModels.map((m) => (
-            <option key={m.id} value={m.id}>
-              {m.name}
-            </option>
-          ))}
-        </select>
-        <p className="text-xs text-base-content/50 mt-1">
-          {aiModels.find((m) => m.id === settings?.model)?.description}
-        </p>
+        <div className="text-sm text-base-content/70">
+          OpenAI - GPT 5.2 High
+        </div>
       </div>
 
       {/* Default Prompt */}
@@ -122,7 +116,7 @@ export function ConfigureTab({
       {isOwner && onDeletePage && (
         <div className="pt-4 border-t border-base-300">
           <button
-            onClick={onDeletePage}
+            onClick={handleDeleteClick}
             className="btn btn-ghost btn-sm gap-2 text-base-content/60 hover:text-error"
           >
             <Trash2 className="h-4 w-4" />
@@ -130,6 +124,16 @@ export function ConfigureTab({
           </button>
         </div>
       )}
+
+      {/* Delete confirmation modal */}
+      <DeleteConfirmationModal
+        isOpen={showDeleteModal}
+        onClose={() => setShowDeleteModal(false)}
+        onConfirm={handleConfirmDelete}
+        title="Delete Page"
+        description="Are you sure you want to delete this page? This action cannot be undone."
+        confirmText="Delete Page"
+      />
     </div>
   );
 }

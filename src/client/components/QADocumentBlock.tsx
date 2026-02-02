@@ -14,6 +14,7 @@ import {
   type CollabTextEditorHandle,
 } from "./CollabTextEditor";
 import { LoadingSpinner } from "@/client/components/LoadingSpinner";
+import { DeleteConfirmationModal } from "@/client/components/DeleteConfirmationModal";
 
 interface QADocumentBlockProps {
   block: PageBlock;
@@ -60,6 +61,7 @@ export function QADocumentBlock({
   const questionEditorRef = useRef<CollabTextEditorHandle>(null);
   // Track if block has focus within for accessibility (controls should only be tabbable when block is focused)
   const [hasFocusWithin, setHasFocusWithin] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
 
   const {
     attributes,
@@ -279,7 +281,7 @@ export function QADocumentBlock({
             {!isOnly && (
               <li>
                 <button
-                  onClick={() => onDelete(block.id)}
+                  onClick={() => setShowDeleteModal(true)}
                   className="flex items-center gap-2 text-sm text-error"
                 >
                   <Trash2 className="h-4 w-4" />
@@ -293,6 +295,19 @@ export function QADocumentBlock({
 
       {/* Divider */}
       <div className="mt-4 border-b border-base-300/50" />
+
+      {/* Delete confirmation modal */}
+      <DeleteConfirmationModal
+        isOpen={showDeleteModal}
+        onClose={() => setShowDeleteModal(false)}
+        onConfirm={() => {
+          setShowDeleteModal(false);
+          onDelete(block.id);
+        }}
+        title="Delete Question"
+        description="Are you sure you want to delete this question and answer? This action cannot be undone."
+        confirmText="Delete"
+      />
     </div>
   );
 }

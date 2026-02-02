@@ -1,10 +1,9 @@
-import { useEffect, useCallback } from "react";
+import { useEffect, useCallback, useState } from "react";
 import { X } from "lucide-react";
 import { usePractice } from "@/client/hooks/practice";
 import type { PageBlock } from "@/types/schemas/pages";
 import { WelcomePhase } from "./WelcomePhase";
 import { PracticingPhase } from "./PracticingPhase";
-import { ReviewingPhase } from "./ReviewingPhase";
 import { SummaryPhase } from "./SummaryPhase";
 
 interface PracticeModeModalProps {
@@ -21,8 +20,30 @@ export function PracticeModeModal({
   onClose,
 }: PracticeModeModalProps) {
   const practice = usePractice({ pageId });
+  const [isAnimating, setIsAnimating] = useState(false);
+  const [shouldRender, setShouldRender] = useState(false);
 
-  // Sync open state
+  // Handle mount/unmount animations
+  useEffect(() => {
+    if (isOpen) {
+      setShouldRender(true);
+      // Small delay to trigger enter animation
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          setIsAnimating(true);
+        });
+      });
+    } else {
+      setIsAnimating(false);
+      // Wait for exit animation before unmounting
+      const timeout = setTimeout(() => {
+        setShouldRender(false);
+      }, 200);
+      return () => clearTimeout(timeout);
+    }
+  }, [isOpen]);
+
+  // Sync open state with practice hook
   useEffect(() => {
     if (isOpen && !practice.isOpen) {
       practice.open();
@@ -36,76 +57,89 @@ export function PracticeModeModal({
     onClose();
   }, [practice, onClose]);
 
-  if (!isOpen) return null;
+  if (!shouldRender) return null;
+
+  const getPhaseTitle = () => {
+    switch (practice.phase) {
+      case "welcome":
+        return "Practice Mode";
+      case "practicing":
+        return "Practice";
+      case "summary":
+        return "Summary";
+      default:
+        return "Practice Mode";
+    }
+  };
 
   return (
-    <div className="fixed inset-0 z-50 bg-base-100 flex flex-col">
+    <div
+      className={`fixed inset-0 z-50 bg-base-100 flex flex-col transition-all duration-200 ease-out ${
+        isAnimating ? "opacity-100" : "opacity-0"
+      }`}
+    >
       {/* Header */}
-      <div className="flex items-center justify-between p-4 border-b border-base-300">
-        <h1 className="text-xl font-semibold">Practice Mode</h1>
+      <header className="flex items-center justify-between px-4 py-3 border-b border-base-300 bg-base-100/80 backdrop-blur-sm sticky top-0 z-10">
+        <h1 className="text-lg font-semibold">{getPhaseTitle()}</h1>
         <button
           onClick={handleClose}
-          className="btn btn-ghost btn-sm btn-square"
+          className="btn btn-ghost btn-sm btn-square hover:bg-base-200"
+          aria-label="Close practice mode"
         >
-          <X className="h-5 w-5" />
+          <X className="w-5 h-5" />
         </button>
-      </div>
+      </header>
 
-      {/* Content */}
-      <div className="flex-1 overflow-auto">
-        {practice.phase === "welcome" && (
-          <WelcomePhase
-            poolSize={practice.poolSize}
-            lastPracticeDate={practice.lastPracticeDate}
-            incompleteSession={practice.incompleteSession}
-            isLoading={practice.isLoading}
-            onStartNew={practice.startNewSession}
-            onResume={practice.resumeSession}
-            onDiscard={practice.discardSession}
-            onManagePool={() => practice.setPhase("pool-settings")}
-          />
-        )}
+      {/* Content with phase transitions */}
+      <main className="flex-1 overflow-hidden">
+        <div
+          className={`h-full transition-opacity duration-150 ${
+            isAnimating ? "opacity-100" : "opacity-0"
+          }`}
+        >
+          {practice.phase === "welcome" && (
+            <WelcomePhase
+              poolSize={practice.poolSize}
+              lastPracticeDate={practice.lastPracticeDate}
+              incompleteSession={practice.incompleteSession}
+              isLoading={practice.isLoading}
+              onStartNew={practice.startNewSession}
+              onResume={practice.resumeSession}
+              onDiscard={practice.discardSession}
+              onManagePool={() => practice.setPhase("pool-settings")}
+            />
+          )}
 
-        {practice.phase === "practicing" && (
-          <PracticingPhase
-            blocks={blocks}
-            practiceQueue={practice.practiceQueue}
-            currentIndex={practice.currentQuestionIndex}
-            answersCount={practice.currentSession?.answers.length ?? 0}
-            onRecordAnswer={practice.recordAnswer}
-            onUpdateTranscription={practice.updateTranscription}
-            onNext={practice.nextQuestion}
-            onSkip={practice.skipQuestion}
-            onGoToReview={async () => {
-              await practice.goToReview();
-            }}
-          />
-        )}
+          {practice.phase === "practicing" && (
+            <PracticingPhase
+              blocks={blocks}
+              practiceQueue={practice.practiceQueue}
+              currentIndex={practice.currentQuestionIndex}
+              answersCount={practice.currentSession?.answers.length ?? 0}
+              criteria={practice.criteria}
+              onRecordAnswer={practice.recordAnswer}
+              onUpdateTranscription={practice.updateTranscription}
+              onSaveRatings={practice.saveRatings}
+              onNext={practice.nextQuestion}
+              onSkip={practice.skipQuestion}
+              onFinish={practice.completeSession}
+            />
+          )}
 
-        {practice.phase === "reviewing" && (
-          <ReviewingPhase
-            blocks={blocks}
-            session={practice.currentSession}
-            criteria={practice.criteria}
-            currentIndex={practice.currentReviewIndex}
-            onSaveRatings={practice.saveRatings}
-            onNext={practice.nextReview}
-            onComplete={practice.completeSession}
-          />
-        )}
-
-        {practice.phase === "summary" && (
-          <SummaryPhase
-            session={practice.currentSession}
-            criteria={practice.criteria}
-            blocks={blocks}
-            onDone={handleClose}
-            onPracticeMore={async () => {
-              await practice.startNewSession();
-            }}
-          />
-        )}
-      </div>
+          {practice.phase === "summary" && (
+            <SummaryPhase
+              session={practice.currentSession}
+              criteria={practice.criteria}
+              blocks={blocks}
+              practiceQueue={practice.practiceQueue}
+              onDone={handleClose}
+              onPracticeMore={async () => {
+                await practice.startNewSession();
+              }}
+            />
+          )}
+        </div>
+      </main>
     </div>
   );
 }
