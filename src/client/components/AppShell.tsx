@@ -24,7 +24,7 @@ function AppShellContent() {
       {/* Main content area */}
       <div className="flex flex-col h-screen overflow-hidden">
         {/* Navbar */}
-        <div className="navbar bg-base-100 border-b border-base-300 px-4 min-h-14 flex-shrink-0">
+        <div className="navbar pt-safe bg-base-100 border-b border-base-300 px-4 min-h-14 flex-shrink-0">
           <div className="flex-1">
             <div className="flex items-center gap-2">
               <span className="font-semibold text-base-content">Graham</span>
