@@ -1,6 +1,6 @@
 # Graham - Refine your answers
 
-As I build my business, I'm constantly fielding similar questions. Graham is for refining the answers to questions. One great example: helping your team to perfect your application to YCombinator.
+I'm constantly fielding similar questions. Graham is for refining the answers to questions. One great example: helping your team to perfect your application to YCombinator.
 
 Features:
 
@@ -8,7 +8,9 @@ Features:
 - 🤪 Create pages for your pitch to investors, customers, or friends and family.
 - ✨ AI Review with customizable prompts
 - 🎤 Practice mode: answer questions verbally, get transcriptions, and self-rate your performance
+    - Mobile friendly ✅
 - 👫 Share pages for real-time multiplayer editing
+- 🔒 Authentication & User Management via [Every App](https://github.com/every-app/every-app)
 
 ### Customizable AI Review
 
