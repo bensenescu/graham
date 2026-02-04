@@ -1,16 +1,30 @@
 # Graham - Refine your answers
 
-As I build my business, I'm constantly answering similar questions over and over. Graham is for refining answers to questions.
-
-It's also great for you and your team to perfect you application to YCombinator.
+As I build my business, I'm constantly fielding similar questions. Graham is for refining the answers to questions. One great example: helping your team to perfect your application to YCombinator.
 
 Features:
 
-- Use off the shelf templates like the YCombinator Application questions
-- Create pages for your pitch to investors, customers or friends and family.
-- Customize prompts for AI to help you improve your answers
-- Practice mode: record yourself answering questions verbally, get transcriptions, and self-rate your performance
-- Share pages with collaborators for real-time multiplayer editing
+- 📔 Use templates like the YC App questions.
+- 🤪 Create pages for your pitch to investors, customers, or friends and family.
+- ✨ AI Review with customizable prompts
+- 🎤 Practice mode: answer questions verbally, get transcriptions, and self-rate your performance
+- 👫 Share pages for real-time multiplayer editing
+
+## Run Locally (Demo)
+If you want to get a SaaS like experience, self host Graham on Cloudflare following the instructions below. But, if you don't have a Cloudflare account and just want to test it out, run it locally with these steps.
+
+```sh
+git clone https://github.com/bensenescu/graham.git
+cd graham
+pnpm i
+DEMO_MODE_LOCAL_ONLY=true pnpm run dev
+```
+
+If you want use AI features, create a .env.local with these values:
+```
+VITE_APP_ID=graham
+OPENAI_API_KEY=your-key
+```
 
 ## Self Hosting
 
@@ -23,7 +37,7 @@ cd graham
 npx everyapp app deploy
 ```
 
-3. Add your OPENAI_API_KEY:
+3. Add your OPENAI_API_KEY (other providers should be easy to add if you want to contribute a PR!):
 
 ```sh
 npx wrangler secret put OPENAI_API_KEY
@@ -33,19 +47,15 @@ npx wrangler secret put OPENAI_API_KEY
 
 Graham was built as part of my larger project: [Every App](https://github.com/every-app/every-app). Every App hoists common logic out of individual apps like auth and user management so that each app doesn't need to reinvent the wheel.
 
-The goal is to foster an open source ecosystem of apps and make it more accessible to people who aren't already self hosting software themselves.
+The goal is to foster an open source ecosystem of apps and make them more accessible to people who aren't already self hosting software themselves.
 
 Every App apps are self hosted on Cloudflare so there is a little bit of initial setup, but then self hosting more apps is as simple as the `npx everyapp app deploy` above.
 
-1. Install [Node.js](https://nodejs.org/)
-
-   This also installs `npx`, a tool that runs Node packages without installing them globally. You'll see `npx` commands throughout these docs.
-
-2. Make a Cloudflare Account (No credit card needed) - https://dash.cloudflare.com/sign-up
+1. Make a Cloudflare Account (No credit card needed) - https://dash.cloudflare.com/sign-up
 
    Skip any Cloudflare onboarding like configuring a domain, this is unnecessary for Every App.
 
-3. Authenticate with Cloudflare (choose one):
+2. Authenticate with Cloudflare (choose one):
    - Login via the [Cloudflare CLI](https://developers.cloudflare.com/workers/wrangler/commands/#login) (recommended):
      ```bash
      npx wrangler login
@@ -66,5 +76,5 @@ Every App apps are self hosted on Cloudflare so there is a little bit of initial
 
 ### Run locally
 
-`pnpm dev`
+`pnpm run dev`
 
