@@ -10,21 +10,21 @@ Features:
 - 🎤 Practice mode: answer questions verbally, get transcriptions, and self-rate your performance
 - 👫 Share pages for real-time multiplayer editing
 
+### Customizable AI Review
+
+<img width="1724" alt="Customizable AI Review" src="https://github.com/user-attachments/assets/d11bb5e9-6d83-4a61-b907-7db5eb15c2af" />
+
 ### Collaborate with your teammates
 
 ![Collaborate with your teammates](https://github.com/user-attachments/assets/6c52b61e-050e-45b6-9468-250dfd84b6aa)
 
 ### Practice your answers
 
-<img width="645" alt="Practice your answers" src="https://github.com/user-attachments/assets/9785c711-b0d2-49b9-abe6-eff8ec419e17" />
-
-### Customizable AI Review
-
-<img width="1724" alt="Customizable AI Review" src="https://github.com/user-attachments/assets/d11bb5e9-6d83-4a61-b907-7db5eb15c2af" />
+<img width="1722" alt="Practice your answers" src="https://github.com/user-attachments/assets/1c49586a-f239-44fc-acd7-f22814093cf0" />
 
 ## Run Locally (Demo)
 
-If you want to get a SaaS like experience, self host Graham on Cloudflare following the instructions below. But, if you don't have a Cloudflare account and just want to test it out, run it locally with these steps.
+If you don't have a Cloudflare account and just want to test it out, run it locally with these steps:
 
 ```sh
 git clone https://github.com/bensenescu/graham.git
@@ -42,7 +42,7 @@ OPENAI_API_KEY=your-key
 
 ## Self Hosting
 
-1. Complete below prerequisites
+1. Complete [Prerequisites](#prerequisites)
 2. Run these commands:
 
 ```sh
