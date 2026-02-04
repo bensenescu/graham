@@ -10,7 +10,20 @@ Features:
 - 🎤 Practice mode: answer questions verbally, get transcriptions, and self-rate your performance
 - 👫 Share pages for real-time multiplayer editing
 
+### Collaborate with your teammates
+
+![Collaborate with your teammates](https://github.com/user-attachments/assets/6c52b61e-050e-45b6-9468-250dfd84b6aa)
+
+### Practice your answers
+
+<img width="645" alt="Practice your answers" src="https://github.com/user-attachments/assets/9785c711-b0d2-49b9-abe6-eff8ec419e17" />
+
+### Customizable AI Review
+
+<img width="1724" alt="Customizable AI Review" src="https://github.com/user-attachments/assets/d11bb5e9-6d83-4a61-b907-7db5eb15c2af" />
+
 ## Run Locally (Demo)
+
 If you want to get a SaaS like experience, self host Graham on Cloudflare following the instructions below. But, if you don't have a Cloudflare account and just want to test it out, run it locally with these steps.
 
 ```sh
@@ -21,6 +34,7 @@ DEMO_MODE_LOCAL_ONLY=true pnpm run dev
 ```
 
 If you want use AI features, create a .env.local with these values:
+
 ```
 VITE_APP_ID=graham
 OPENAI_API_KEY=your-key
@@ -61,7 +75,7 @@ Every App apps are self hosted on Cloudflare so there is a little bit of initial
      npx wrangler login
      ```
    - Or set the `CLOUDFLARE_API_TOKEN` environment variable
-4. Self host the Every App Gateway
+3. Self host the Every App Gateway
    - `npx everyapp gateway deploy`
    - Follow the link this returns to create your account in the Gateway.
 
@@ -77,4 +91,3 @@ Every App apps are self hosted on Cloudflare so there is a little bit of initial
 ### Run locally
 
 `pnpm run dev`
-
