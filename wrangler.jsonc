@@ -42,11 +42,11 @@
   "migrations": [
     {
       "tag": "v1",
-      "new_classes": ["SimpleCollabDO"],
+      "new_sqlite_classes": ["SimpleCollabDO"],
     },
     {
       "tag": "v2",
-      "new_classes": ["PageCollabDO"],
+      "new_sqlite_classes": ["PageCollabDO"],
     },
   ],
 }
