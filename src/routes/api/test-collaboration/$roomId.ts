@@ -4,6 +4,8 @@ import { proxyWebsocketRequest } from "../helpers/-websocketProxy";
 import { z } from "zod";
 import { errorResponse } from "../helpers/apiResponses";
 
+const roomIdSchema = z.string().min(1).max(128);
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export const Route = createFileRoute("/api/test-collaboration/$roomId" as any)({
   server: {
@@ -16,7 +18,7 @@ export const Route = createFileRoute("/api/test-collaboration/$roomId" as any)({
         params: { roomId: string };
       }) => {
         const { roomId } = params;
-        const roomIdResult = z.string().uuid().safeParse(roomId);
+        const roomIdResult = roomIdSchema.safeParse(roomId);
         if (!roomIdResult.success) {
           return errorResponse({
             error: "Invalid roomId",
@@ -30,11 +32,7 @@ export const Route = createFileRoute("/api/test-collaboration/$roomId" as any)({
           doNamespace: env.SIMPLE_COLLAB_DO,
           logTag: "api/test-collaboration",
           logContext: { roomId },
-          checkAccess: async (userId: string) => {
-            if (roomId !== userId) {
-              throw new Error("Not authorized for this room");
-            }
-          },
+          // No checkAccess — any authenticated user can join any test room
         });
       },
     },
