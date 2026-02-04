@@ -9,6 +9,14 @@ export default defineConfig({
   server: {
     port: 3001,
   },
+  define: {
+    "import.meta.env.VITE_DEMO_MODE_LOCAL_ONLY": JSON.stringify(
+      process.env.DEMO_MODE_LOCAL_ONLY ?? "false",
+    ),
+    ...(process.env.DEMO_MODE_LOCAL_ONLY === "true" && {
+      "import.meta.env.VITE_APP_ID": JSON.stringify("graham"),
+    }),
+  },
   plugins: [
     cloudflare({ viteEnvironment: { name: "ssr" } }),
     tsConfigPaths(),
